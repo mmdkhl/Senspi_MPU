@@ -1,0 +1,4 @@
+numpy>=1.25
+RPi.GPIO
+smbus2
+PyYAML

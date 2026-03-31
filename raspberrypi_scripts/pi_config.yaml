@@ -1,0 +1,19 @@
+# GENERATED FILE - DO NOT EDIT BY HAND
+# This file is derived from SamplingConfig and PiLoggerConfig.
+
+device_rate_hz: 200.0
+record_decimate: 1
+stream_decimate: 1
+generated: GENERATED FILE - DO NOT EDIT BY HAND
+mpu6050:
+  output_dir: /home/pi/logs/mpu
+  sample_rate_hz: 200
+  record_decimate: 1
+  stream_every: 1
+  channels: default
+  dlpf: 3
+  include_temperature: false
+  sensors:
+  - 1
+  - 2
+  - 3

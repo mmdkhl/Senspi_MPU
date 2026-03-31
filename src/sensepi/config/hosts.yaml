@@ -1,0 +1,9 @@
+pis:
+- name: ExamplePi
+  host: 192.168.0.100
+  user: pi
+  password: change-me
+  base_path: /home/pi/sensor
+  data_dir: /home/pi/logs
+  pi_config_path: /home/pi/sensor/pi_config.yaml
+  port: 22

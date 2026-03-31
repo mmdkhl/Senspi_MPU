@@ -1,0 +1,8 @@
+sampling:
+  device_rate_hz: 100.0
+  mode: high_fidelity
+sensors:
+  mpu6050:
+    channels: default
+    dlpf: 3
+    include_temperature: false

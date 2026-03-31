@@ -1,0 +1,10 @@
+PySide6>=6.6
+numpy>=1.25
+scipy>=1.11
+matplotlib>=3.8
+paramiko>=3.3
+PyYAML>=6.0
+psutil>=5.9
+pyqtgraph>=0.13
+# Optional for the Digital Twin tab:
+# openseespy>=3.7

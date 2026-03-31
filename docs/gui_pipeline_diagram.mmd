@@ -1,0 +1,51 @@
+flowchart TB
+    main["main.py"]
+    app["sensepi.gui.application<br/>create_app() / main()"]
+    window["MainWindow"]
+
+    settings["SettingsTab"]
+    signals["SignalsTab"]
+    fft["FftTab"]
+    dtwin["DigitalTwinTab"]
+    sonify["SonificationTab"]
+
+    controller["RecorderController"]
+    buffer["StreamingDataBuffer"]
+    pirec["PiRecorder"]
+    ingest["SensorIngestWorker<br/>(QThread)"]
+    pi["Raspberry Pi logger<br/>mpu6050_multi_logger.py"]
+
+    opensees["sensepi.opensees<br/>runner / models"]
+    sonify_backend["sensepi.sonification.structural<br/>offline WAV export"]
+
+    main -->|"launch"| app
+    app -->|"build GUI"| window
+
+    window --> settings
+    window --> signals
+    window --> fft
+    window --> dtwin
+    window --> sonify
+    window -->|"owns"| controller
+
+    controller -->|"updates"| buffer
+    controller -->|"start / stop"| pirec
+    pirec -->|"SSH / run remote logger"| pi
+    pi -->|"JSON stdout stream"| ingest
+    ingest -->|"parsed samples"| controller
+
+    buffer -->|"live traces"| signals
+    buffer -->|"FFT input"| fft
+    fft -->|"measured frequency estimates"| dtwin
+    dtwin -->|"run model"| opensees
+    sonify -->|"file-based sonification"| sonify_backend
+
+    classDef core fill:#dbeafe,stroke:#1d4ed8,stroke-width:1.5px,color:#111827;
+    classDef tab fill:#dcfce7,stroke:#15803d,stroke-width:1.5px,color:#111827;
+    classDef runtime fill:#fef3c7,stroke:#b45309,stroke-width:1.5px,color:#111827;
+    classDef backend fill:#f3e8ff,stroke:#7e22ce,stroke-width:1.5px,color:#111827;
+
+    class main,app,window,controller core;
+    class settings,signals,fft,dtwin,sonify tab;
+    class buffer,pirec,ingest,pi runtime;
+    class opensees,sonify_backend backend;

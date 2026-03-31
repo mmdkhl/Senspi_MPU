@@ -1,0 +1,53 @@
+# Virtualenv
+.venv/
+venv/
+env/
+.python-version
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs & data (keep folders, ignore contents)
+logs/*
+!logs/.gitkeep
+
+data/*
+!data/.gitkeep
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+DigitalTwin OpenSees/__MACOSX/
+DigitalTwin OpenSees/DigitalTwin OpenSees/.DS_Store
+DigitalTwin OpenSees/DigitalTwin OpenSees/output/*.out
+DigitalTwin OpenSees/DigitalTwin OpenSees/output/gui_*/
+
+# OS / editor junk
+.DS_Store
+._*
+__MACOSX/
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# AI / scratch
+.ai/
+
+# Build / packaging
+*.egg-info/
+.dist/
+.eggs/
+build/
+dist/
+python-*.exe
+python-*.msi
+
+# Local secrets / machine-specific overrides
+src/sensepi/config/hosts.local.yaml
+deploy_pi.local.bat
+.env
+.env.*
