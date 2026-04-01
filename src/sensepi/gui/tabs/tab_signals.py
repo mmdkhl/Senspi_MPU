@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QSpinBox,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -1163,6 +1164,16 @@ class SignalsTab(QWidget):
         self.record_only_check.setToolTip(
             "When enabled, data is recorded on the Pi but not streamed live to this GUI."
         )
+        self.limit_duration_check = QCheckBox("Stop after", top_row_group)
+        self.limit_duration_check.setToolTip(
+            "Automatically stop after the selected recording duration."
+        )
+        self.duration_spin = QSpinBox(top_row_group)
+        self.duration_spin.setRange(1, 120)
+        self.duration_spin.setSingleStep(1)
+        self.duration_spin.setValue(20)
+        self.duration_spin.setSuffix(" s")
+        self.duration_spin.setEnabled(False)
         self._session_name_edit = QLineEdit(top_row_group)
         self._session_name_edit.setPlaceholderText("Session name (optional)")
         self._session_name_edit.setClearButtonEnabled(True)
@@ -1195,9 +1206,12 @@ class SignalsTab(QWidget):
         self.start_button.clicked.connect(self._on_start_clicked)
         self.stop_button.clicked.connect(self._on_stop_clicked)
         self.record_only_check.stateChanged.connect(self._on_record_only_toggled)
+        self.limit_duration_check.toggled.connect(self.duration_spin.setEnabled)
         self.sync_logs_button.clicked.connect(self._on_sync_logs_clicked)
 
         top_row.addWidget(self.record_only_check)
+        top_row.addWidget(self.limit_duration_check)
+        top_row.addWidget(self.duration_spin)
         top_row.addWidget(QLabel("Session:", top_row_group))
         top_row.addWidget(self._session_name_edit)
         top_row.addWidget(self.start_button)
@@ -1346,6 +1360,16 @@ class SignalsTab(QWidget):
 
         return self.session_name()
 
+    def duration_limit_enabled(self) -> bool:
+        if not hasattr(self, "limit_duration_check"):
+            return False
+        return bool(self.limit_duration_check.isChecked())
+
+    def duration_limit_seconds(self) -> int:
+        if not hasattr(self, "duration_spin"):
+            return 20
+        return int(self.duration_spin.value())
+
     def calibrate_from_buffer(self, window_s: float | None = None) -> None:
         self._plot.calibrate_from_buffer(window_s=window_s)
 
@@ -1482,6 +1506,8 @@ class SignalsTab(QWidget):
             sampling=acq.sampling,
             stream_rate_hz=acq.stream_rate_hz,
             record_only=self._get_record_only_checked(),
+            limit_duration=self.duration_limit_enabled(),
+            duration_s=float(self.duration_limit_seconds()),
             sensor_selection=sel,
         )
         self._current_gui_acquisition_config = cfg

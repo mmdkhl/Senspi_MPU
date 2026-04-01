@@ -110,6 +110,8 @@ class GuiAcquisitionConfig:
     sampling: SamplingConfig
     stream_rate_hz: float
     record_only: bool = False
+    limit_duration: bool = False
+    duration_s: float = 0.0
     sensor_selection: SensorSelectionConfig = field(
         default_factory=SensorSelectionConfig
     )
@@ -125,6 +127,8 @@ class GuiAcquisitionConfig:
             f"sampling={self.sampling!r}, "
             f"stream={self.stream_rate_hz:.2f} Hz, "
             f"record_only={self.record_only}, "
+            f"limit_duration={self.limit_duration}, "
+            f"duration_s={self.duration_s:.1f}, "
             f"{selection_summary}"
         )
 
@@ -142,6 +146,9 @@ class GuiAcquisitionConfig:
 
         if not self.record_only and self.stream_rate_hz == 0:
             raise ValueError("stream_rate_hz is 0.0 but record_only is False")
+
+        if self.limit_duration and self.duration_s <= 0:
+            raise ValueError("duration_s must be > 0 when limit_duration is enabled")
 
         if not self.sensor_selection.active_sensors:
             raise ValueError("No active sensors configured in sensor_selection")
@@ -162,6 +169,8 @@ class GuiAcquisitionConfig:
             ),
             "stream_rate_hz": self.stream_rate_hz,
             "record_only": self.record_only,
+            "limit_duration": self.limit_duration,
+            "duration_s": self.duration_s,
             "sensor_selection": self.sensor_selection.to_dict(),
             "calibration": self.calibration.to_dict() if self.calibration else None,
         }
@@ -178,6 +187,8 @@ class GuiAcquisitionConfig:
             sampling=sampling,
             stream_rate_hz=float(data["stream_rate_hz"]),
             record_only=bool(data.get("record_only", False)),
+            limit_duration=bool(data.get("limit_duration", False)),
+            duration_s=float(data.get("duration_s", 0.0)),
             sensor_selection=SensorSelectionConfig.from_dict(
                 data.get("sensor_selection", {})
             ),

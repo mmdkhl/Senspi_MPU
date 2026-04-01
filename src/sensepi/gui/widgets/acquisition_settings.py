@@ -255,6 +255,8 @@ class AcquisitionSettingsWidget(QWidget):
             sampling=settings.sampling,
             stream_rate_hz=settings.stream_rate_hz,
             record_only=settings.record_only,
+            limit_duration=False,
+            duration_s=0.0,
             sensor_selection=sensor_selection,
         )
 

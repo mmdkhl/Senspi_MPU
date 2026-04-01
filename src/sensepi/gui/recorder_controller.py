@@ -78,6 +78,7 @@ class RecorderController(QObject):
         self._ingest_max_latency_ms = 100
         self._ingest_had_error = False
         self._last_session_name: str = ""
+        self._expected_remote_end: bool = False
 
         decimation = self._sampling_config.compute_decimation()
         self._data_buffer = StreamingDataBuffer(
@@ -195,6 +196,7 @@ class RecorderController(QObject):
         record_only = bool(gui_config.record_only)
         self._recording_mode = bool(recording_enabled or record_only)
         self._current_sensor_selection = gui_config.sensor_selection
+        self._expected_remote_end = bool(gui_config.limit_duration and gui_config.duration_s > 0)
 
         self._apply_sampling_config(gui_config.sampling, notify=True)
         self._last_session_name = session_name or (
@@ -206,6 +208,9 @@ class RecorderController(QObject):
 
         if session_name:
             extra_cli["session_name"] = session_name
+
+        if gui_config.limit_duration and gui_config.duration_s > 0:
+            extra_cli["duration"] = max(1, min(120, int(round(gui_config.duration_s))))
 
         if sel.active_sensors:
             extra_cli["sensors"] = ",".join(str(s) for s in sel.active_sensors)
@@ -264,6 +269,9 @@ class RecorderController(QObject):
                     self._pi_recorder.close()
                 except Exception:
                     logger.exception("Failed to close recorder")
+            self.streaming_stopped.emit()
+            self.stream_stopped.emit()
+            self.recording_stopped.emit()
 
     # --------------------------------------------------------------- start helpers
     def _create_streaming_buffer(
@@ -419,9 +427,14 @@ class RecorderController(QObject):
 
     @Slot()
     def _on_ingest_finished(self) -> None:
-        if not self._stop_requested and not self._ingest_had_error:
+        if (
+            not self._stop_requested
+            and not self._ingest_had_error
+            and not self._expected_remote_end
+        ):
             self._emit_error("Live stream stopped unexpectedly (no stop request)")
         self._stop_requested = False
+        self._expected_remote_end = False
         self._ingest_worker = None
         self._ingest_thread = None
         self.streaming_stopped.emit()
@@ -444,4 +457,3 @@ class RecorderController(QObject):
 
     def last_session_name(self) -> str:
         return self._last_session_name
-

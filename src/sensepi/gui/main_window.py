@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QObject, QThread, Signal, Slot
+from PySide6.QtCore import QObject, QThread, Signal, Slot, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget, QVBoxLayout, QWidget
 
@@ -61,6 +61,8 @@ class MainWindow(QMainWindow):
         self._current_host: dict | None = None
         self._log_sync_thread: QThread | None = None
         self._log_sync_worker: _LogSyncTask | None = None
+        self._auto_stop_timer = QTimer(self)
+        self._auto_stop_timer.setSingleShot(True)
 
         self._build_tabs()
         self._wire_signals()
@@ -117,6 +119,9 @@ class MainWindow(QMainWindow):
         self.recorder_tab.stream_stopped.connect(self.signals_tab.on_stream_stopped)
         self.recorder_tab.stream_started.connect(self.fft_tab.on_stream_started)
         self.recorder_tab.stream_stopped.connect(self.fft_tab.on_stream_stopped)
+        self.recorder_tab.stream_stopped.connect(self._cancel_auto_stop_timer)
+        self.recorder_tab.recording_stopped.connect(self._cancel_auto_stop_timer)
+        self._auto_stop_timer.timeout.connect(self._on_auto_stop_timeout)
         # SettingsTab is the canonical source of sensor / channel selection.
         self.settings_tab.sensorSelectionChanged.connect(
             self._on_sensor_selection_changed
@@ -171,6 +176,8 @@ class MainWindow(QMainWindow):
             getattr(self.signals_tab, "record_only_check", None)
             and self.signals_tab.record_only_check.isChecked()
         )
+        gui_cfg.limit_duration = self.signals_tab.duration_limit_enabled()
+        gui_cfg.duration_s = float(self.signals_tab.duration_limit_seconds())
 
         gui_cfg.calibration = self._current_calibration_offsets
         self._current_gui_acquisition_config = gui_cfg
@@ -218,13 +225,31 @@ class MainWindow(QMainWindow):
             host_cfg=host_cfg,
             session_name=session_name,
         )
+        self._arm_auto_stop_timer(gui_cfg)
 
     @Slot()
     def _on_stop_stream_requested(self) -> None:
         if getattr(self.recorder_tab, "_recording_mode", False):
             self._log_recording_calibration("stopping")
+        self._cancel_auto_stop_timer()
         # Ensure the ingest worker thread has fully stopped before allowing a new Start.
         self.recorder_tab.stop_live_stream(wait=True)
+
+    @Slot()
+    def _on_auto_stop_timeout(self) -> None:
+        self.recorder_tab.stop_live_stream(wait=True)
+
+    @Slot()
+    def _cancel_auto_stop_timer(self) -> None:
+        if self._auto_stop_timer.isActive():
+            self._auto_stop_timer.stop()
+
+    def _arm_auto_stop_timer(self, cfg: GuiAcquisitionConfig) -> None:
+        self._cancel_auto_stop_timer()
+        if not cfg.limit_duration:
+            return
+        duration_s = max(1.0, min(120.0, float(cfg.duration_s)))
+        self._auto_stop_timer.start(int(duration_s * 1000))
 
     @Slot()
     def _on_sync_logs_requested(self) -> None:
