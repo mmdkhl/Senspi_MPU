@@ -36,6 +36,7 @@ Thumbs.db
 
 # AI / scratch
 .ai/
+.claude/
 
 # Build / packaging
 *.egg-info/
