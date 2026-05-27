@@ -6,7 +6,7 @@ flowchart TB
     settings["SettingsTab"]
     signals["SignalsTab"]
     fft["FftTab"]
-    dtwin["DigitalTwinTab"]
+    modelupdating["ModelUpdatingTab"]
     sonify["SonificationTab"]
 
     controller["RecorderController"]
@@ -15,7 +15,7 @@ flowchart TB
     ingest["SensorIngestWorker<br/>(QThread)"]
     pi["Raspberry Pi logger<br/>mpu6050_multi_logger.py"]
 
-    opensees["sensepi.opensees<br/>runner / models"]
+    opensees_project["opensees-model-updating<br/>OpenSeesPy modules"]
     sonify_backend["sensepi.sonification.structural<br/>offline WAV export"]
 
     main -->|"launch"| app
@@ -24,7 +24,7 @@ flowchart TB
     window --> settings
     window --> signals
     window --> fft
-    window --> dtwin
+    window --> modelupdating
     window --> sonify
     window -->|"owns"| controller
 
@@ -36,8 +36,7 @@ flowchart TB
 
     buffer -->|"live traces"| signals
     buffer -->|"FFT input"| fft
-    fft -->|"measured frequency estimates"| dtwin
-    dtwin -->|"run model"| opensees
+    modelupdating -->|"run calibration / analysis"| opensees_project
     sonify -->|"file-based sonification"| sonify_backend
 
     classDef core fill:#dbeafe,stroke:#1d4ed8,stroke-width:1.5px,color:#111827;
@@ -46,6 +45,6 @@ flowchart TB
     classDef backend fill:#f3e8ff,stroke:#7e22ce,stroke-width:1.5px,color:#111827;
 
     class main,app,window,controller core;
-    class settings,signals,fft,dtwin,sonify tab;
+    class settings,signals,fft,modelupdating,sonify tab;
     class buffer,pirec,ingest,pi runtime;
-    class opensees,sonify_backend backend;
+    class opensees_project,sonify_backend backend;

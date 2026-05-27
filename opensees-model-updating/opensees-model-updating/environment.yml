@@ -1,0 +1,13 @@
+name: opensees
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - openseespy>=3.4.0
+      - numpy>=1.20
+      - scipy>=1.7
+      - matplotlib>=3.3
+      - opsvis>=1.0

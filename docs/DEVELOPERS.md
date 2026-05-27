@@ -27,12 +27,6 @@ python -m sensepi.gui.application
 sensepi-gui
 ```
 
-To enable the `Digital Twin` tab:
-
-```bash
-pip install -e ".[digital-twin]"
-```
-
 Run unit tests:
 
 ```bash
@@ -80,10 +74,11 @@ The GUI treats the desktop config as the source of truth.
 ## 4) Runtime architecture (end-to-end)
 
 ### Tabs in the current GUI
-The main window builds three tabs:
+The main window builds these tabs:
 - **Live Signals** (`src/sensepi/gui/tabs/tab_signals.py`)
 - **Spectrum / FFT** (`src/sensepi/gui/tabs/tab_fft.py`)
-- **Digital Twin** (`src/sensepi/gui/tabs/tab_digital_twin.py`)
+- **Model Updating** (`src/sensepi/gui/tabs/tab_model_updating.py`)
+- **Sonification** (`src/sensepi/gui/tabs/tab_sonification.py`)
 - **Settings** (`src/sensepi/gui/tabs/tab_settings.py`)
 
 ### The “controller” layer

@@ -46,12 +46,6 @@ pip install -e .
 sensepi-gui
 ```
 
-If you want to use the **Digital Twin** tab, install the optional OpenSees dependency:
-
-```bat
-pip install ".[digital-twin]"
-```
-
 ---
 
 ## Configure your Raspberry Pi in the GUI
@@ -131,13 +125,21 @@ sudo raspi-config
 6. Click **Stop** when done
 7. Click **Sync logs** to download new logs to your PC
 
-The GUI also includes a **Digital Twin** tab for running an OpenSeesPy structural model from inside the app. It can:
-- load a ground-motion text file
-- run modal + transient analysis
-- write OpenSees-style output files
-- plot roof displacement / acceleration directly in the GUI
+The **Model Updating** tab provides native PySide controls for the bundled OpenSees model-updating project in:
 
-If `openseespy` is not installed, the tab stays visible but shows a dependency warning when you try to run it.
+```text
+opensees-model-updating/opensees-model-updating
+```
+
+Use a Python environment that has `openseespy`, `numpy`, `scipy`, `matplotlib`, and `opsvis` installed. The tab reuses the bundled OpenSees computational modules for modal analysis, calibration, reporting, and transient analysis.
+
+If SensePi is installed as an editable package, the OpenSees-specific packages can be installed with:
+
+```bat
+pip install -e ".[model-updating]"
+```
+
+On Windows this pins the OpenSeesPy Windows binary to a version that imports correctly with Python 3.11.
 
 ---
 

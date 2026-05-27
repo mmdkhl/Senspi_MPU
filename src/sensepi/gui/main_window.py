@@ -18,7 +18,7 @@ from .config.acquisition_state import (
 )
 from .recorder_controller import RecorderController
 from .tabs.tab_fft import FftTab
-from .tabs.tab_digital_twin import DigitalTwinTab
+from .tabs.tab_model_updating import ModelUpdatingTab
 from .tabs.tab_settings import SettingsTab
 from .tabs.tab_signals import SignalsTab
 from .tabs.tab_sonification import SonificationTab
@@ -92,12 +92,12 @@ class MainWindow(QMainWindow):
             parent=self,
             app_config=self._app_config,
         )
-        self.digital_twin_tab = DigitalTwinTab(fft_tab=self.fft_tab, parent=self)
+        self.model_updating_tab = ModelUpdatingTab(parent=self)
         self.sonification_tab = SonificationTab(parent=self)
 
         self._tabs.addTab(self.signals_tab, self.tr("Live Signals"))
         self._tabs.addTab(self.fft_tab, self.tr("Spectrum"))
-        self._tabs.addTab(self.digital_twin_tab, self.tr("Digital Twin"))
+        self._tabs.addTab(self.model_updating_tab, self.tr("Model Updating"))
         self._tabs.addTab(self.sonification_tab, self.tr("Sonification"))
         self._tabs.addTab(self.settings_tab, self.tr("Settings"))
 
