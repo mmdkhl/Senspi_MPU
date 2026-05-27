@@ -9,7 +9,7 @@ from queue import Empty, Full, Queue
 
 import numpy as np
 
-from decimation import DecimationConfig, Decimator
+from .decimation import DecimationConfig, Decimator
 
 __all__ = [
     "SampleSink",
