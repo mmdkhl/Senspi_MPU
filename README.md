@@ -30,20 +30,19 @@ From the project root:
 python -m venv .venv
 .venv\Scripts\activate
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -e .
 ```
 
 Run the GUI:
 
 ```bat
-python -m sensepi.gui.application
+sensepi-gui
 ```
 
-Optional: install as an editable package (lets you run `sensepi-gui`):
+Alternative: run directly from the project root:
 
 ```bat
-pip install -e .
-sensepi-gui
+python main.py
 ```
 
 ---
