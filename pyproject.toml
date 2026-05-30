@@ -30,6 +30,8 @@ model-updating = [
 [project.scripts]
 sensepi-gui = "sensepi.gui.application:main"
 sensepi-sonify = "sensepi.sonification.cli:main"
+opensees-calibrate = "opensees_model_updating.cli.main:main"
+opensees-gui = "opensees_model_updating.__main__:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
