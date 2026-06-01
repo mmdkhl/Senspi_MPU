@@ -256,6 +256,170 @@ def run_transient_analysis_collect_data(params, modal_data, show_info=False, rec
     }
 
 
+def run_transient_analysis_stream(
+    params,
+    modal_data,
+    show_info=False,
+    recorder_prefix="",
+    frame_callback=None,
+    plot_every=10,
+    anim_every=10,
+    realtime=True,
+    sfac_anim=20.0,
+):
+    """
+    Run transient analysis one OpenSees step at a time and stream frames to a GUI.
+
+    This is the PySide6-friendly version of the older live visualization
+    workflow from DigitalTwin_V8.py. It does not create its own Matplotlib
+    window. Instead, every few time steps it calls ``frame_callback(frame)``
+    with roof response arrays and deformed 3D line segments.
+
+    If ``realtime`` is True, the loop is deliberately slowed so that a
+    20-second ground-motion file takes about 20 seconds to play in the GUI.
+
+    Parameters
+    ----------
+    params : dict
+        Model and analysis parameters. Must contain gmFile, dtGM, zeta,
+        numModes, etc.
+    modal_data : dict
+        Output from extract_modal_results(). The OpenSees model corresponding
+        to this modal_data must still be in memory.
+    show_info : bool
+        Print progress to console.
+    recorder_prefix : str
+        Prefix for recorder output files.
+    frame_callback : callable or None
+        Function receiving dictionaries with keys ``kind``, ``time``,
+        ``t_hist``, ``u_hist``, ``a_hist`` and ``deformed_segments``.
+    plot_every : int
+        Emit roof response updates every this many OpenSees steps.
+    anim_every : int
+        Update 3D deformed geometry every this many OpenSees steps.
+    realtime : bool
+        If True, sleep between steps so wall-clock time follows analysis time.
+    sfac_anim : float
+        Deformation scale factor for the 3D animation.
+
+    Returns
+    -------
+    dict
+        Same structure as run_transient_analysis_collect_data():
+        ``t_hist``, ``u_hist`` and ``a_hist`` as NumPy arrays.
+    """
+    ctx = modal_data["ctx"]
+    zeta = params["zeta"]
+    gmFile = params["gmFile"]
+    dtGM = params["dtGM"]
+
+    plot_every = max(1, int(plot_every))
+    anim_every = max(1, int(anim_every))
+    emit_every = max(1, min(plot_every, anim_every))
+
+    alphaM, betaKinit = set_rayleigh_damping_from_modal(modal_data, zeta, params["numModes"])
+
+    if show_info:
+        print("Rayleigh damping:")
+        print("alphaM    =", alphaM)
+        print("betaKinit =", betaKinit)
+
+    setup_dynamic_excitation(params)
+    roof_master = setup_recorders(ctx, prefix=recorder_prefix)
+
+    ops.wipeAnalysis()
+    ops.constraints('Transformation')
+    ops.numberer('RCM')
+    ops.system('BandGeneral')
+    ops.test('NormDispIncr', 1.0e-10, 100, 0)
+    ops.algorithm('Newton')
+    ops.integrator('Newmark', 0.5, 0.25)
+    ops.analysis('Transient')
+
+    with open(gmFile, 'r', encoding="utf-8") as f:
+        npts = sum(1 for line in f if line.strip())
+
+    if npts < 2:
+        raise ValueError("Ground motion file must contain at least 2 acceleration points.")
+
+    nSteps = npts - 1
+    tmax = nSteps * dtGM
+    vis_elems = list(ctx.get("vis_elems", []))
+
+    t_hist = []
+    u_hist = []
+    a_hist = []
+    ok = 0
+
+    def _deformed_segments():
+        segments = []
+        for n1, n2 in vis_elems:
+            x1, y1, z1 = get_deformed_xyz(n1, sfac_anim)
+            x2, y2, z2 = get_deformed_xyz(n2, sfac_anim)
+            segments.append(((float(x1), float(y1), float(z1)), (float(x2), float(y2), float(z2))))
+        return segments
+
+    def _emit_frame(kind="frame"):
+        if frame_callback is None:
+            return
+        frame_callback({
+            "kind": kind,
+            "time": float(ops.getTime()),
+            "tmax": float(tmax),
+            "t_hist": np.asarray(t_hist, dtype=float),
+            "u_hist": np.asarray(u_hist, dtype=float),
+            "a_hist": np.asarray(a_hist, dtype=float),
+            "deformed_segments": _deformed_segments(),
+            "ok": int(ok),
+        })
+
+    # Send one initial, undeformed frame so the GUI can draw the model before
+    # the first dynamic step is completed.
+    _emit_frame(kind="frame")
+
+    t0_wall = time.perf_counter()
+
+    for i in range(nSteps):
+        ok = ops.analyze(1, dtGM)
+
+        if ok != 0:
+            print(f"Transient analysis failed at step {i+1}, time = {ops.getTime()}")
+            break
+
+        t = ops.getTime()
+        u = ops.nodeDisp(roof_master, 1)
+        a = ops.nodeAccel(roof_master, 1)
+
+        t_hist.append(float(t))
+        u_hist.append(float(u))
+        a_hist.append(float(a))
+
+        if i % emit_every == 0:
+            _emit_frame(kind="frame")
+
+        if realtime:
+            target_wall_time = t0_wall + float(t)
+            sleep_time = target_wall_time - time.perf_counter()
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+    # Always emit one final frame, even if the final step number was not on the
+    # regular plotting interval.
+    _emit_frame(kind="final")
+
+    if ok == 0:
+        print("Transient analysis completed successfully.")
+        print("Final roof displacement X =", r3(ops.nodeDisp(roof_master, 1)), "m")
+    else:
+        print("Transient analysis failed before completion.")
+
+    return {
+        "t_hist": np.array(t_hist, dtype=float),
+        "u_hist": np.array(u_hist, dtype=float),
+        "a_hist": np.array(a_hist, dtype=float),
+    }
+
+
 def run_transient_analysis_with_visualization(params, modal_data, show_info=False, overlay_response=None):
     """
     Run transient analysis with real-time matplotlib visualization.

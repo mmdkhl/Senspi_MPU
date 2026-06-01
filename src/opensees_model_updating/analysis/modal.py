@@ -186,11 +186,11 @@ def render_mode_shapes_to_png(modal_data, title_prefix="Calibrated"):
     # meaning fonts stay readable after the _ScaledImageLabel downscales.
     if numModes <= 3:
         ncols, nrows = numModes, 1
-        figsize = (3.2 * numModes, 4.0)
+        figsize = (4.5 * numModes, 5.5)
     else:
         ncols = 2
         nrows = math.ceil(numModes / ncols)
-        figsize = (6.0, 4.0 * nrows)
+        figsize = (9.0, 5.5 * nrows)
 
     fig = Figure(figsize=figsize)
     FigureCanvasAgg(fig)
@@ -215,9 +215,58 @@ def render_mode_shapes_to_png(modal_data, title_prefix="Calibrated"):
 
     fig.tight_layout(pad=1.2)
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=140, bbox_inches="tight")
+    fig.savefig(buf, format="png", dpi=180, bbox_inches="tight")
     buf.seek(0)
     return buf.read()
+
+
+def render_mode_shapes_individually_to_png(modal_data):
+    """
+    Render each mode shape as a separate high-quality PNG.
+
+    Returns a list of bytes objects, one per mode. Must be called while the
+    OpenSees model is still in memory (same constraint as render_mode_shapes_to_png).
+
+    Parameters
+    ----------
+    modal_data : dict
+        Output from extract_modal_results().
+
+    Returns
+    -------
+    list[bytes] : one PNG per mode
+    """
+    import io
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    freqs = modal_data["freqs"]
+    periods = modal_data["periods"]
+    pngs = []
+
+    for i in range(len(freqs)):
+        mode = i + 1
+        fig = Figure(figsize=(5.0, 6.0))
+        FigureCanvasAgg(fig)
+        ax = fig.add_subplot(1, 1, 1, projection="3d")
+        opsv.plot_mode_shape(mode, ax=ax, az_el=(-70, 25))
+        ax.grid(False)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_zticks([])
+        for coll in list(ax.collections):
+            coll.remove()
+        ax.set_title(
+            f"Mode {mode}\nT={periods[i]:.4f} s   f={freqs[i]:.3f} Hz",
+            fontsize=15,
+        )
+        fig.tight_layout(pad=1.2)
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
+        buf.seek(0)
+        pngs.append(buf.read())
+
+    return pngs
 
 
 def export_modal_files(modal_data, output_prefix):

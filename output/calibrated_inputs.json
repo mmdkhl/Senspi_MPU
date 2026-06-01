@@ -8,15 +8,15 @@
     0.24
   ],
   "floor_masses": [
-    0.293,
-    0.314,
-    0.247
+    0.29,
+    0.309,
+    0.244
   ],
   "t_column": 0.001,
   "b_column": 0.006,
   "b_beam": 0.001,
   "h_beam": 0.008,
-  "E": 173255157106.461,
+  "E": 170809422411.742,
   "nu": 0.33,
   "numModes": 3,
   "zeta": 0.005,
@@ -26,7 +26,7 @@
   "show_info": 0,
   "run_transient": 1,
   "enable_calibration": 1,
-  "use_mode_shapes": 1,
+  "use_mode_shapes": 0,
   "mass_calibration_scope": "self_weight_only",
   "nCalibModes": 3,
   "freq_tol_percent": 5.0,

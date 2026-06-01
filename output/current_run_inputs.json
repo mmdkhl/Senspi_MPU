@@ -26,7 +26,7 @@
   "show_info": 0,
   "run_transient": 1,
   "enable_calibration": 1,
-  "use_mode_shapes": 1,
+  "use_mode_shapes": 0,
   "mass_calibration_scope": "self_weight_only",
   "nCalibModes": 3,
   "freq_tol_percent": 5.0,

@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 from PySide6.QtCore import QPointF, QObject, Qt, QThread, Signal, Slot
 from PySide6.QtGui import QColor, QPainter, QPen, QTextCursor
 from PySide6.QtGui import QPixmap
@@ -21,6 +23,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -67,6 +70,9 @@ class _CalibrationState:
     input_signature: str | None = None
     calibrated_params: dict[str, Any] | None = None
     uncalibrated_response: dict[str, Any] | None = None
+    prior_freqs: list[float] | None = None
+    prior_periods: list[float] | None = None
+    prior_mode_shapes: list[list[float]] | None = None
 
 
 @dataclass
@@ -269,8 +275,174 @@ class _ScaledImageLabel(QLabel):
     def _rescale(self) -> None:
         if self._raw is None or self._raw.isNull():
             return
-        scaled = self._raw.scaled(self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        dpr = self.devicePixelRatio()
+        target = self.size() * dpr
+        scaled = self._raw.scaled(target, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        scaled.setDevicePixelRatio(dpr)
         super().setPixmap(scaled)
+
+
+class _LiveResponseCanvas(FigureCanvas):
+    """Embedded Matplotlib canvas for live roof displacement/acceleration."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        self.fig = Figure(figsize=(6.6, 4.8))
+        super().__init__(self.fig)
+        self.setParent(parent)
+        self.setMinimumSize(320, 260)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+        self.ax_disp = self.fig.add_subplot(2, 1, 1)
+        self.ax_acc = self.fig.add_subplot(2, 1, 2)
+        self.line_disp, = self.ax_disp.plot([], [], color="red", linewidth=1.7, label="Calibrated")
+        self.line_acc, = self.ax_acc.plot([], [], color="red", linewidth=1.7, label="Calibrated")
+        self.overlay_disp = None
+        self.overlay_acc = None
+        self._tmax = 1.0
+        self._configure_axes()
+
+    def _configure_axes(self) -> None:
+        self.ax_disp.set_title("Roof Displacement")
+        self.ax_disp.set_xlabel("Time (s)")
+        self.ax_disp.set_ylabel("Displacement (m)")
+        self.ax_disp.grid(True, alpha=0.25)
+
+        self.ax_acc.set_title("Roof Acceleration")
+        self.ax_acc.set_xlabel("Time (s)")
+        self.ax_acc.set_ylabel("Acceleration (m/s²)")
+        self.ax_acc.grid(True, alpha=0.25)
+        self.fig.tight_layout(pad=1.6)
+
+    def initialize(self, overlay_response: dict[str, Any] | None = None, tmax: float | None = None) -> None:
+        self.ax_disp.clear()
+        self.ax_acc.clear()
+        self.line_disp, = self.ax_disp.plot([], [], color="red", linewidth=1.7, label="Calibrated")
+        self.line_acc, = self.ax_acc.plot([], [], color="red", linewidth=1.7, label="Calibrated")
+        self._tmax = float(tmax) if tmax and tmax > 0 else 1.0
+
+        if overlay_response is not None:
+            self.ax_disp.plot(
+                overlay_response["t_hist"], overlay_response["u_hist"],
+                color="black", linestyle="--", linewidth=0.9, label="Uncalibrated",
+            )
+            self.ax_acc.plot(
+                overlay_response["t_hist"], overlay_response["a_hist"],
+                color="black", linestyle="--", linewidth=0.9, label="Uncalibrated",
+            )
+            self.ax_disp.legend(loc="upper right", fontsize=9)
+            self.ax_acc.legend(loc="upper right", fontsize=9)
+
+        self._configure_axes()
+        self.ax_disp.set_xlim(0.0, self._tmax)
+        self.ax_acc.set_xlim(0.0, self._tmax)
+        self.draw_idle()
+
+    def update_frame(self, frame: dict[str, Any]) -> None:
+        t = np.asarray(frame.get("t_hist", []), dtype=float)
+        u = np.asarray(frame.get("u_hist", []), dtype=float)
+        a = np.asarray(frame.get("a_hist", []), dtype=float)
+        tmax = float(frame.get("tmax", self._tmax) or self._tmax)
+        if tmax > 0:
+            self._tmax = tmax
+
+        self.line_disp.set_data(t, u)
+        self.line_acc.set_data(t, a)
+        self.ax_disp.set_xlim(0.0, self._tmax)
+        self.ax_acc.set_xlim(0.0, self._tmax)
+
+        self.ax_disp.relim()
+        self.ax_disp.autoscale_view(scalex=False, scaley=True)
+        self.ax_acc.relim()
+        self.ax_acc.autoscale_view(scalex=False, scaley=True)
+        self.draw_idle()
+
+
+class _Live3DCanvas(FigureCanvas):
+    """Embedded Matplotlib 3D canvas for live frame deformation."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        self.fig = Figure(figsize=(5.2, 3.4))
+        super().__init__(self.fig)
+        self.setParent(parent)
+        self.setMinimumSize(300, 220)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.ax = self.fig.add_subplot(1, 1, 1, projection="3d")
+        self._defo_lines: list[Any] = []
+        self._configure_empty()
+
+    def _configure_empty(self) -> None:
+        self.ax.clear()
+        self.ax.set_title("3D Transient Response")
+        self.ax.set_xlabel("X")
+        self.ax.set_ylabel("Y")
+        self.ax.set_zlabel("Z")
+        self.ax.set_xticks([])
+        self.ax.set_yticks([])
+        self.ax.set_zticks([])
+        self.ax.grid(False)
+        self.ax.view_init(elev=25, azim=-70)
+        self.fig.tight_layout(pad=0.5)
+        self.draw_idle()
+
+    def initialize_model(self, modal_data: dict[str, Any] | None, title: str = "3D Transient Response") -> None:
+        self.ax.clear()
+        self.ax.set_title(title)
+        self.ax.set_xlabel("X")
+        self.ax.set_ylabel("Y")
+        self.ax.set_zlabel("Z")
+        self.ax.set_xticks([])
+        self.ax.set_yticks([])
+        self.ax.set_zticks([])
+        self.ax.grid(False)
+        self.ax.view_init(elev=25, azim=-70)
+
+        self._defo_lines = []
+        if not modal_data:
+            self.draw_idle()
+            return
+
+        ctx = modal_data.get("ctx", {})
+        vis_elems = list(ctx.get("vis_elems", []))
+        vis_nodes = list(ctx.get("vis_nodes", []))
+        node_xyz = dict(ctx.get("node_xyz", {}))
+        if not vis_elems or not vis_nodes or not node_xyz:
+            self.draw_idle()
+            return
+
+        xs = [float(node_xyz[n][0]) for n in vis_nodes]
+        ys = [float(node_xyz[n][1]) for n in vis_nodes]
+        zs = [float(node_xyz[n][2]) for n in vis_nodes]
+        xmid = 0.5 * (min(xs) + max(xs))
+        ymid = 0.5 * (min(ys) + max(ys))
+        zmid = 0.5 * (min(zs) + max(zs))
+        half = 0.55 * max(max(xs) - min(xs), max(ys) - min(ys), max(zs) - min(zs), 1.0e-9)
+        self.ax.set_xlim(xmid - half, xmid + half)
+        self.ax.set_ylim(ymid - half, ymid + half)
+        self.ax.set_zlim(zmid - half, zmid + half)
+        try:
+            self.ax.set_box_aspect((1, 1, 1))
+        except Exception:
+            pass
+
+        for n1, n2 in vis_elems:
+            x1, y1, z1 = node_xyz[n1]
+            x2, y2, z2 = node_xyz[n2]
+            self.ax.plot([x1, x2], [y1, y2], [z1, z2], linestyle="--", linewidth=1.0, color="0.6")
+
+        for _ in vis_elems:
+            line, = self.ax.plot([], [], [], color="navy", linewidth=2.6)
+            self._defo_lines.append(line)
+
+        self.fig.tight_layout(pad=0.5)
+        self.draw_idle()
+
+    def update_frame(self, frame: dict[str, Any]) -> None:
+        segments = frame.get("deformed_segments", [])
+        for line, segment in zip(self._defo_lines, segments):
+            (x1, y1, z1), (x2, y2, z2) = segment
+            line.set_data([x1, x2], [y1, y2])
+            line.set_3d_properties([z1, z2])
+        self.draw_idle()
 
 
 class _HalfWidthContainer(QWidget):
@@ -285,6 +457,7 @@ class _HalfWidthContainer(QWidget):
 
 class _ModelUpdatingWorker(QObject):
     log = Signal(str)
+    frame = Signal(object)
     finished = Signal(object)
     error = Signal(str)
 
@@ -312,11 +485,13 @@ class _ModelUpdatingWorker(QObject):
         from opensees_model_updating.analysis.modal import (  # type: ignore
             export_modal_files,
             extract_modal_results,
+            render_mode_shapes_individually_to_png,
             render_mode_shapes_to_png,
         )
         from opensees_model_updating.analysis.transient import (  # type: ignore
             render_transient_to_png,
             run_transient_analysis_collect_data,
+            run_transient_analysis_stream,
         )
         from opensees_model_updating.calibration.calibrator import (  # type: ignore
             prepare_experimental_modal_data,
@@ -353,38 +528,95 @@ class _ModelUpdatingWorker(QObject):
                         exp_data = prepare_experimental_modal_data(params)
                 write_json("output/experimental_modal_data_loaded.json", exp_data["raw_data"])
 
-                self.log.emit("\nRunning original modal analysis...\n")
                 modal_before = extract_modal_results(
                     original_params, normalize_modes=True, show_info=params["show_info"]
                 )
                 export_modal_files(modal_before, "original")
-                freqs_fmt = "  ".join(f"Mode {i+1}: {float(f):.4f}" for i, f in enumerate(modal_before["freqs"]))
-                per_fmt   = "  ".join(f"Mode {i+1}: {float(p):.4f}" for i, p in enumerate(modal_before["periods"]))
-                self.log.emit(f"  Original frequencies: {freqs_fmt} Hz\n")
-                self.log.emit(f"  Original periods:     {per_fmt} s\n")
 
-                # Render ORIGINAL mode shapes while model is in memory (before calibration rebuilds it)
-                self.log.emit("\nRendering original mode shapes figure...\n")
-                mode_shapes_png = render_mode_shapes_to_png(modal_before, title_prefix="Original")
+                _sep = "─" * 60
+                n_show = params["numModes"]
+                orig_heights = original_params.get("story_heights", [])
+                orig_masses = original_params["floor_masses"]
+
+                self.log.emit(f"\n{_sep}\n")
+                self.log.emit("PRIOR MODEL\n")
+                self.log.emit(f"{_sep}\n")
+                self.log.emit(f"  E = {float(original_params['E']):.4e} Pa\n")
+                for i, m in enumerate(orig_masses):
+                    h_str = f"  h = {orig_heights[i]:.4f} m," if i < len(orig_heights) else ""
+                    self.log.emit(f"  Story {i+1}:{h_str}  self-weight mass = {float(m):.4f} kg\n")
+                add_masses_orig = original_params.get("additional_masses", {})
+                if any(any(float(v) > 0 for v in vals) for vals in add_masses_orig.values()):
+                    self.log.emit("  Additional masses [center, C1, C2, C3, C4] kg:\n")
+                    for sk in sorted(add_masses_orig, key=lambda k: int(k) if str(k).isdigit() else 0):
+                        vals = add_masses_orig[sk]
+                        if any(float(v) > 0 for v in vals):
+                            self.log.emit(f"    Story {sk}: " + "  ".join(f"{float(v):.4f}" for v in vals) + "\n")
+                self.log.emit("\n  Modal frequencies:\n")
+                for i, (f, p) in enumerate(zip(modal_before["freqs"][:n_show], modal_before["periods"][:n_show])):
+                    self.log.emit(f"    Mode {i+1}: f = {float(f):.4f} Hz   T = {float(p):.4f} s\n")
+                self.log.emit("\n  Mode shapes UX (normalized, |max| = 1):\n")
+                for i, phi in enumerate(modal_before["mode_shapes_ux_master"][:n_show]):
+                    self.log.emit(f"    Mode {i+1}: " + "  ".join(f"Story {j+1}: {float(v):+.4f}" for j, v in enumerate(phi)) + "\n")
+                self.log.emit("\n  Experimental target frequencies:\n")
+                for i, f_tgt in enumerate(exp_data["freqs"][:params["nCalibModes"]]):
+                    self.log.emit(f"    Mode {i+1}: {float(f_tgt):.4f} Hz\n")
+
+                # Render prior model mode shapes while the model is still in memory
+                mode_shapes_png = render_mode_shapes_to_png(modal_before, title_prefix="Prior model")
 
                 if params["enable_calibration"]:
-                    self.log.emit("\nRunning automatic calibration...\n")
+                    self.log.emit(f"\n{_sep}\n")
+                    self.log.emit("CALIBRATION\n")
+                    self.log.emit(f"{_sep}\n")
+                    self.log.emit(f"  Modes used:          {params['nCalibModes']}\n")
+                    self.log.emit(f"  Use mode shapes:     {params['use_mode_shapes']}\n")
+                    self.log.emit(f"  Frequency weight:    {params['w_freq']:.4f}\n")
+                    self.log.emit(f"  Mode-shape weight:   {params['w_mode']:.4f}\n")
+                    self.log.emit(f"  E scale bounds:      [{params['E_scale_lb']:.3f}, {params['E_scale_ub']:.3f}] × E_prior\n")
+                    self.log.emit(f"  Mass scale bounds:   [{params['m_scale_lb']:.3f}, {params['m_scale_ub']:.3f}] × m_prior\n")
+                    self.log.emit(f"  Frequency tolerance: {params['freq_tol_percent']:.2f}%\n")
+                    self.log.emit(f"  Max evaluations:     {params['max_nfev']}\n")
+                    self.log.emit("\nRunning calibration optimizer...\n")
                     calib_result, calibrated_params = run_calibration(
                         original_params, exp_data, show_info=params["show_info"]
                     )
-                    self.log.emit("\nCalibration finished.\n")
-                    self.log.emit(f"Success: {calib_result.success}\n")
-                    self.log.emit(f"Message: {calib_result.message}\n")
+                    self.log.emit(f"  Result:       {'Converged' if calib_result.success else 'Did not converge'}\n")
+                    self.log.emit(f"  Evaluations:  {calib_result.nfev}\n")
+                    self.log.emit(f"  Message:      {calib_result.message}\n")
 
-                    self.log.emit("\nRunning calibrated modal analysis...\n")
                     modal_after = extract_modal_results(
                         calibrated_params,
                         normalize_modes=True,
                         show_info=params["show_info"],
                     )
                     export_modal_files(modal_after, "calibrated")
-                    cal_freqs_fmt = "  ".join(f"Mode {i+1}: {float(f):.4f}" for i, f in enumerate(modal_after["freqs"]))
-                    self.log.emit(f"  Calibrated frequencies: {cal_freqs_fmt} Hz\n")
+
+                    e_orig_val = float(original_params["E"])
+                    e_cal_val = float(calibrated_params["E"])
+                    cal_heights = calibrated_params.get("story_heights", orig_heights)
+                    cal_masses = calibrated_params["floor_masses"]
+
+                    self.log.emit(f"\n{_sep}\n")
+                    self.log.emit("UPDATED MODEL\n")
+                    self.log.emit(f"{_sep}\n")
+                    self.log.emit(f"  E = {e_cal_val:.4e} Pa  ({(e_cal_val - e_orig_val) / e_orig_val * 100:+.2f}% from prior)\n")
+                    for i, (m_orig, m_cal) in enumerate(zip(orig_masses, cal_masses)):
+                        m_chg = (float(m_cal) - float(m_orig)) / float(m_orig) * 100 if float(m_orig) != 0 else 0.0
+                        h_str = f"  h = {cal_heights[i]:.4f} m," if i < len(cal_heights) else ""
+                        self.log.emit(f"  Story {i+1}:{h_str}  self-weight mass = {float(m_cal):.4f} kg  ({m_chg:+.2f}% from prior)\n")
+                    tgt_freqs = list(exp_data["freqs"])
+                    self.log.emit("\n  Modal frequencies vs target:\n")
+                    for i, (f_cal, p_cal) in enumerate(zip(modal_after["freqs"][:n_show], modal_after["periods"][:n_show])):
+                        line = f"    Mode {i+1}: f = {float(f_cal):.4f} Hz   T = {float(p_cal):.4f} s"
+                        if i < params["nCalibModes"] and i < len(tgt_freqs):
+                            f_t = float(tgt_freqs[i])
+                            err = (float(f_cal) - f_t) / f_t * 100 if f_t != 0 else 0.0
+                            line += f"   (target: {f_t:.4f} Hz, error: {err:+.2f}%)"
+                        self.log.emit(line + "\n")
+                    self.log.emit("\n  Mode shapes UX (normalized, |max| = 1):\n")
+                    for i, phi in enumerate(modal_after["mode_shapes_ux_master"][:n_show]):
+                        self.log.emit(f"    Mode {i+1}: " + "  ".join(f"Story {j+1}: {float(v):+.4f}" for j, v in enumerate(phi)) + "\n")
                 else:
                     calib_result = None
                     calibrated_params = original_params
@@ -443,6 +675,13 @@ class _ModelUpdatingWorker(QObject):
                     "uncalibrated_response": uncalibrated_response,
                     "report_text": report_text,
                     "output_dir": str(project_dir / "output"),
+                    # Prior modal data — stored in _CalibrationState so Run Analysis can show it
+                    "prior_freqs": [float(f) for f in modal_before["freqs"][:n_show]],
+                    "prior_periods": [float(p) for p in modal_before["periods"][:n_show]],
+                    "prior_mode_shapes": [
+                        [float(v) for v in phi]
+                        for phi in modal_before["mode_shapes_ux_master"][:n_show]
+                    ],
                     # PNG figures to embed in the Output tab
                     "fig1_png": calib_summary_png,   # calibration comparison (4 subplots)
                     "fig2_png": mode_shapes_png,      # original (pre-calibration) mode shapes
@@ -461,28 +700,41 @@ class _ModelUpdatingWorker(QObject):
 
             write_json("output/current_run_inputs.json", run_params)
 
-            sep = "─" * 60
+            _sep = "─" * 60
+
+            def _log_model_params(p: dict, heights: list, label: str) -> None:
+                self.log.emit(f"\n{_sep}\n")
+                self.log.emit(f"{label}\n")
+                self.log.emit(f"{_sep}\n")
+                self.log.emit(f"  E = {float(p['E']):.4e} Pa\n")
+                for i, m in enumerate(p["floor_masses"]):
+                    h_str = f"  h = {heights[i]:.4f} m," if i < len(heights) else ""
+                    self.log.emit(f"  Story {i+1}:{h_str}  self-weight mass = {float(m):.4f} kg\n")
+                add = p.get("additional_masses", {})
+                if any(any(float(v) > 0 for v in vals) for vals in add.values()):
+                    self.log.emit("  Additional masses [center, C1, C2, C3, C4] kg:\n")
+                    for sk in sorted(add, key=lambda k: int(k) if str(k).isdigit() else 0):
+                        vals = add[sk]
+                        if any(float(v) > 0 for v in vals):
+                            self.log.emit(f"    Story {sk}: " + "  ".join(f"{float(v):.4f}" for v in vals) + "\n")
+
             if use_precalibrated:
-                self.log.emit(f"\n{sep}\n")
-                self.log.emit("RUN ANALYSIS — using calibrated parameters\n")
-                self.log.emit(f"{sep}\n")
                 write_json("output/calibrated_inputs_used_for_run.json", final_params)
-                self.log.emit(f"  Calibrated E:      {float(final_params['E']):.4e} Pa\n")
-                self.log.emit(
-                    f"  Calibrated masses: "
-                    + "  ".join(f"Story {i+1}: {float(m):.4f} kg" for i, m in enumerate(final_params["floor_masses"]))
-                    + "\n"
-                )
+                prior_heights = run_params.get("story_heights", [])
+                _log_model_params(run_params, prior_heights, "PRIOR MODEL (uncalibrated)")
+                if state.prior_freqs:
+                    self.log.emit("\n  Modal frequencies:\n")
+                    for i, (f, p) in enumerate(zip(state.prior_freqs, state.prior_periods or [])):
+                        self.log.emit(f"    Mode {i+1}: f = {float(f):.4f} Hz   T = {float(p):.4f} s\n")
+                if state.prior_mode_shapes:
+                    self.log.emit("\n  Mode shapes UX (normalized, |max| = 1):\n")
+                    for i, phi in enumerate(state.prior_mode_shapes):
+                        self.log.emit(f"    Mode {i+1}: " + "  ".join(f"Story {j+1}: {float(v):+.4f}" for j, v in enumerate(phi)) + "\n")
+                upd_heights = final_params.get("story_heights", [])
+                _log_model_params(final_params, upd_heights, "UPDATED MODEL (calibrated)")
             else:
-                self.log.emit(f"\n{sep}\n")
-                self.log.emit("RUN ANALYSIS — original (uncalibrated) parameters\n")
-                self.log.emit(f"{sep}\n")
-                self.log.emit(f"  E:      {float(final_params['E']):.4e} Pa\n")
-                self.log.emit(
-                    f"  Masses: "
-                    + "  ".join(f"Story {i+1}: {float(m):.4f} kg" for i, m in enumerate(final_params["floor_masses"]))
-                    + "\n"
-                )
+                prior_heights = final_params.get("story_heights", [])
+                _log_model_params(final_params, prior_heights, "RUN ANALYSIS — Prior model (uncalibrated)")
 
             self.log.emit("\nExtracting modal properties...\n")
             final_modal = extract_modal_results(
@@ -500,10 +752,6 @@ class _ModelUpdatingWorker(QObject):
                 vals = "  ".join(f"Story {j+1}: {float(v):+.4f}" for j, v in enumerate(phi))
                 self.log.emit(f"  Mode {i+1}: {vals}\n")
 
-            mode_title = "Calibrated" if use_precalibrated else "Run Model"
-            self.log.emit("\nRendering mode shapes figure...\n")
-            mode_shapes_png = render_mode_shapes_to_png(final_modal, title_prefix=mode_title)
-
             transient_png: bytes | None = None
             transient_response = None
             overlay_response = (
@@ -514,11 +762,22 @@ class _ModelUpdatingWorker(QObject):
 
             if run_params["run_transient"]:
                 self.log.emit("\nRunning transient analysis...\n")
-                transient_response = run_transient_analysis_collect_data(
+                self.frame.emit({
+                    "kind": "init",
+                    "modal_data": final_modal,
+                    "overlay_response": overlay_response,
+                    "title": "Calibrated 3D Response" if use_precalibrated else "3D Response",
+                })
+                transient_response = run_transient_analysis_stream(
                     final_params,
                     final_modal,
                     show_info=run_params["show_info"],
                     recorder_prefix="run_",
+                    frame_callback=self.frame.emit,
+                    plot_every=10,
+                    anim_every=10,
+                    realtime=True,
+                    sfac_anim=20.0,
                 )
                 np.savez(
                     "output/run_transient_response.npz",
@@ -542,6 +801,16 @@ class _ModelUpdatingWorker(QObject):
                     transient_response, final_modal, overlay_response=overlay_response
                 )
 
+                # Individual mode shapes for the 2×2 right grid.
+                self.log.emit("\nRendering mode shapes figures...\n")
+                mode_shapes_pngs = render_mode_shapes_individually_to_png(final_modal)
+            else:
+                # No transient — render a combined mode shapes PNG for the static label.
+                mode_title = "Calibrated" if use_precalibrated else "Run Model"
+                self.log.emit("\nRendering mode shapes figure...\n")
+                mode_shapes_pngs = []
+                transient_png = render_mode_shapes_to_png(final_modal, title_prefix=mode_title)
+
             return {
                 "action": "run",
                 "used_calibration": use_precalibrated,
@@ -549,9 +818,12 @@ class _ModelUpdatingWorker(QObject):
                 "modal_summary": modal_summary,
                 "transient_response": transient_response,
                 "overlay_response": overlay_response,
-                # PNG figures to embed in the Output tab
-                "fig1_png": transient_png,     # LEFT: roof displacement + acceleration
-                "fig2_png": mode_shapes_png,   # RIGHT: mode shapes
+                # For run with transient: individual mode PNGs for the 2×2 grid.
+                # For run without transient: fig1_png holds the combined mode shapes PNG,
+                #   fig_mode_pngs is empty.
+                "fig1_png": transient_png,
+                "fig2_png": None,
+                "fig_mode_pngs": mode_shapes_pngs,
             }
         finally:
             os.chdir(previous_cwd)
@@ -1218,28 +1490,70 @@ class ModelUpdatingTab(QWidget):
     def _build_output_tab(self) -> None:
         outer = QVBoxLayout(self._output_tab)
 
-        # ── Two self-scaling figure labels side by side ───────────────────────
+        # Left side: static PNG (calibrate) or live roof response curves (run).
         self._fig1_label = _ScaledImageLabel(
             "Run Calibrate or Analysis\nto see results here.", self
         )
+        self._live_response_canvas = _LiveResponseCanvas(self)
+        self._live_response_canvas.hide()
+
+        left_col = QWidget(self)
+        left_layout = QVBoxLayout(left_col)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.addWidget(self._fig1_label, stretch=1)
+        left_layout.addWidget(self._live_response_canvas, stretch=1)
+
+        # Right side — two mutually exclusive panels:
+        #   _fig2_label:       combined mode shapes PNG (calibrate / run without transient)
+        #   _run_right_widget: 2×2 grid — Mode 1, Mode 2, Mode 3, live 3D canvas (run with transient)
         self._fig2_label = _ScaledImageLabel("", self)
+
+        self._mode_shape_labels: list[_ScaledImageLabel] = [
+            _ScaledImageLabel("", self),
+            _ScaledImageLabel("", self),
+            _ScaledImageLabel("", self),
+        ]
+        self._live_3d_canvas = _Live3DCanvas(self)
+        # Override the class minimum so the 3D cell doesn't force its column wider than the mode cells.
+        self._live_3d_canvas.setMinimumSize(10, 10)
+
+        self._run_right_widget = QWidget(self)
+        run_grid = QGridLayout(self._run_right_widget)
+        run_grid.setContentsMargins(0, 0, 0, 0)
+        run_grid.setSpacing(4)
+        run_grid.addWidget(self._mode_shape_labels[0], 0, 0)
+        run_grid.addWidget(self._mode_shape_labels[1], 0, 1)
+        run_grid.addWidget(self._mode_shape_labels[2], 1, 0)
+        run_grid.addWidget(self._live_3d_canvas, 1, 1)
+        # Equal column and row weights so all four cells share space evenly.
+        run_grid.setColumnStretch(0, 1)
+        run_grid.setColumnStretch(1, 1)
+        run_grid.setRowStretch(0, 1)
+        run_grid.setRowStretch(1, 1)
+        self._run_right_widget.hide()
+
+        right_col = QWidget(self)
+        right_layout = QVBoxLayout(right_col)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.addWidget(self._fig2_label, stretch=1)
+        right_layout.addWidget(self._run_right_widget, stretch=1)
 
         fig_row = QWidget(self)
         fig_layout = QHBoxLayout(fig_row)
         fig_layout.setContentsMargins(0, 0, 0, 0)
-        fig_layout.addWidget(self._fig1_label, stretch=1)
-        fig_layout.addWidget(self._fig2_label, stretch=1)
+        fig_layout.addWidget(left_col, stretch=1)
+        fig_layout.addWidget(right_col, stretch=1)
 
-        # ── Log panel ─────────────────────────────────────────────────────────
+        # Log panel.
         self._log = QPlainTextEdit(self)
         self._log.setReadOnly(True)
         self._log.setMinimumHeight(80)
 
-        # ── Vertical splitter: figures top, log bottom ────────────────────────
+        # Vertical splitter: figures top, log bottom.
         splitter = QSplitter(Qt.Vertical, self)
         splitter.addWidget(fig_row)
         splitter.addWidget(self._log)
-        splitter.setStretchFactor(0, 3)
+        splitter.setStretchFactor(0, 4)
         splitter.setStretchFactor(1, 1)
 
         outer.addWidget(splitter)
@@ -1555,6 +1869,39 @@ class ModelUpdatingTab(QWidget):
     def _display_png(self, label: _ScaledImageLabel, png_bytes: bytes | None) -> None:
         label.set_figure(png_bytes)
 
+    def _prepare_live_view(self, action: str, run_transient: bool) -> None:
+        """Choose whether the Output tab shows static PNGs or the live 2×2 grid."""
+        if action == "run" and run_transient:
+            self._fig1_label.hide()
+            self._fig2_label.hide()
+            self._live_response_canvas.show()
+            self._run_right_widget.show()
+            self._live_response_canvas.initialize(None)
+            self._live_3d_canvas.initialize_model(None)
+        else:
+            self._live_response_canvas.hide()
+            self._run_right_widget.hide()
+            self._fig1_label.show()
+            self._fig2_label.show()
+
+    @Slot(object)
+    def _on_animation_frame(self, frame: dict[str, Any]) -> None:
+        kind = frame.get("kind")
+        if kind == "init":
+            self._fig1_label.hide()
+            self._fig2_label.hide()
+            self._live_response_canvas.show()
+            self._run_right_widget.show()
+            self._live_response_canvas.initialize(frame.get("overlay_response"))
+            self._live_3d_canvas.initialize_model(
+                frame.get("modal_data"),
+                title=str(frame.get("title") or "3D Transient Response"),
+            )
+            return
+
+        self._live_response_canvas.update_frame(frame)
+        self._live_3d_canvas.update_frame(frame)
+
     def _start_worker(self, action: str) -> None:
         if self._thread is not None:
             QMessageBox.information(self, "Busy", "Model updating is already running.")
@@ -1581,6 +1928,7 @@ class ModelUpdatingTab(QWidget):
         worker.moveToThread(thread)
 
         worker.log.connect(self._append_log)
+        worker.frame.connect(self._on_animation_frame)
         worker.finished.connect(self._on_worker_finished)
         worker.error.connect(self._on_worker_error)
         thread.started.connect(worker.run)
@@ -1597,6 +1945,7 @@ class ModelUpdatingTab(QWidget):
         self._set_busy(True, f"Running {action_label}...")
         self._log.clear()
         self._tabs.setCurrentWidget(self._output_tab)
+        self._prepare_live_view(action, params.get("run_transient", False))
         thread.start()
 
     @Slot(str)
@@ -1611,8 +1960,22 @@ class ModelUpdatingTab(QWidget):
         action = result.get("action")
         self._tabs.setCurrentWidget(self._output_tab)
 
-        self._display_png(self._fig1_label, result.get("fig1_png"))
-        self._display_png(self._fig2_label, result.get("fig2_png"))
+        if action == "run" and result.get("transient_response") is not None:
+            # Keep the live canvases; populate the individual mode shape cells.
+            self._fig1_label.hide()
+            self._fig2_label.hide()
+            self._live_response_canvas.show()
+            self._run_right_widget.show()
+            mode_pngs = result.get("fig_mode_pngs") or []
+            for i, lbl in enumerate(self._mode_shape_labels):
+                lbl.set_figure(mode_pngs[i] if i < len(mode_pngs) else None)
+        else:
+            self._live_response_canvas.hide()
+            self._run_right_widget.hide()
+            self._fig1_label.show()
+            self._fig2_label.show()
+            self._display_png(self._fig1_label, result.get("fig1_png"))
+            self._display_png(self._fig2_label, result.get("fig2_png"))
 
         if action == "calibrate":
             self._calibration_state = _CalibrationState(
@@ -1620,6 +1983,9 @@ class ModelUpdatingTab(QWidget):
                 input_signature=result["signature"],
                 calibrated_params=copy.deepcopy(result["params"]),
                 uncalibrated_response=result.get("uncalibrated_response"),
+                prior_freqs=result.get("prior_freqs"),
+                prior_periods=result.get("prior_periods"),
+                prior_mode_shapes=result.get("prior_mode_shapes"),
             )
             if result.get("report_text"):
                 self._append_log("\n\n" + result["report_text"])

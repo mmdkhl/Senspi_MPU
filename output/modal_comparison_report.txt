@@ -15,21 +15,21 @@ Before calibration:
   Mode 3: f = 10.268 Hz, error = 12.836 %
 
 After calibration:
-  Mode 1: f = 2.32 Hz, error = -0.016 %
-  Mode 2: f = 6.503 Hz, error = 0.044 %
-  Mode 3: f = 9.097 Hz, error = -0.028 %
+  Mode 1: f = 2.32 Hz, error = -0.0 %
+  Mode 2: f = 6.5 Hz, error = -0.0 %
+  Mode 3: f = 9.1 Hz, error = 0.0 %
 
 Tolerance used: 5.0 %
 Before within tolerance: False
 After within tolerance:  True
-Used mode shapes in calibration: True
+Used mode shapes in calibration: False
 
 Parameter update:
   Mass calibration target = Self-weight mass only
   Original E   = 2.000e+11
-  Calibrated E = 1.733e+11
+  Calibrated E = 1.708e+11
   Original self-weight masses   = [0.27, 0.27, 0.27]
-  Calibrated self-weight masses = [0.293, 0.314, 0.247]
+  Calibrated self-weight masses = [0.29, 0.309, 0.244]
 
 Column orientation layout:
   1:1=weak,2=weak,3=weak,4=weak; 2:1=weak,2=weak,3=weak,4=weak; 3:1=weak,2=weak,3=weak,4=weak
@@ -39,30 +39,12 @@ Original additional masses [center,c1,c2,c3,c4] kg:
 Calibrated additional masses [center,c1,c2,c3,c4] kg:
   1:0.0,0.0,0.0,0.0,0.0; 2:0.0,0.0,0.0,0.0,0.0; 3:0.0,0.0,0.0,0.0,0.0
 
-Mode-shape comparison (normalized, max abs = 1):
-  Mode 1:
-    Experimental          = [0.3, 0.75, 1.0]
-    Before calibration    = [0.442, 0.801, 1.0]
-    After calibration     = [0.456, 0.821, 1.0]
-    Before L2 mismatch    = 0.15
-    After L2 mismatch     = 0.172
-  Mode 2:
-    Experimental          = [-1.0, 0.1, 0.95]
-    Before calibration    = [-1.0, -0.451, 0.802]
-    After calibration     = [-1.0, -0.36, 0.918]
-    Before L2 mismatch    = 0.57
-    After L2 mismatch     = 0.461
-  Mode 3:
-    Experimental          = [1.0, -0.85, 0.3]
-    Before calibration    = [0.807, -1.0, 0.444]
-    After calibration     = [0.841, -1.0, 0.589]
-    Before L2 mismatch    = 0.284
-    After L2 mismatch     = 0.362
+Mode-shape comparison was not produced because mode shapes were not used or were not available for this story count.
 
 Optimizer summary:
   Success = True
-  Status  = 2
-  Message = `ftol` termination condition is satisfied.
-  nfev    = 8
-  Cost    = 0.023
-  x       = [0.866, 1.087, 1.164, 0.915]
+  Status  = 1
+  Message = `gtol` termination condition is satisfied.
+  nfev    = 21
+  Cost    = 0.0
+  x       = [0.854, 1.073, 1.145, 0.903]
