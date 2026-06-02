@@ -93,6 +93,10 @@ class MainWindow(QMainWindow):
             app_config=self._app_config,
         )
         self.model_updating_tab = ModelUpdatingTab(parent=self)
+        # Give the Model Updating tab access to the live capture buffer for
+        # sensor-driven Continuous Update (Mode B). The tab never touches SSH;
+        # it only reads thread-safe snapshots from the controller (guardrail G2).
+        self.model_updating_tab.set_recorder_controller(self.recorder_tab)
         self.sonification_tab = SonificationTab(parent=self)
 
         self._tabs.addTab(self.signals_tab, self.tr("Live Signals"))

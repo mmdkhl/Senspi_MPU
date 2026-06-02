@@ -14,7 +14,7 @@ from typing import Any
 import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-from PySide6.QtCore import QPointF, QObject, Qt, QThread, Signal, Slot
+from PySide6.QtCore import QPointF, QObject, Qt, QThread, QTimer, Signal, Slot
 from PySide6.QtGui import QColor, QPainter, QPen, QTextCursor
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -42,6 +43,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+from ...analysis import modal as modal_id
+from ...dataio import modal_session_loader as msl
 
 
 REQUIRED_MODULES = ("openseespy", "opsvis")
@@ -984,6 +989,385 @@ def _make_calibration_signature(params: dict[str, Any]) -> str:
     )
 
 
+# ======================================================================
+# Sensor-driven modal identification (M2/M3/M4) — figure helpers + workers
+# ======================================================================
+
+def _fig_to_png(fig: Figure) -> bytes:
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=110, bbox_inches="tight")
+    return buf.getvalue()
+
+
+def _render_fdd_spectrum_png(result: "modal_id.ExperimentalModalResult",
+                             f_min: float, f_max: float) -> bytes:
+    """FDD singular-value spectrum (dB) with identified peaks marked."""
+    fig = Figure(figsize=(6.4, 4.4))
+    ax = fig.add_subplot(1, 1, 1)
+    freqs = np.asarray(result.fdd_freqs, dtype=float)
+    spec = np.asarray(result.fdd_spectrum, dtype=float)
+    if freqs.size and spec.size:
+        floor = np.max(spec) * 1e-9 + 1e-30
+        db = 10.0 * np.log10(np.maximum(spec, floor))
+        ax.plot(freqs, db, color="#2563eb", linewidth=1.3)
+        for i, f in enumerate(result.frequencies_hz):
+            ax.axvline(f, color="#dc2626", linestyle="--", linewidth=1.0)
+            ax.annotate(f"{f:.2f} Hz", xy=(f, ax.get_ylim()[1]),
+                        xytext=(2, -10), textcoords="offset points",
+                        fontsize=8, color="#dc2626", rotation=90, va="top")
+    ax.set_xlim(f_min, f_max)
+    ax.set_title("FDD spectrum (1st singular value)")
+    ax.set_xlabel("Frequency (Hz)")
+    ax.set_ylabel("Power (dB)")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    return _fig_to_png(fig)
+
+
+def _render_identified_shapes_png(story_data: "modal_id.StoryModalData",
+                                  result: "modal_id.ExperimentalModalResult") -> bytes:
+    """Identified mode shapes: measured points per story, one subplot per mode."""
+    n_modes = max(1, len(result.frequencies_hz))
+    fig = Figure(figsize=(6.4, 4.4))
+    for m in range(n_modes):
+        ax = fig.add_subplot(1, n_modes, m + 1)
+        stories = list(range(1, story_data.n_story + 1))
+        measured = story_data.measured_points[m] if m < len(story_data.measured_points) else {}
+        ax.axvline(0.0, color="0.7", linewidth=0.8)
+        if measured:
+            xs = [measured[s] for s in stories if s in measured]
+            ys = [s for s in stories if s in measured]
+            ax.plot(xs, ys, "-o", color="#16a34a", linewidth=1.6)
+        ax.set_title(f"Mode {m + 1}\n{result.frequencies_hz[m]:.2f} Hz", fontsize=9)
+        ax.set_yticks(stories)
+        if m == 0:
+            ax.set_ylabel("Story")
+        ax.set_xlabel("ux")
+        ax.grid(True, alpha=0.3)
+    fig.suptitle("Identified mode shapes (measured stories)", fontsize=10)
+    fig.tight_layout()
+    return _fig_to_png(fig)
+
+
+def _render_param_history_png(history: list[dict[str, Any]]) -> bytes:
+    """Mode B evolution: E % change and identified frequencies vs cycle."""
+    fig = Figure(figsize=(6.6, 4.8))
+    ax1 = fig.add_subplot(2, 1, 1)
+    ax2 = fig.add_subplot(2, 1, 2)
+    cycles = [h["cycle"] for h in history]
+    if cycles:
+        e_pct = [h.get("E_pct", 0.0) for h in history]
+        ax1.plot(cycles, e_pct, "-o", color="#dc2626", linewidth=1.6)
+        ax1.set_ylabel("E change (%)")
+        ax1.set_title("Calibrated stiffness vs cycle")
+        ax1.grid(True, alpha=0.3)
+
+        n_freq = max((len(h.get("freqs", [])) for h in history), default=0)
+        for k in range(n_freq):
+            ys = [h["freqs"][k] if k < len(h.get("freqs", [])) else np.nan for h in history]
+            ax2.plot(cycles, ys, "-o", linewidth=1.4, label=f"f{k + 1}")
+        ax2.set_ylabel("Identified freq (Hz)")
+        ax2.set_xlabel("Cycle")
+        ax2.grid(True, alpha=0.3)
+        if n_freq:
+            ax2.legend(loc="upper right", fontsize=8, ncol=n_freq)
+    fig.tight_layout()
+    return _fig_to_png(fig)
+
+
+def _build_sensor_exp_dict(session: "msl.ModalSession", params: dict[str, Any]):
+    """Run FDD on a loaded/snapshot session and map to the experimental dict.
+
+    Returns ``(exp_dict, result, story_data)`` where ``exp_dict`` matches the
+    ``{frequencies_hz, mode_shapes_ux?}`` schema the calibrator path consumes.
+    Pure: no OpenSees, no Qt.
+    """
+    result = modal_id.identify_modes(
+        session.data, session.fs,
+        f_min=params["sensor_f_min"], f_max=params["sensor_f_max"],
+        n_modes=params["sensor_n_modes"],
+    )
+    if not result.success:
+        return None, result, None
+    # Map identification's sensor order to the configured stories.
+    story_map = [params["sensor_story_map"].get(sid, 0) for sid in session.sensor_ids]
+    story_data = modal_id.map_to_stories(result, story_map, params["nStory"])
+    exp_dict = modal_id.to_experimental_dict(story_data)
+    return exp_dict, result, story_data
+
+
+class _IdentifyWorker(QObject):
+    """Mode A: load a recorded session, run FDD, return frequencies + shapes.
+
+    Deliberately free of OpenSees imports (G8) — identification works whether or
+    not the calibration extras are installed.
+    """
+
+    log = Signal(str)
+    finished = Signal(object)
+    error = Signal(str)
+
+    def __init__(self, params: dict[str, Any], session_path: str) -> None:
+        super().__init__()
+        self._params = params
+        self._session_path = session_path
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            p = self._params
+            sep = "═" * 64
+            manual_fs = p.get("sensor_target_fs")
+            rate_src = (
+                f"manual override {manual_fs:.1f} Hz (timestamps ignored)" if manual_fs
+                else "auto-detected from timestamps"
+            )
+
+            # ── INPUTS ────────────────────────────────────────────────
+            self.log.emit(f"{sep}\nLOAD & IDENTIFY — sensor modal identification\n{sep}\n")
+            self.log.emit("INPUTS\n")
+            self.log.emit(f"  Recorded session: {self._session_path}\n")
+            self.log.emit(f"  Axis:             {p['sensor_axis']}\n")
+            self.log.emit(f"  Window:           last {p['sensor_window_s']:.1f} s\n")
+            self.log.emit(f"  Sample rate:      {rate_src}\n")
+            self.log.emit(f"  Frequency band:   {p['sensor_f_min']:.2f} – {p['sensor_f_max']:.2f} Hz\n")
+            self.log.emit(f"  Modes requested:  {p['sensor_n_modes']}\n")
+            self.log.emit(f"  Model stories:    {p['nStory']}\n")
+            self.log.emit("  Sensor → story mapping:\n")
+            for sid in sorted(p["sensor_story_map"]):
+                self.log.emit(f"    Sensor {sid} → Story {p['sensor_story_map'][sid]}\n")
+
+            session = msl.load_session(
+                Path(self._session_path),
+                axis=p["sensor_axis"],
+                last_seconds=p["sensor_window_s"],
+                target_fs=manual_fs,
+                use_index_time=manual_fs is not None,
+            )
+            if not session.success:
+                self.log.emit(f"\nERROR loading session: {session.message}\n")
+                self.error.emit(session.message)
+                return
+
+            # ── DATA ──────────────────────────────────────────────────
+            self.log.emit("\nDATA\n")
+            self.log.emit(f"  Sensors found:    {len(session.sensor_ids)}  (ids: "
+                          f"{', '.join(str(s) for s in session.sensor_ids)})\n")
+            self.log.emit(f"  Samples:          {session.data.shape[1]} @ {session.fs:.1f} Hz\n")
+            self.log.emit(f"  Duration:         {session.duration_s:.1f} s\n")
+            self.log.emit(f"  Missing samples:  {session.nan_fraction * 100:.2f} %\n")
+            if session.nan_fraction > 0.10:
+                self.log.emit("  WARNING: high fraction of missing samples — results may be unreliable.\n")
+
+            exp_dict, result, story_data = _build_sensor_exp_dict(session, p)
+            if not result.success:
+                self.log.emit(f"\nIDENTIFICATION FAILED: {result.message}\n")
+                self.error.emit(result.message)
+                return
+
+            # ── IDENTIFICATION RESULTS ────────────────────────────────
+            self.log.emit("\nIDENTIFICATION (Frequency Domain Decomposition)\n")
+            self.log.emit(f"  {result.message}\n")
+            for m, f in enumerate(result.frequencies_hz):
+                period = 1.0 / f if f > 0 else float("nan")
+                zeta = result.damping_ratios[m] if m < len(result.damping_ratios) else float("nan")
+                zeta_str = f"{zeta * 100:.1f} %" if zeta == zeta else "n/a"  # nan check
+                self.log.emit(f"    Mode {m + 1}:  f = {f:6.3f} Hz   T = {period:6.3f} s   ζ = {zeta_str}\n")
+
+            self.log.emit("\n  Per-sensor mode shapes (signed, |max| = 1):\n")
+            for m, shape in enumerate(result.mode_shapes_sensor):
+                cells = "   ".join(
+                    f"S{session.sensor_ids[i]}: {v:+.3f}"
+                    for i, v in enumerate(shape) if i < len(session.sensor_ids)
+                )
+                self.log.emit(f"    Mode {m + 1}:  {cells}\n")
+
+            self.log.emit("\n  Mapped to stories (averaged per story):\n")
+            for m, measured in enumerate(story_data.measured_points):
+                cells = "   ".join(
+                    f"Story {s}: {measured[s]:+.3f}" for s in sorted(measured)
+                )
+                self.log.emit(f"    Mode {m + 1}:  {cells}\n")
+
+            # ── COVERAGE ──────────────────────────────────────────────
+            self.log.emit("\nCOVERAGE\n")
+            mode = "full → mode shapes WILL be used" if story_data.mode_shapes_available \
+                else "partial → FREQUENCY-ONLY calibration"
+            self.log.emit(f"  Stories with a sensor: {story_data.coverage_stories} "
+                          f"of {story_data.n_story}  ({mode})\n")
+            if not story_data.mode_shapes_available:
+                self.log.emit("  (interior stories have no sensor; mode shapes are not sent to the optimizer)\n")
+            if story_data.torsion_indicator:
+                self.log.emit("  Torsion check (spread between sensors on the same story):\n")
+                for s, spread in story_data.torsion_indicator.items():
+                    self.log.emit(f"    Story {s}: {spread:.4f}\n")
+
+            self.log.emit(f"\n{sep}\n")
+            self.log.emit(
+                "NOTE: Load & Identify does NOT run the OpenSees update. The identified\n"
+                "values are loaded into Manual input — review them, then press Calibrate,\n"
+                "or use 'Identify & Update' to run the OpenSees calibration in one step.\n"
+            )
+            self.log.emit(f"{sep}\n")
+
+            fdd_png = _render_fdd_spectrum_png(result, p["sensor_f_min"], p["sensor_f_max"])
+            shapes_png = _render_identified_shapes_png(story_data, result)
+
+            self.finished.emit({
+                "action": "identify",
+                "exp_dict": exp_dict,
+                "frequencies_hz": list(result.frequencies_hz),
+                "mode_shapes_available": story_data.mode_shapes_available,
+                "fig1_png": fdd_png,
+                "fig2_png": shapes_png,
+            })
+        except Exception as exc:  # pragma: no cover - defensive
+            self.log.emit("\nIdentification failed:\n")
+            self.log.emit(traceback.format_exc())
+            self.error.emit(str(exc))
+
+
+class _ContinuousUpdateWorker(QObject):
+    """Mode B: capture → FDD → calibrate from fixed prior → repeat."""
+
+    log = Signal(str)
+    result = Signal(object)   # per-cycle figure/state payload
+    error = Signal(str)
+    finished = Signal()
+
+    def __init__(self, params: dict[str, Any], settings: dict[str, Any], capture_fn) -> None:
+        super().__init__()
+        self._params = params
+        self._settings = settings
+        self._capture_fn = capture_fn
+        self._running = True
+        self._history: list[dict[str, Any]] = []
+
+    @Slot()
+    def stop(self) -> None:
+        self._running = False
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            from opensees_model_updating.calibration.calibrator import run_calibration  # type: ignore
+        except Exception as exc:
+            self.error.emit(f"OpenSees not available for continuous calibration: {exc}")
+            self.finished.emit()
+            return
+
+        original_params = copy.deepcopy(self._params)
+        duration = float(self._settings["duration_s"])
+        interval = float(self._settings["interval_s"])
+        max_failures = int(self._settings["max_failures"])
+        failures = 0
+        cycle = 0
+        elapsed_wait = 0.0
+
+        self.log.emit("Continuous update started. Press Stop to end.\n")
+        while self._running:
+            cycle += 1
+            self.log.emit(f"\n── Cycle {cycle} ──\n")
+            session = self._capture_fn(
+                axis=self._params["sensor_axis"], last_seconds=duration,
+                target_fs=self._params.get("sensor_target_fs"),
+            )
+            if not session.success or session.duration_s < modal_id.MIN_DURATION_S:
+                self.log.emit(f"  Capture not ready ({session.message}); waiting…\n")
+                if not self._sleep(min(interval, 5.0)):
+                    break
+                continue
+
+            exp_dict, fdd, story_data = _build_sensor_exp_dict(session, self._params)
+            if fdd is None or not fdd.success:
+                failures += 1
+                self.log.emit(f"  Identification failed ({fdd.message}). "
+                              f"Failure {failures}/{max_failures}.\n")
+                if failures >= max_failures:
+                    self.error.emit("Too many consecutive identification failures. Loop paused.")
+                    break
+                if not self._sleep(interval):
+                    break
+                continue
+
+            # Sanity: frequencies within band.
+            in_band = all(self._params["sensor_f_min"] <= f <= self._params["sensor_f_max"]
+                          for f in fdd.frequencies_hz)
+            if not in_band:
+                failures += 1
+                self.log.emit(f"  Peak outside frequency bounds. Failure {failures}/{max_failures}.\n")
+                if failures >= max_failures:
+                    self.error.emit("Too many out-of-band cycles. Loop paused.")
+                    break
+                if not self._sleep(interval):
+                    break
+                continue
+
+            failures = 0
+            # Re-fit from the FIXED prior each cycle (decided 2026-06-01).
+            cycle_params = copy.deepcopy(original_params)
+            n_found = len(fdd.frequencies_hz)
+            cycle_params["nCalibModes"] = min(cycle_params["nCalibModes"], n_found)
+            cycle_params["use_mode_shapes"] = bool(
+                cycle_params["use_mode_shapes"] and story_data.mode_shapes_available
+            )
+            cycle_params["experimental_data_source"] = "manual"
+            cycle_params["experimental_modal_data"] = exp_dict
+            try:
+                exp_data = _build_exp_data_from_gui_values(cycle_params)
+                calib_result, calibrated = run_calibration(
+                    cycle_params, exp_data, show_info=False
+                )
+            except Exception as exc:
+                self.log.emit(f"  Calibration error: {exc}. Keeping previous model.\n")
+                if not self._sleep(interval):
+                    break
+                continue
+
+            e_prior = float(original_params["E"])
+            e_cal = float(calibrated["E"])
+            e_pct = (e_cal - e_prior) / e_prior * 100 if e_prior else 0.0
+            ok = "✓" if calib_result.success else "≈"
+            freq_str = ", ".join(f"{f:.2f}" for f in fdd.frequencies_hz)
+            self.log.emit(
+                f"  {freq_str} Hz — Calibrated {ok}  E {e_pct:+.2f}%  "
+                f"(masses { ' '.join(f'{float(m):.3f}' for m in calibrated['floor_masses']) })\n"
+            )
+
+            self._history.append({
+                "cycle": cycle,
+                "E_pct": e_pct,
+                "E": e_cal,
+                "masses": [float(m) for m in calibrated["floor_masses"]],
+                "freqs": list(fdd.frequencies_hz),
+                "success": bool(calib_result.success),
+            })
+            self._history = self._history[-20:]  # keep last 20
+
+            self.result.emit({
+                "fig1_png": _render_param_history_png(self._history),
+                "fig2_png": _render_fdd_spectrum_png(
+                    fdd, self._params["sensor_f_min"], self._params["sensor_f_max"]),
+                "cycle": cycle,
+            })
+
+            if not self._sleep(max(0.0, interval - duration)):
+                break
+
+        self.log.emit("\nContinuous update stopped.\n")
+        self.finished.emit()
+
+    def _sleep(self, seconds: float) -> bool:
+        """Sleep in small slices so Stop is responsive. Returns False if stopped."""
+        slept = 0.0
+        while slept < seconds:
+            if not self._running:
+                return False
+            QThread.msleep(100)
+            slept += 0.1
+        return self._running
+
+
 class ModelUpdatingTab(QWidget):
     """Native PySide controls for the bundled OpenSees model-updating workflow."""
 
@@ -992,6 +1376,13 @@ class ModelUpdatingTab(QWidget):
         self._thread: QThread | None = None
         self._worker: _ModelUpdatingWorker | None = None
         self._calibration_state = _CalibrationState()
+        self._recorder_controller = None
+        self._continuous_thread: QThread | None = None
+        self._continuous_worker: _ContinuousUpdateWorker | None = None
+        # Remaining follow-up actions after a sensor identification (e.g.
+        # ["calibrate", "run"] for the Identify & Analyze button). Each step is
+        # launched from _clear_worker once the previous thread has finished.
+        self._sensor_chain: list[str] = []
         self._build_ui()
         self._set_defaults()
         self._rebuild_story_table()
@@ -1025,6 +1416,30 @@ class ModelUpdatingTab(QWidget):
         self._run_btn = QPushButton("Run Analysis", self)
         actions.addWidget(self._calibrate_btn)
         actions.addWidget(self._run_btn)
+
+        sep = QFrame(self)
+        sep.setFrameShape(QFrame.VLine)
+        sep.setFrameShadow(QFrame.Sunken)
+        actions.addWidget(sep)
+
+        self._identify_btn = QPushButton("Load && Identify", self)
+        self._identify_btn.setToolTip("Identify modes from a recorded session and load them into Manual input (no OpenSees).")
+        self._identify_analyze_btn = QPushButton("Identify && Analyze", self)
+        self._identify_analyze_btn.setToolTip(
+            "From sensors: identify modes → calibrate (update) the model → run analysis. "
+            "Shows the Run Analysis output computed from sensor results."
+        )
+        self._continuous_btn = QPushButton("Start Continuous Update", self)
+        self._identify_btn.setEnabled(False)
+        self._identify_analyze_btn.setEnabled(False)
+        self._continuous_btn.setEnabled(False)
+        actions.addWidget(self._identify_btn)
+        actions.addWidget(self._identify_analyze_btn)
+        actions.addWidget(self._continuous_btn)
+
+        self._reset_btn = QPushButton("Reset", self)
+        self._reset_btn.setToolTip("Clear results/log and return to a ready state for a new analysis.")
+        actions.addWidget(self._reset_btn)
         actions.addStretch(1)
         root.addLayout(actions)
 
@@ -1033,6 +1448,12 @@ class ModelUpdatingTab(QWidget):
 
         self._calibrate_btn.clicked.connect(lambda: self._start_worker("calibrate"))
         self._run_btn.clicked.connect(lambda: self._start_worker("run"))
+        self._identify_btn.clicked.connect(lambda: self._start_identify(chain=[]))
+        self._identify_analyze_btn.clicked.connect(
+            lambda: self._start_identify(chain=["calibrate", "run"])
+        )
+        self._continuous_btn.clicked.connect(self._toggle_continuous)
+        self._reset_btn.clicked.connect(self._reset_tab)
 
     def _build_model_tab(self) -> None:
         layout = QVBoxLayout(self._model_tab)
@@ -1282,7 +1703,7 @@ class ModelUpdatingTab(QWidget):
         source_row = QHBoxLayout()
         source_row.addWidget(QLabel("Data source:", self))
         self._exp_source = QComboBox(self)
-        self._exp_source.addItems(["Manual input", "From JSON file"])
+        self._exp_source.addItems(["Manual input", "From JSON file", "From Sensors"])
         source_row.addWidget(self._exp_source)
         source_row.addStretch(1)
         outer.addLayout(source_row)
@@ -1321,21 +1742,183 @@ class ModelUpdatingTab(QWidget):
         json_row.addWidget(self._browse_exp_json_btn)
 
         outer.addWidget(self._exp_json_widget)
+
+        # ── From-sensors panel ────────────────────────────────────────
+        self._exp_sensors_widget = self._build_sensors_panel()
+        outer.addWidget(self._exp_sensors_widget)
+
         parent_layout.addWidget(group)
 
         # Wire
         self._exp_source.currentIndexChanged.connect(self._on_exp_source_changed)
         self._browse_exp_json_btn.clicked.connect(self._browse_exp_json)
 
-        # Build initial table (defaults loaded later in _set_defaults)
+        # Build initial table + set the initial source visibility (so the
+        # sensor / JSON panels are hidden until their source is selected).
         self._rebuild_exp_data_widgets()
         self._on_exp_source_changed()
 
+    # Sensor IDs available from the hardware (fixed at 3 MPU6050 units).
+    _SENSOR_IDS = (1, 2, 3)
+
+    def _build_sensors_panel(self) -> QWidget:
+        """Sensor Configuration panel shown when data source is 'From Sensors'."""
+        panel = QWidget(self)
+        vbox = QVBoxLayout(panel)
+        vbox.setContentsMargins(0, 4, 0, 0)
+
+        # Preset + per-sensor story mapping.
+        map_group = QGroupBox("Sensor → Story mapping", self)
+        map_form = QFormLayout(map_group)
+
+        self._sensor_preset = QComboBox(self)
+        self._sensor_preset.addItems([
+            "1 bottom + 2 top",
+            "Fully instrumented (1 per floor)",
+            "Bottom + top only",
+            "Custom",
+        ])
+        map_form.addRow("Preset:", self._sensor_preset)
+
+        self._sensor_axis = QComboBox(self)
+        self._sensor_axis.addItems(["ax", "ay"])
+        map_form.addRow("Axis (shaker = X → ax):", self._sensor_axis)
+
+        self._sensor_story_combos: dict[int, QComboBox] = {}
+        for sid in self._SENSOR_IDS:
+            combo = QComboBox(self)
+            self._sensor_story_combos[sid] = combo
+            map_form.addRow(f"Sensor {sid} → Story:", combo)
+        self._sensor_guidance = QLabel("", self)
+        self._sensor_guidance.setWordWrap(True)
+        self._sensor_guidance.setStyleSheet("color: #555;")
+        map_form.addRow(self._sensor_guidance)
+        vbox.addWidget(map_group)
+
+        # Identification parameters.
+        id_group = QGroupBox("Identification", self)
+        id_form = QFormLayout(id_group)
+        self._sensor_window = self._double_spin(modal_id.MIN_DURATION_S, 600.0, 30.0, 1)
+        self._sensor_fmin = self._double_spin(0.05, 500.0, 0.5, 3)
+        self._sensor_fmax = self._double_spin(0.10, 1000.0, 20.0, 3)
+        self._sensor_nmodes = QSpinBox(self)
+        self._sensor_nmodes.setRange(1, 12)
+        self._sensor_nmodes.setValue(3)
+
+        # Sample rate: auto-detect from the recording's timestamps (most reliable),
+        # or override when timestamps are missing/jittery. Recordings may be at
+        # different rates, so this is NOT hardcoded to 200 Hz.
+        self._sensor_fs_auto = QCheckBox("Auto-detect from recording", self)
+        self._sensor_fs_auto.setChecked(True)
+        self._sensor_fs_manual = self._double_spin(1.0, 5000.0, 200.0, 1)
+        self._sensor_fs_manual.setEnabled(False)
+        fs_row = QHBoxLayout()
+        fs_row.addWidget(self._sensor_fs_auto)
+        fs_row.addWidget(self._sensor_fs_manual)
+        fs_widget = QWidget(self)
+        fs_widget.setLayout(fs_row)
+        self._sensor_fs_auto.toggled.connect(
+            lambda on: self._sensor_fs_manual.setEnabled(not on)
+        )
+
+        id_form.addRow("Window length (s):", self._sensor_window)
+        id_form.addRow("Sample rate (Hz):", fs_widget)
+        id_form.addRow("Freq band min (Hz):", self._sensor_fmin)
+        id_form.addRow("Freq band max (Hz):", self._sensor_fmax)
+        id_form.addRow("Modes to identify:", self._sensor_nmodes)
+        vbox.addWidget(id_group)
+
+        # Recorded-session source (Mode A).
+        sess_group = QGroupBox("Recorded session (for Load & Identify)", self)
+        sess_v = QVBoxLayout(sess_group)
+        sess_row = QHBoxLayout()
+        self._sensor_session_edit = QLineEdit(self)
+        self._sensor_session_edit.setPlaceholderText("Latest session in data/raw (or browse)")
+        sess_row.addWidget(self._sensor_session_edit, stretch=1)
+        self._sensor_latest_btn = QPushButton("Use latest", self)
+        self._sensor_browse_btn = QPushButton("Browse…", self)
+        sess_row.addWidget(self._sensor_latest_btn)
+        sess_row.addWidget(self._sensor_browse_btn)
+        sess_v.addLayout(sess_row)
+        vbox.addWidget(sess_group)
+
+        # Wire sensor-panel controls.
+        self._sensor_preset.currentIndexChanged.connect(self._apply_sensor_preset)
+        self._sensor_latest_btn.clicked.connect(self._use_latest_session)
+        self._sensor_browse_btn.clicked.connect(self._browse_session)
+        return panel
+
+    def _refresh_sensor_story_combos(self) -> None:
+        """Rebuild story options to match the Model tab's story count."""
+        if not hasattr(self, "_sensor_story_combos"):
+            return
+        n_story = int(self._story_count.value())
+        for sid, combo in self._sensor_story_combos.items():
+            prev = combo.currentText()
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems([str(s) for s in range(1, n_story + 1)])
+            if prev and prev in [str(s) for s in range(1, n_story + 1)]:
+                combo.setCurrentText(prev)
+            combo.blockSignals(False)
+        self._apply_sensor_preset()
+
+    @Slot()
+    def _apply_sensor_preset(self, *_: object) -> None:
+        if not hasattr(self, "_sensor_story_combos"):
+            return
+        preset = self._sensor_preset.currentText()
+        n_story = int(self._story_count.value())
+        if preset == "Custom":
+            self._sensor_guidance.setText("Custom: set each sensor's story manually.")
+            return
+        if preset == "Fully instrumented (1 per floor)":
+            mapping = {sid: min(i + 1, n_story) for i, sid in enumerate(self._SENSOR_IDS)}
+            guide = "Place one sensor on each of stories 1, 2, 3 (full mode shapes)."
+        elif preset == "Bottom + top only":
+            mapping = {1: 1, 2: n_story, 3: n_story}
+            guide = f"Sensor 1 on story 1; sensors 2 & 3 on the top story ({n_story})."
+        else:  # "1 bottom + 2 top"
+            mapping = {1: 1, 2: n_story, 3: n_story}
+            guide = f"Sensor 1 on story 1 (bottom); sensors 2 & 3 on the top story ({n_story}) corners."
+        for sid, story in mapping.items():
+            combo = self._sensor_story_combos.get(sid)
+            if combo is not None:
+                combo.setCurrentText(str(min(story, n_story)))
+        self._sensor_guidance.setText(guide)
+
+    @Slot()
+    def _use_latest_session(self) -> None:
+        sessions = msl.list_sessions()
+        if not sessions:
+            QMessageBox.information(self, "No recordings",
+                                    "No recorded sessions found in data/raw.")
+            return
+        self._sensor_session_edit.setText(str(sessions[0]))
+
+    @Slot()
+    def _browse_session(self) -> None:
+        path = QFileDialog.getExistingDirectory(
+            self, "Choose recorded session folder",
+            self._sensor_session_edit.text().strip() or str(msl.AppPaths().raw_data),
+        )
+        if path:
+            self._sensor_session_edit.setText(path)
+
     @Slot()
     def _on_exp_source_changed(self) -> None:
-        manual = self._exp_source.currentText() == "Manual input"
-        self._exp_manual_widget.setVisible(manual)
-        self._exp_json_widget.setVisible(not manual)
+        source = self._exp_source.currentText()
+        self._exp_manual_widget.setVisible(source == "Manual input")
+        self._exp_json_widget.setVisible(source == "From JSON file")
+        if hasattr(self, "_exp_sensors_widget"):
+            self._exp_sensors_widget.setVisible(source == "From Sensors")
+        # Sensor-driven buttons are only meaningful in sensor mode.
+        if hasattr(self, "_identify_btn"):
+            sensor_mode = source == "From Sensors"
+            idle = self._thread is None and self._continuous_thread is None
+            self._identify_btn.setEnabled(sensor_mode and idle)
+            self._identify_analyze_btn.setEnabled(sensor_mode and idle)
+            self._continuous_btn.setEnabled(sensor_mode and idle)
 
     @Slot()
     def _rebuild_exp_data_widgets(self) -> None:
@@ -1616,6 +2199,7 @@ class ModelUpdatingTab(QWidget):
 
         self._rebuild_mass_table(existing_masses)
         self._sync_mode_counts_to_story_count()
+        self._refresh_sensor_story_combos()
         self._refresh_previews()
 
     def _rebuild_mass_table(self, existing: dict[int, list[float]] | None = None) -> None:
@@ -1838,12 +2422,15 @@ class ModelUpdatingTab(QWidget):
         }
 
         # Experimental modal data source
-        if self._exp_source.currentText() == "Manual input":
+        source = self._exp_source.currentText()
+        if source == "Manual input":
             params["experimental_data_source"] = "manual"
             params["experimental_modal_data"] = self._read_exp_data()
-        else:
+        elif source == "From JSON file":
             params["experimental_data_source"] = "json"
             params["experimental_json_path"] = self._exp_json_edit.text().strip()
+        else:  # From Sensors — experimental data comes from identification at run time
+            params["experimental_data_source"] = "sensors"
 
         self._validate_params(params)
         return params
@@ -1902,16 +2489,27 @@ class ModelUpdatingTab(QWidget):
         self._live_response_canvas.update_frame(frame)
         self._live_3d_canvas.update_frame(frame)
 
-    def _start_worker(self, action: str) -> None:
-        if self._thread is not None:
-            QMessageBox.information(self, "Busy", "Model updating is already running.")
+    def _start_worker(self, action: str, *, clear_log: bool = True) -> None:
+        if self._thread is not None or self._continuous_thread is not None:
+            QMessageBox.information(self, "Busy", "A model-updating task is already running.")
+            return
+
+        if action == "calibrate" and self._exp_source.currentText() == "From Sensors":
+            QMessageBox.information(
+                self, "Identify first",
+                "In sensor mode, press 'Load & Identify' first. The identified "
+                "frequencies/mode shapes load into Manual input for review, then "
+                "press Calibrate.",
+            )
             return
 
         try:
             params = self._collect_params()
         except Exception as exc:
+            self._sensor_chain = []  # abort any pending sensor chain
             self._tabs.setCurrentWidget(self._output_tab)
-            self._log.clear()
+            if clear_log:
+                self._log.clear()
             self._append_log(f"Invalid model-updating input:\n{exc}\n")
             self._status.setText("Model updating input is invalid.")
             QMessageBox.critical(self, "Invalid model-updating input", str(exc))
@@ -1943,7 +2541,8 @@ class ModelUpdatingTab(QWidget):
         self._thread = thread
         action_label = "analysis" if action == "run" else action
         self._set_busy(True, f"Running {action_label}...")
-        self._log.clear()
+        if clear_log:
+            self._log.clear()
         self._tabs.setCurrentWidget(self._output_tab)
         self._prepare_live_view(action, params.get("run_transient", False))
         thread.start()
@@ -1999,14 +2598,328 @@ class ModelUpdatingTab(QWidget):
 
     @Slot(str)
     def _on_worker_error(self, message: str) -> None:
+        self._sensor_chain = []  # abort any pending sensor chain
         self._set_busy(False, "Model updating failed.")
         QMessageBox.critical(self, "Model updating failed", message)
 
     def _clear_worker(self) -> None:
         self._thread = None
         self._worker = None
+        # Launch the next step of a sensor chain (Identify & Analyze) once the
+        # previous thread has fully finished, so the busy-guard sees no thread.
+        if self._sensor_chain:
+            step = self._sensor_chain.pop(0)
+            QTimer.singleShot(0, lambda s=step: self._start_worker(s, clear_log=False))
 
-    def _set_busy(self, busy: bool, status: str) -> None:
+    def _set_busy(self, busy: bool, status: str, *, continuous: bool = False) -> None:
         self._calibrate_btn.setEnabled(not busy)
         self._run_btn.setEnabled(not busy)
+        sensor_mode = self._exp_source.currentText() == "From Sensors"
+        self._identify_btn.setEnabled(not busy and sensor_mode)
+        self._identify_analyze_btn.setEnabled(not busy and sensor_mode)
+        # During a continuous run the button stays enabled as the Stop control.
+        self._continuous_btn.setEnabled((continuous or not busy) and sensor_mode)
         self._status.setText(status)
+
+    # ------------------------------------------------------------------
+    # Sensor-driven workflows (M3 Mode A / M4 Mode B)
+    # ------------------------------------------------------------------
+    @Slot()
+    def _reset_tab(self) -> None:
+        """Return the tab to a clean, ready state so a new analysis can run.
+
+        Stops a continuous run if active; refuses while a one-shot worker is
+        mid-run (those threads can't be safely interrupted).
+        """
+        if self._continuous_thread is not None:
+            self._stop_continuous()
+        if self._thread is not None:
+            QMessageBox.information(
+                self, "Busy", "Wait for the current task to finish before resetting."
+            )
+            return
+
+        self._sensor_chain = []
+        self._calibration_state = _CalibrationState()
+        self._log.clear()
+
+        # Reset the figure area to placeholders.
+        self._live_response_canvas.hide()
+        self._run_right_widget.hide()
+        self._fig1_label.show()
+        self._fig2_label.show()
+        self._fig1_label.set_figure(None)
+        self._fig2_label.set_figure(None)
+        for lbl in self._mode_shape_labels:
+            lbl.set_figure(None)
+        self._fig1_label.setText("Run Calibrate or Analysis\nto see results here.")
+        self._fig2_label.setText("")
+
+        # Return to the sensor workflow so the sensor buttons are usable again
+        # (Load & Identify switches the source to Manual after it runs).
+        self._exp_source.setCurrentText("From Sensors")
+        self._set_busy(False, "Reset. Ready for a new analysis.")
+
+    def set_recorder_controller(self, controller) -> None:
+        """Wire the RecorderController (for live capture in Continuous Update)."""
+        self._recorder_controller = controller
+        # Default the manual sample-rate override to the app's configured device
+        # rate (same source Live Signals / Spectrum use). Auto-detect stays on.
+        try:
+            fs = float(controller.sampling_config().device_rate_hz)
+            if fs > 0:
+                self._sensor_fs_manual.setValue(fs)
+        except Exception:
+            pass
+
+    def _collect_sensor_params(self) -> dict[str, Any]:
+        story_map = {
+            sid: int(combo.currentText())
+            for sid, combo in self._sensor_story_combos.items()
+            if combo.count()
+        }
+        fmin = float(self._sensor_fmin.value())
+        fmax = float(self._sensor_fmax.value())
+        if fmax <= fmin:
+            raise ValueError("Sensor frequency band max must exceed min.")
+        target_fs = (
+            None if self._sensor_fs_auto.isChecked()
+            else float(self._sensor_fs_manual.value())
+        )
+        return {
+            "sensor_axis": self._sensor_axis.currentText(),
+            "sensor_window_s": float(self._sensor_window.value()),
+            "sensor_f_min": fmin,
+            "sensor_f_max": fmax,
+            "sensor_n_modes": int(self._sensor_nmodes.value()),
+            "sensor_story_map": story_map,
+            "sensor_target_fs": target_fs,
+            "nStory": int(self._story_count.value()),
+        }
+
+    # ---- Mode A: Load & Identify -------------------------------------
+    def _start_identify(self, checked: bool = False, *, chain: list[str] | None = None) -> None:
+        self._sensor_chain = []
+        if self._thread is not None or self._continuous_thread is not None:
+            QMessageBox.information(self, "Busy", "A model-updating task is already running.")
+            return
+
+        # The chained Identify & Analyze needs OpenSees for the calibrate/run steps.
+        if chain:
+            missing = [m for m in REQUIRED_MODULES if importlib.util.find_spec(m) is None]
+            if missing:
+                QMessageBox.critical(
+                    self, "OpenSees required",
+                    "Identify & Analyze needs the model-updating extras (" + ", ".join(missing) +
+                    ').\n\nInstall with:\npip install -e ".[model-updating]"\n\n'
+                    "Use 'Load & Identify' for identification only.",
+                )
+                return
+
+        session_path = self._sensor_session_edit.text().strip()
+        if not session_path:
+            sessions = msl.list_sessions()
+            if not sessions:
+                QMessageBox.warning(
+                    self, "No recording",
+                    "No recorded session found in data/raw. Record one in the Live "
+                    "Signals tab (and sync it from the Pi) first.",
+                )
+                return
+            session_path = str(sessions[0])
+            self._sensor_session_edit.setText(session_path)
+
+        try:
+            params = self._collect_sensor_params()
+        except Exception as exc:
+            QMessageBox.critical(self, "Invalid sensor configuration", str(exc))
+            return
+
+        self._sensor_chain = list(chain or [])
+
+        worker = _IdentifyWorker(params, session_path)
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        worker.log.connect(self._append_log)
+        worker.finished.connect(self._on_identify_finished)
+        worker.error.connect(self._on_identify_error)
+        thread.started.connect(worker.run)
+        worker.finished.connect(thread.quit)
+        worker.error.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        worker.error.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(self._clear_worker)
+
+        self._worker = worker  # type: ignore[assignment]
+        self._thread = thread
+        self._set_busy(True, "Identifying modes from recording…")
+        self._log.clear()
+        self._tabs.setCurrentWidget(self._output_tab)
+        self._prepare_live_view("identify", False)
+        thread.start()
+
+    @Slot(object)
+    def _on_identify_finished(self, result: dict[str, Any]) -> None:
+        self._tabs.setCurrentWidget(self._output_tab)
+        self._live_response_canvas.hide()
+        self._run_right_widget.hide()
+        self._fig1_label.show()
+        self._fig2_label.show()
+        self._display_png(self._fig1_label, result.get("fig1_png"))
+        self._display_png(self._fig2_label, result.get("fig2_png"))
+        self._apply_identified_to_fields(
+            result.get("exp_dict", {}), bool(result.get("mode_shapes_available"))
+        )
+        if self._sensor_chain:
+            # Identify & Analyze: keep busy; _clear_worker launches calibrate → run.
+            self._append_log(
+                "\n─── Identification complete. Proceeding to OpenSees update & analysis… ───\n"
+            )
+            self._status.setText("Updating model from sensor results…")
+        else:
+            self._append_log(
+                "\n─── Identification complete. Values loaded into Manual input — "
+                "review and press Calibrate. ───\n"
+            )
+            self._set_busy(False, "Identification complete.")
+
+    @Slot(str)
+    def _on_identify_error(self, message: str) -> None:
+        self._sensor_chain = []
+        self._set_busy(False, "Identification failed.")
+        QMessageBox.critical(self, "Identification failed", message)
+
+    def _apply_identified_to_fields(self, exp_dict: dict[str, Any], shapes_available: bool) -> None:
+        freqs = exp_dict.get("frequencies_hz", [])
+        n = len(freqs)
+        if n:
+            self._n_calib_modes.setValue(
+                max(1, min(n, int(self._num_modes.value()), int(self._story_count.value())))
+            )
+        self._rebuild_exp_data_widgets()
+        for i, spin in enumerate(self._exp_freq_spins):
+            if i < n:
+                spin.setValue(float(freqs[i]))
+
+        shapes = exp_dict.get("mode_shapes_ux", {})
+        self._use_mode_shapes.setChecked(bool(shapes_available and shapes))
+        if shapes_available and shapes:
+            for c in range(self._exp_mode_table.columnCount()):
+                key = str(c + 1)
+                if key in shapes:
+                    for r, val in enumerate(shapes[key]):
+                        if r < self._exp_mode_table.rowCount():
+                            w = self._exp_mode_table.cellWidget(r, c)
+                            if isinstance(w, QDoubleSpinBox):
+                                w.setValue(float(val))
+        # Switch to Manual input so the user can review/edit before calibrating.
+        self._exp_source.setCurrentText("Manual input")
+
+    # ---- Mode B: Continuous Update -----------------------------------
+    @Slot()
+    def _toggle_continuous(self) -> None:
+        if self._continuous_thread is not None:
+            self._stop_continuous()
+        else:
+            self._start_continuous()
+
+    def _start_continuous(self) -> None:
+        if self._thread is not None or self._continuous_thread is not None:
+            QMessageBox.information(self, "Busy", "A model-updating task is already running.")
+            return
+        ctrl = self._recorder_controller
+        if ctrl is None or not ctrl.is_streaming():
+            QMessageBox.warning(
+                self, "Streaming required",
+                "Start streaming in the Live Signals tab first, then start "
+                "Continuous Update.",
+            )
+            return
+        try:
+            params = self._collect_params()
+            params.update(self._collect_sensor_params())
+        except Exception as exc:
+            self._tabs.setCurrentWidget(self._output_tab)
+            self._append_log(f"Invalid input:\n{exc}\n")
+            QMessageBox.critical(self, "Invalid input", str(exc))
+            return
+
+        settings = self._continuous_settings()
+        if settings is None:
+            return
+        ctrl.set_modal_window_seconds(settings["duration_s"])
+
+        worker = _ContinuousUpdateWorker(params, settings, ctrl.snapshot_modal_capture)
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        worker.log.connect(self._append_log)
+        worker.result.connect(self._on_continuous_result)
+        worker.error.connect(self._on_continuous_error)
+        worker.finished.connect(self._on_continuous_finished)
+        thread.started.connect(worker.run)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+
+        self._continuous_worker = worker
+        self._continuous_thread = thread
+        self._continuous_btn.setText("Stop")
+        self._set_busy(True, "Continuous update running…", continuous=True)
+        self._log.clear()
+        self._tabs.setCurrentWidget(self._output_tab)
+        self._prepare_live_view("identify", False)
+        thread.start()
+
+    def _stop_continuous(self) -> None:
+        if self._continuous_worker is not None:
+            self._continuous_worker.stop()
+        self._continuous_btn.setEnabled(False)
+        self._status.setText("Stopping continuous update…")
+
+    def _continuous_settings(self) -> dict[str, Any] | None:
+        from PySide6.QtWidgets import QDialog, QDialogButtonBox
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Continuous Update Settings")
+        form = QFormLayout(dlg)
+        dur = self._double_spin(modal_id.MIN_DURATION_S, 600.0, float(self._sensor_window.value()), 1)
+        interval = self._double_spin(modal_id.MIN_DURATION_S, 3600.0, 60.0, 1)
+        maxfail = QSpinBox(dlg)
+        maxfail.setRange(1, 50)
+        maxfail.setValue(3)
+        form.addRow("Recording duration per cycle (s):", dur)
+        form.addRow("Update interval (s):", interval)
+        form.addRow("Max consecutive failures:", maxfail)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, dlg)
+        form.addRow(buttons)
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        if dlg.exec() != QDialog.Accepted:
+            return None
+        return {
+            "duration_s": float(dur.value()),
+            "interval_s": float(interval.value()),
+            "max_failures": int(maxfail.value()),
+        }
+
+    @Slot(object)
+    def _on_continuous_result(self, payload: dict[str, Any]) -> None:
+        self._live_response_canvas.hide()
+        self._run_right_widget.hide()
+        self._fig1_label.show()
+        self._fig2_label.show()
+        self._display_png(self._fig1_label, payload.get("fig1_png"))
+        self._display_png(self._fig2_label, payload.get("fig2_png"))
+
+    @Slot(str)
+    def _on_continuous_error(self, message: str) -> None:
+        self._append_log(f"\n{message}\n")
+        QMessageBox.warning(self, "Continuous update", message)
+
+    @Slot()
+    def _on_continuous_finished(self) -> None:
+        self._continuous_worker = None
+        self._continuous_thread = None
+        self._continuous_btn.setText("Start Continuous Update")
+        self._set_busy(False, "Continuous update stopped.")
