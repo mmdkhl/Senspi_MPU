@@ -13,6 +13,8 @@ Pure I/O + numpy — no Qt, no SSH.
 
 from __future__ import annotations
 
+import csv
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -22,6 +24,37 @@ from ..config.app_config import AppPaths
 from ..sensors.mpu6050 import parse_line
 
 _LOG_SUFFIXES = {".jsonl", ".csv", ".log", ".txt"}
+_SID_RE = re.compile(r"_S(\d+)_")
+
+
+def _sid_from_filename(path: Path) -> int | None:
+    """Recover a sensor id from a per-sensor filename like ``mpu_S2_...``."""
+    m = _SID_RE.search(path.name)
+    return int(m.group(1)) if m else None
+
+
+def _is_header_line(line: str) -> bool:
+    """A CSV header has a first token that is not a number (e.g. 'timestamp_ns')."""
+    first = line.split(",", 1)[0].strip()
+    if not first:
+        return False
+    try:
+        float(first)
+        return False
+    except ValueError:
+        return True
+
+
+def _row_time_seconds(row: dict) -> float | None:
+    """Prefer ``t_s`` (seconds since start); fall back to ``timestamp_ns``."""
+    for key, scale in (("t_s", 1.0), ("timestamp_ns", 1e-9)):
+        val = row.get(key)
+        if val not in (None, ""):
+            try:
+                return float(val) * scale
+            except (TypeError, ValueError):
+                return None
+    return None
 
 
 @dataclass
@@ -58,28 +91,89 @@ def find_session_files(session_dir: Path) -> list[Path]:
 
 
 def _collect_samples(paths: list[Path], axis: str) -> dict[int, list[tuple[float, float]]]:
-    """Parse files into {sensor_id: [(t_seconds, axis_value), ...]}."""
+    """Parse files into ``{sensor_id: [(t_seconds, axis_value), ...]}``.
+
+    Handles three on-disk formats produced by the Pi logger:
+    - **JSONL** (lines starting with ``{``) — via :func:`parse_line`.
+    - **Header CSV** (named columns, e.g. ``timestamp_ns,t_s,sensor_id,ax,ay,gz``)
+      — read by column NAME so it works with any channel subset.
+    - **Legacy positional CSV** (no header, ``ts,ax,ay,az,gx,gy,gz``) — via
+      :func:`parse_line`, with sensor id recovered from the filename.
+    """
     attr = axis.lower()
     per_sensor: dict[int, list[tuple[float, float]]] = {}
     for path in paths:
+        sid_default = _sid_from_filename(path) or 1
         try:
-            with path.open("r", encoding="utf-8", errors="replace") as fh:
-                for line in fh:
-                    sample = parse_line(line)
-                    if sample is None:
-                        continue
-                    sid = sample.sensor_id if sample.sensor_id is not None else 1
-                    if sample.t_s is not None:
-                        t = float(sample.t_s)
-                    else:
-                        t = float(sample.timestamp_ns) / 1e9
-                    value = getattr(sample, attr, None)
-                    if value is None:
-                        continue
-                    per_sensor.setdefault(int(sid), []).append((t, float(value)))
+            with path.open("r", encoding="utf-8", errors="replace", newline="") as fh:
+                first = ""
+                while first == "":
+                    line = fh.readline()
+                    if not line:
+                        break
+                    first = line.strip()
+                fh.seek(0)
+                if not first:
+                    continue
+
+                if first.startswith("{"):
+                    _collect_jsonl(fh, attr, sid_default, per_sensor)
+                elif _is_header_line(first):
+                    _collect_header_csv(fh, attr, sid_default, per_sensor)
+                else:
+                    _collect_positional(fh, attr, sid_default, per_sensor)
         except OSError:
             continue
     return per_sensor
+
+
+def _collect_jsonl(fh, attr, sid_default, per_sensor) -> None:
+    for line in fh:
+        sample = parse_line(line)
+        if sample is None:
+            continue
+        value = getattr(sample, attr, None)
+        if value is None or (isinstance(value, float) and value != value):  # skip NaN
+            continue
+        t = float(sample.t_s) if sample.t_s is not None else float(sample.timestamp_ns) / 1e9
+        sid = sample.sensor_id if sample.sensor_id is not None else sid_default
+        per_sensor.setdefault(int(sid), []).append((t, float(value)))
+
+
+def _collect_header_csv(fh, attr, sid_default, per_sensor) -> None:
+    reader = csv.DictReader(fh)
+    if not reader.fieldnames or attr not in reader.fieldnames:
+        return  # this file doesn't carry the requested axis
+    for row in reader:
+        raw = row.get(attr)
+        if raw in (None, ""):
+            continue
+        try:
+            value = float(raw)
+        except (TypeError, ValueError):
+            continue
+        t = _row_time_seconds(row)
+        if t is None:
+            continue
+        sid_raw = row.get("sensor_id")
+        try:
+            sid = int(float(sid_raw)) if sid_raw not in (None, "") else sid_default
+        except (TypeError, ValueError):
+            sid = sid_default
+        per_sensor.setdefault(sid, []).append((t, value))
+
+
+def _collect_positional(fh, attr, sid_default, per_sensor) -> None:
+    for line in fh:
+        sample = parse_line(line)
+        if sample is None:
+            continue
+        value = getattr(sample, attr, None)
+        if value is None or (isinstance(value, float) and value != value):
+            continue
+        t = float(sample.t_s) if sample.t_s is not None else float(sample.timestamp_ns) / 1e9
+        sid = sample.sensor_id if sample.sensor_id is not None else sid_default
+        per_sensor.setdefault(int(sid), []).append((t, float(value)))
 
 
 def load_session(

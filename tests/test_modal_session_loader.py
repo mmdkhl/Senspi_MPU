@@ -67,5 +67,57 @@ class TestLoadSession(unittest.TestCase):
             self.assertTrue(result.success, result.message)
 
 
+def _write_header_csv(path: Path, fs=42.5, duration=20.0, n_sensors=3):
+    """Mimic the real Pi CSV: header row, columns timestamp_ns,t_s,sensor_id,ax,ay,gz."""
+    import numpy as np
+    n = int(fs * duration)
+    for sid in range(1, n_sensors + 1):
+        f = path / f"mpu_S{sid}_2025-12-18_02-35-53.csv"
+        with f.open("w", encoding="utf-8") as fh:
+            fh.write("timestamp_ns,t_s,sensor_id,ax,ay,gz\n")
+            for i in range(n):
+                t = i / fs
+                ax = float(np.sin(2 * np.pi * 2.0 * t))
+                fh.write(f"{int(t*1e9)},{t:.9f},{sid},{ax},0.0,0.0\n")
+
+
+class TestHeaderCsv(unittest.TestCase):
+    """The real Pi recording is header CSV with only ax/ay/gz (no az/gx/gy)."""
+
+    def test_loads_header_csv(self):
+        with tempfile.TemporaryDirectory() as d:
+            session = Path(d) / "pi-5"
+            mpu = session / "mpu"
+            mpu.mkdir(parents=True)
+            _write_header_csv(mpu)
+            out = msl.load_session(session, axis="ax")
+            self.assertTrue(out.success, out.message)
+            self.assertEqual(out.sensor_ids, [1, 2, 3])
+            self.assertEqual(out.data.shape[0], 3)
+            self.assertAlmostEqual(out.fs, 42.5, delta=2.0)
+
+    def test_header_csv_feeds_identify(self):
+        from sensepi.analysis import modal
+        with tempfile.TemporaryDirectory() as d:
+            session = Path(d) / "pi-5"
+            mpu = session / "mpu"
+            mpu.mkdir(parents=True)
+            _write_header_csv(mpu, duration=30.0)
+            out = msl.load_session(session, axis="ax")
+            result = modal.identify_modes(out.data, out.fs, f_min=0.5, f_max=15.0, n_modes=1)
+            self.assertTrue(result.success, result.message)
+            self.assertAlmostEqual(result.frequencies_hz[0], 2.0, delta=0.3)
+
+    def test_missing_axis_column(self):
+        # If the requested axis isn't a column, that file yields no samples.
+        with tempfile.TemporaryDirectory() as d:
+            session = Path(d) / "pi-5"
+            mpu = session / "mpu"
+            mpu.mkdir(parents=True)
+            _write_header_csv(mpu)
+            out = msl.load_session(session, axis="az")  # az not present
+            self.assertFalse(out.success)
+
+
 if __name__ == "__main__":
     unittest.main()
