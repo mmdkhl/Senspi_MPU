@@ -8,6 +8,9 @@ Extracted from launch_input_window() in DigitalTwin_V8.py.
 import os
 import copy
 import json
+
+_PACKAGE_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+_DEFAULT_GM_FILE = os.path.join(_PACKAGE_ROOT, "input", "sine_1Hz_accel.txt")
 import numpy as np
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -533,7 +536,7 @@ def launch_input_window():
     r = add_field(ana, r, "Number of modes in model", "numModes", "4", "Total number of numerical modes to extract.")
     r = add_field(ana, r, "Damping ratio ζ (-)", "zeta", "0.005", "Target Rayleigh damping ratio.")
     r = add_field(ana, r, "Ground-motion scale factor", "gmFactor", "9.81", "Multiplier applied to the input record.")
-    r = add_field(ana, r, "Ground-motion file", "gmFile", "input/sine_1Hz_accel.txt", "Path to the acceleration time-history file.")
+    r = add_field(ana, r, "Ground-motion file", "gmFile", _DEFAULT_GM_FILE, "Path to the acceleration time-history file.")
     r = add_field(ana, r, "Ground-motion time step dt (s)", "dtGM", "0.01", "Sampling time step of the ground-motion record.")
     r = add_check(ana, r, "Run transient after calibration", "run_transient", True,
                   "If unchecked, only modal analysis and calibration are performed.")

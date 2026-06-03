@@ -8,8 +8,9 @@ import numpy as np
 from ..utils.formatters import deep_round
 
 
-# Fixed path for experimental modal data
-EXPERIMENTAL_MODAL_JSON = "input/experimental_modal_data.json"
+# Path anchored to this file: src/opensees_model_updating/io/ -> .. -> src/opensees_model_updating/
+_PACKAGE_ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+EXPERIMENTAL_MODAL_JSON = os.path.join(_PACKAGE_ROOT, "input", "experimental_modal_data.json")
 
 
 def write_json(path, data, round_values=True):

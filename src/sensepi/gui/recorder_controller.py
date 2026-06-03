@@ -3,10 +3,12 @@ from __future__ import annotations
 import logging
 import math
 import queue
+import threading
+from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Deque, Dict, Optional, Tuple
 
 from PySide6.QtCore import QObject, QMetaObject, QThread, Qt, Signal, Slot
 
@@ -34,6 +36,71 @@ class MpuGuiConfig:
     include_temp: bool = False
     limit_duration: bool = False
     duration_s: float = 0.0
+
+
+class ModalCaptureBuffer:
+    """Long-window, lock-protected per-sensor sample store for modal capture.
+
+    Separate from the GUI's 6 s ``StreamingDataBuffer`` (guardrail G3/G5 keep
+    that one small). Written on the GUI thread in ``_on_samples_batch`` and read
+    by the Mode B worker thread via :meth:`snapshot`; a ``threading.Lock``
+    serializes the two so the deques are never mutated mid-read. Stores only
+    ``(t_seconds, ax, ay, az)`` — enough for X/Y modal identification.
+    """
+
+    def __init__(self, window_seconds: float = 120.0) -> None:
+        self._window_s = max(1.0, float(window_seconds))
+        self._lock = threading.Lock()
+        self._buf: Dict[int, Deque[Tuple[float, float, float, float]]] = {}
+
+    def set_window(self, window_seconds: float) -> None:
+        with self._lock:
+            self._window_s = max(1.0, float(window_seconds))
+
+    def clear(self) -> None:
+        with self._lock:
+            self._buf.clear()
+
+    def add_batch(self, batch: Iterable[MpuSample]) -> None:
+        with self._lock:
+            for s in batch:
+                if not isinstance(s, MpuSample):
+                    continue
+                t = float(s.t_s) if s.t_s is not None else float(s.timestamp_ns) * 1e-9
+                sid = int(s.sensor_id) if s.sensor_id is not None else 1
+                dq = self._buf.get(sid)
+                if dq is None:
+                    dq = deque()
+                    self._buf[sid] = dq
+                dq.append((t, float(s.ax), float(s.ay), float(s.az)))
+            self._trim_locked()
+
+    def _trim_locked(self) -> None:
+        latest = 0.0
+        for dq in self._buf.values():
+            if dq:
+                latest = max(latest, dq[-1][0])
+        if latest <= 0.0:
+            return
+        threshold = latest - self._window_s
+        for dq in self._buf.values():
+            while dq and dq[0][0] < threshold:
+                dq.popleft()
+
+    def available_seconds(self) -> float:
+        with self._lock:
+            spans = [dq[-1][0] - dq[0][0] for dq in self._buf.values() if len(dq) > 1]
+        return min(spans) if spans else 0.0
+
+    def snapshot_series(self, axis: str) -> Dict[int, list[Tuple[float, float]]]:
+        """Return a copied {sensor_id: [(t, axis_value), ...]} (thread-safe)."""
+        col = {"ax": 1, "ay": 2, "az": 3}.get(axis.lower(), 1)
+        with self._lock:
+            return {
+                sid: [(row[0], row[col]) for row in dq]
+                for sid, dq in self._buf.items()
+                if dq
+            }
 
 
 class RecorderController(QObject):
@@ -91,6 +158,10 @@ class RecorderController(QObject):
         self._sample_queue: queue.Queue[object] = queue.Queue(maxsize=10_000)
         self._current_sensor_selection = SensorSelectionConfig()
         self._current_gui_acquisition_config: GuiAcquisitionConfig | None = None
+
+        # Long-window store for modal capture (Mode B). Independent of the 6 s
+        # GUI buffer above; written on the GUI thread, read by the modal worker.
+        self._modal_buffer = ModalCaptureBuffer(window_seconds=120.0)
 
     # --------------------------------------------------------------- helpers
     def _load_sampling_config(self) -> SamplingConfig:
@@ -154,6 +225,40 @@ class RecorderController(QObject):
 
     def data_buffer(self) -> StreamingDataBuffer | None:
         return self._data_buffer
+
+    # --------------------------------------------------------------- modal capture
+    def is_streaming(self) -> bool:
+        """True when a live stream is active (Mode B prerequisite)."""
+        return self._ingest_worker is not None
+
+    def set_modal_window_seconds(self, seconds: float) -> None:
+        """Resize the long-window modal accumulator (Mode B cycle length)."""
+        self._modal_buffer.set_window(seconds)
+
+    def modal_available_seconds(self) -> float:
+        """Seconds of data currently buffered across all sensors (min span)."""
+        return self._modal_buffer.available_seconds()
+
+    def snapshot_modal_capture(
+        self,
+        *,
+        axis: str = "ax",
+        last_seconds: float | None = None,
+        target_fs: float | None = None,
+    ):
+        """Snapshot the live accumulator into an aligned ``ModalSession``.
+
+        Thread-safe: the underlying buffer copies its deques under a lock, so
+        this can be called from the Mode B worker thread. Returns the same
+        ``ModalSession`` type the disk loader produces, so downstream code is
+        identical for live and recorded data.
+        """
+        from ..dataio.modal_session_loader import align_per_sensor_series
+
+        series = self._modal_buffer.snapshot_series(axis)
+        return align_per_sensor_series(
+            series, last_seconds=last_seconds, target_fs=target_fs, source="live capture"
+        )
 
     def recording_requested(self) -> bool:
         return bool(self._recording_preference)
@@ -416,6 +521,10 @@ class RecorderController(QObject):
                     self._data_buffer.add_samples(batch)  # type: ignore[arg-type]
                 except Exception:
                     logger.exception("RecorderController: failed to add samples to buffer")
+            try:
+                self._modal_buffer.add_batch(batch)  # type: ignore[arg-type]
+            except Exception:
+                logger.exception("RecorderController: failed to add samples to modal buffer")
         for sample in batch:
             self.sample_received.emit(sample)
 

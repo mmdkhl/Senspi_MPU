@@ -231,6 +231,102 @@ def report_to_text(report):
     return "\n".join(lines)
 
 
+def generate_calibration_summary_png(exp_data, modal_before, modal_after,
+                                      original_params, calibrated_params):
+    """
+    Generate the calibration summary figure (2 subplots) and return PNG bytes.
+
+    Shows only: Frequencies comparison (left) + Normalized Mode Shapes (right).
+
+    Parameters
+    ----------
+    exp_data : dict
+        Experimental data from prepare_experimental_modal_data().
+    modal_before : dict
+        Modal results before calibration.
+    modal_after : dict
+        Modal results after calibration.
+    original_params : dict
+        Original model parameters.
+    calibrated_params : dict
+        Calibrated model parameters.
+
+    Returns
+    -------
+    bytes : PNG image data
+    """
+    import io as _io
+    n_use = exp_data["n_modes_used"]
+    stories = np.arange(1, original_params["nStory"] + 1)
+    modes = np.arange(1, n_use + 1)
+
+    fs = 15   # base font size — readable after ~50 % downscale
+
+    fig = Figure(figsize=(10, 4.5))
+    FigureCanvas(fig)
+
+    # --- Left: Frequency comparison ---
+    ax1 = fig.add_subplot(1, 2, 1)
+    ax1.plot(modes, exp_data["freqs"][:n_use], marker="o", linewidth=2.2,
+             color="red", label="Target")
+    ax1.plot(modes, modal_before["freqs"][:n_use], marker="s", linewidth=2.0,
+             color="black", linestyle="--", label="Original")
+    ax1.plot(modes, modal_after["freqs"][:n_use], marker="^", linewidth=2.0,
+             color="green", linestyle="-.", label="Calibrated")
+    ax1.set_title("Frequencies", fontsize=fs + 1)
+    ax1.set_xlabel("Mode", fontsize=fs)
+    ax1.set_ylabel("Frequency (Hz)", fontsize=fs)
+    ax1.set_xticks(modes)
+    ax1.tick_params(labelsize=fs - 1)
+    ax1.grid(True, alpha=0.3)
+    ax1.legend(fontsize=fs - 2)
+
+    # --- Right: Normalized mode shapes ---
+    ax2 = fig.add_subplot(1, 2, 2)
+    mode_shapes_can_plot = (
+        bool(exp_data.get("use_mode_shapes", False))
+        and len(exp_data.get("modes", [])) >= n_use
+    )
+
+    if mode_shapes_can_plot:
+        line_styles = ["-", "--", ":", "-."]
+        for i in range(n_use):
+            phi_exp = np.asarray(exp_data["modes"][i], dtype=float)
+            phi_before = align_mode_sign(
+                np.asarray(modal_before["mode_shapes_ux_master"][i], dtype=float), phi_exp
+            )
+            phi_after = align_mode_sign(
+                np.asarray(modal_after["mode_shapes_ux_master"][i], dtype=float), phi_exp
+            )
+            ls = line_styles[i % len(line_styles)]
+            ax2.plot(phi_before, stories, color="black", linestyle=ls,
+                     marker="s", linewidth=1.8, label=f"Orig M{i+1}")
+            ax2.plot(phi_exp, stories, color="red", linestyle=ls,
+                     marker="o", linewidth=1.8, label=f"Target M{i+1}")
+            ax2.plot(phi_after, stories, color="green", linestyle=ls,
+                     marker="^", linewidth=1.8, label=f"Calib M{i+1}")
+        ax2.set_title("Normalized Mode Shapes (UX)", fontsize=fs + 1)
+        ax2.set_xlabel("Normalized amplitude", fontsize=fs)
+        ax2.set_ylabel("Story", fontsize=fs)
+        ax2.set_yticks(stories)
+        ax2.tick_params(labelsize=fs - 1)
+        ax2.grid(True, alpha=0.3)
+        ax2.legend(ncol=3, fontsize=fs - 4)
+    else:
+        ax2.axis("off")
+        ax2.set_title("Mode Shapes", fontsize=fs + 1)
+        ax2.text(0.05, 0.95,
+                 "Mode shapes were not used\nor not available for this story count.\n\n"
+                 "Frequencies are still used for calibration.",
+                 va="top", ha="left", fontsize=fs - 1)
+
+    fig.tight_layout(pad=1.8)
+    buf = _io.BytesIO()
+    fig.savefig(buf, format="png", dpi=140, bbox_inches="tight")
+    buf.seek(0)
+    return buf.read()
+
+
 def save_calibration_summary_figure(exp_data, modal_before, modal_after,
                                      original_params, calibrated_params,
                                      save_path="output/calibration_summary.png"):
