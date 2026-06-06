@@ -78,6 +78,40 @@ class TestIdentifyModes(unittest.TestCase):
         self.assertFalse(result.success)
 
 
+class TestIdentifyModesFFT(unittest.TestCase):
+    def test_recovers_frequencies(self):
+        x, fs = _synthetic()
+        result = modal.identify_modes(x, fs, f_min=0.5, f_max=20.0, n_modes=3, method="fft")
+        self.assertTrue(result.success, result.message)
+        self.assertEqual(result.method, "fft")
+        self.assertEqual(result.n_modes_found, 3)
+        for got, expected in zip(result.frequencies_hz, TRUE_FREQS):
+            self.assertAlmostEqual(got, expected, delta=0.2)
+
+    def test_shapes_are_magnitude(self):
+        # FFT recovers magnitude only (sign unknown), so compare against |truth|.
+        x, fs = _synthetic()
+        result = modal.identify_modes(x, fs, n_modes=3, method="fft")
+        for got, expected in zip(result.mode_shapes_sensor, TRUE_SHAPES):
+            self.assertGreater(_mac(got, np.abs(expected)), 0.9)
+            self.assertTrue(all(v >= 0 for v in got))
+
+    def test_shapes_normalized_maxabs_one(self):
+        x, fs = _synthetic()
+        result = modal.identify_modes(x, fs, n_modes=3, method="fft")
+        for shape in result.mode_shapes_sensor:
+            self.assertAlmostEqual(max(abs(v) for v in shape), 1.0, places=6)
+
+    def test_default_method_is_fdd(self):
+        x, fs = _synthetic()
+        self.assertEqual(modal.identify_modes(x, fs).method, "fdd")
+
+    def test_unknown_method_fails(self):
+        x, fs = _synthetic()
+        result = modal.identify_modes(x, fs, method="bogus")
+        self.assertFalse(result.success)
+
+
 class TestEstimateFs(unittest.TestCase):
     def test_uniform(self):
         t = np.arange(1000) / 200.0

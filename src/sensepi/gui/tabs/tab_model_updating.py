@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from PySide6.QtCore import QPointF, QObject, Qt, QThread, QTimer, Signal, Slot
 from PySide6.QtGui import QColor, QPainter, QPen, QTextCursor
 from PySide6.QtGui import QPixmap
@@ -999,27 +1000,49 @@ def _fig_to_png(fig: Figure) -> bytes:
     return buf.getvalue()
 
 
+# One fixed color per mode index, used CONSISTENTLY across every output figure
+# (spectrum peaks, identified mode shapes, parameter-history frequencies) so a
+# given mode is the same color everywhere. Indexed by 0-based mode number.
+_MODE_COLORS = ["#2563eb", "#ea580c", "#16a34a", "#9333ea", "#0891b2", "#ca8a04"]
+
+
+def _mode_color(i: int) -> str:
+    return _MODE_COLORS[i % len(_MODE_COLORS)]
+
+
 def _render_fdd_spectrum_png(result: "modal_id.ExperimentalModalResult",
                              f_min: float, f_max: float) -> bytes:
-    """FDD singular-value spectrum (dB) with identified peaks marked."""
+    """Identification spectrum (dB) with each identified mode in its own color.
+
+    Title/labels adapt to the method on ``result`` (FDD = 1st singular value of
+    the CSD matrix; FFT = sensor-averaged Welch PSD)."""
+    is_fft = getattr(result, "method", "fdd") == "fft"
+    title = ("FFT spectrum (averaged PSD)" if is_fft
+             else "FDD spectrum (1st singular value)")
     fig = Figure(figsize=(6.4, 4.4))
     ax = fig.add_subplot(1, 1, 1)
     freqs = np.asarray(result.fdd_freqs, dtype=float)
     spec = np.asarray(result.fdd_spectrum, dtype=float)
+    handles: list[Line2D] = []
     if freqs.size and spec.size:
         floor = np.max(spec) * 1e-9 + 1e-30
         db = 10.0 * np.log10(np.maximum(spec, floor))
-        ax.plot(freqs, db, color="#2563eb", linewidth=1.3)
+        ax.plot(freqs, db, color="#475569", linewidth=1.2, zorder=1)
         for i, f in enumerate(result.frequencies_hz):
-            ax.axvline(f, color="#dc2626", linestyle="--", linewidth=1.0)
+            c = _mode_color(i)
+            ax.axvline(f, color=c, linestyle="--", linewidth=1.4, zorder=2)
             ax.annotate(f"{f:.2f} Hz", xy=(f, ax.get_ylim()[1]),
                         xytext=(2, -10), textcoords="offset points",
-                        fontsize=8, color="#dc2626", rotation=90, va="top")
+                        fontsize=8, color=c, rotation=90, va="top")
+            handles.append(Line2D([0], [0], color=c, linestyle="--",
+                                  label=f"Mode {i + 1} — {f:.2f} Hz"))
     ax.set_xlim(f_min, f_max)
-    ax.set_title("FDD spectrum (1st singular value)")
+    ax.set_title(title)
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("Power (dB)")
     ax.grid(True, alpha=0.3)
+    if handles:
+        ax.legend(handles=handles, loc="upper right", fontsize=8, framealpha=0.9)
     fig.tight_layout()
     return _fig_to_png(fig)
 
@@ -1029,23 +1052,29 @@ def _render_identified_shapes_png(story_data: "modal_id.StoryModalData",
     """Identified mode shapes: measured points per story, one subplot per mode."""
     n_modes = max(1, len(result.frequencies_hz))
     fig = Figure(figsize=(6.4, 4.4))
+    handles: list[Line2D] = []
     for m in range(n_modes):
         ax = fig.add_subplot(1, n_modes, m + 1)
         stories = list(range(1, story_data.n_story + 1))
         measured = story_data.measured_points[m] if m < len(story_data.measured_points) else {}
+        c = _mode_color(m)
         ax.axvline(0.0, color="0.7", linewidth=0.8)
         if measured:
             xs = [measured[s] for s in stories if s in measured]
             ys = [s for s in stories if s in measured]
-            ax.plot(xs, ys, "-o", color="#16a34a", linewidth=1.6)
+            ax.plot(xs, ys, "-o", color=c, linewidth=1.6)
         ax.set_title(f"Mode {m + 1}\n{result.frequencies_hz[m]:.2f} Hz", fontsize=9)
         ax.set_yticks(stories)
         if m == 0:
             ax.set_ylabel("Story")
         ax.set_xlabel("ux")
         ax.grid(True, alpha=0.3)
+        handles.append(Line2D([0], [0], color=c, marker="o",
+                              label=f"Mode {m + 1} — {result.frequencies_hz[m]:.2f} Hz"))
     fig.suptitle("Identified mode shapes (measured stories)", fontsize=10)
-    fig.tight_layout()
+    fig.legend(handles=handles, loc="lower center", ncol=min(n_modes, 3),
+               fontsize=8, framealpha=0.9)
+    fig.tight_layout(rect=(0.0, 0.08, 1.0, 1.0))
     return _fig_to_png(fig)
 
 
@@ -1065,7 +1094,7 @@ def _render_param_history_png(history: list[dict[str, Any]]) -> bytes:
         n_freq = max((len(h.get("freqs", [])) for h in history), default=0)
         for k in range(n_freq):
             ys = [h["freqs"][k] if k < len(h.get("freqs", [])) else np.nan for h in history]
-            ax2.plot(cycles, ys, "-o", linewidth=1.4, label=f"f{k + 1}")
+            ax2.plot(cycles, ys, "-o", linewidth=1.4, color=_mode_color(k), label=f"f{k + 1}")
         ax2.set_ylabel("Identified freq (Hz)")
         ax2.set_xlabel("Cycle")
         ax2.grid(True, alpha=0.3)
@@ -1082,17 +1111,20 @@ def _build_sensor_exp_dict(session: "msl.ModalSession", params: dict[str, Any]):
     ``{frequencies_hz, mode_shapes_ux?}`` schema the calibrator path consumes.
     Pure: no OpenSees, no Qt.
     """
+    method = params.get("sensor_method", "fdd")
     result = modal_id.identify_modes(
         session.data, session.fs,
         f_min=params["sensor_f_min"], f_max=params["sensor_f_max"],
         n_modes=params["sensor_n_modes"],
+        method=method,
     )
     if not result.success:
         return None, result, None
     # Map identification's sensor order to the configured stories.
     story_map = [params["sensor_story_map"].get(sid, 0) for sid in session.sensor_ids]
     story_data = modal_id.map_to_stories(result, story_map, params["nStory"])
-    exp_dict = modal_id.to_experimental_dict(story_data)
+    exp_dict = modal_id.to_experimental_dict(
+        story_data, notes=f"Identified from sensor data ({method.upper()})")
     return exp_dict, result, story_data
 
 
@@ -1166,7 +1198,9 @@ class _IdentifyWorker(QObject):
                 return
 
             # ── IDENTIFICATION RESULTS ────────────────────────────────
-            self.log.emit("\nIDENTIFICATION (Frequency Domain Decomposition)\n")
+            method_name = ("FFT peak-picking (averaged PSD)" if result.method == "fft"
+                           else "Frequency Domain Decomposition")
+            self.log.emit(f"\nIDENTIFICATION ({method_name})\n")
             self.log.emit(f"  {result.message}\n")
             for m, f in enumerate(result.frequencies_hz):
                 period = 1.0 / f if f > 0 else float("nan")
@@ -1174,7 +1208,8 @@ class _IdentifyWorker(QObject):
                 zeta_str = f"{zeta * 100:.1f} %" if zeta == zeta else "n/a"  # nan check
                 self.log.emit(f"    Mode {m + 1}:  f = {f:6.3f} Hz   T = {period:6.3f} s   ζ = {zeta_str}\n")
 
-            self.log.emit("\n  Per-sensor mode shapes (signed, |max| = 1):\n")
+            shape_kind = "magnitude" if result.method == "fft" else "signed"
+            self.log.emit(f"\n  Per-sensor mode shapes ({shape_kind}, |max| = 1):\n")
             for m, shape in enumerate(result.mode_shapes_sensor):
                 cells = "   ".join(
                     f"S{session.sensor_ids[i]}: {v:+.3f}"
@@ -1798,6 +1833,14 @@ class ModelUpdatingTab(QWidget):
         # Identification parameters.
         id_group = QGroupBox("Identification", self)
         id_form = QFormLayout(id_group)
+        self._sensor_method = QComboBox(self)
+        self._sensor_method.addItems(["FDD", "FFT"])
+        self._sensor_method.setToolTip(
+            "FDD: SVD of the cross-spectral-density matrix — signed mode shapes.\n"
+            "FFT: sensor-averaged Welch PSD peak-picking — simpler, magnitude-only shapes\n"
+            "(natural fit for frequency-only calibration)."
+        )
+        id_form.addRow("Method:", self._sensor_method)
         self._sensor_window = self._double_spin(modal_id.MIN_DURATION_S, 600.0, 30.0, 1)
         self._sensor_fmin = self._double_spin(0.05, 500.0, 0.5, 3)
         self._sensor_fmax = self._double_spin(0.10, 1000.0, 20.0, 3)
@@ -2688,6 +2731,7 @@ class ModelUpdatingTab(QWidget):
         )
         return {
             "sensor_axis": self._sensor_axis.currentText(),
+            "sensor_method": self._sensor_method.currentText().lower(),
             "sensor_window_s": float(self._sensor_window.value()),
             "sensor_f_min": fmin,
             "sensor_f_max": fmax,

@@ -40,8 +40,13 @@ class ExperimentalModalResult:
     frequencies_hz: list[float] = field(default_factory=list)
     mode_shapes_sensor: list[list[float]] = field(default_factory=list)
     damping_ratios: list[float] = field(default_factory=list)
+    # The identification spectrum that gets plotted. For ``method="fdd"`` this is
+    # the first singular value of the CSD matrix; for ``method="fft"`` it is the
+    # sensor-averaged Welch PSD. The field names keep the ``fdd_`` prefix for
+    # backward compatibility; ``method`` says which spectrum it actually holds.
     fdd_freqs: np.ndarray = field(default_factory=lambda: np.empty(0))
     fdd_spectrum: np.ndarray = field(default_factory=lambda: np.empty(0))
+    method: str = "fdd"
     n_modes_found: int = 0
     success: bool = False
     message: str = ""
@@ -131,60 +136,82 @@ def _half_power_damping(freqs: np.ndarray, spectrum: np.ndarray, peak_idx: int) 
     return float(bandwidth / (2.0 * f_n))
 
 
-def identify_modes(
-    data: np.ndarray,
-    fs: float,
+def _pick_peaks_and_build(
+    freqs: np.ndarray,
+    spectrum: np.ndarray,
+    shape_fn,
     *,
-    f_min: float = 0.5,
-    f_max: float = 20.0,
-    n_modes: int = 3,
-    nperseg: int | None = None,
-    prominence_db: float = 3.0,
-    detrend: bool = True,
+    f_min: float,
+    f_max: float,
+    n_modes: int,
+    prominence_db: float,
+    method: str,
 ) -> ExperimentalModalResult:
-    """Identify natural frequencies and signed mode shapes via FDD.
+    """Shared tail for FDD and FFT: peak-pick a spectrum and build the result.
 
-    Parameters
-    ----------
-    data : np.ndarray, shape ``(n_sensors, n_samples)``
-        Acceleration time series, one ``ax`` channel per sensor, already
-        resampled onto a common uniform time grid.
-    fs : float
-        Sampling rate in Hz.
-    f_min, f_max : float
-        Frequency band to search for modes.
-    n_modes : int
-        Maximum number of modes to return (strongest peaks, sorted by frequency).
-    nperseg : int, optional
-        CSD segment length. Auto-chosen if None.
-    prominence_db : float
-        Peak prominence threshold on the dB FDD spectrum.
+    ``shape_fn(idx)`` returns the (already normalized) mode-shape vector at the
+    spectral bin ``idx`` — signed for FDD, magnitude-only for FFT.
     """
-    data = np.atleast_2d(np.asarray(data, dtype=float))
-    n_sensors, n_samples = data.shape
-
-    if not np.isfinite(fs) or fs <= 0:
-        return ExperimentalModalResult(success=False, message="Invalid sampling rate.")
-    duration = n_samples / fs
-    if duration < MIN_DURATION_S:
+    nf = freqs.size
+    band = (freqs >= f_min) & (freqs <= f_max)
+    if not np.any(band):
         return ExperimentalModalResult(
-            success=False,
-            message=(
-                f"Recording too short: {duration:.1f} s < {MIN_DURATION_S:.0f} s minimum. "
-                "Record a longer segment (30 s recommended)."
-            ),
+            fdd_freqs=freqs, fdd_spectrum=spectrum, method=method,
+            success=False, message=f"No spectral lines in [{f_min}, {f_max}] Hz.",
         )
-    if f_max >= fs / 2.0:
-        f_max = 0.95 * (fs / 2.0)
 
-    work = data
-    if detrend:
-        work = signal.detrend(work, axis=1, type="linear")
+    # Peak-pick on the dB spectrum within the band.
+    floor = np.max(spectrum[band]) * 1e-9 + 1e-30
+    spec_db = 10.0 * np.log10(np.maximum(spectrum, floor))
+    band_idx = np.where(band)[0]
+    min_distance = max(1, int(round(0.25 / (freqs[1] - freqs[0])))) if nf > 1 else 1
+    peaks_local, props = signal.find_peaks(
+        spec_db[band_idx], prominence=prominence_db, distance=min_distance
+    )
+    peaks = band_idx[peaks_local]
 
-    if nperseg is None:
-        nperseg = _choose_nperseg(n_samples)
-    nperseg = int(min(nperseg, n_samples))
-    noverlap = nperseg // 2
+    if peaks.size == 0:
+        return ExperimentalModalResult(
+            fdd_freqs=freqs, fdd_spectrum=spectrum, method=method,
+            n_modes_found=0, success=False,
+            message="No spectral peaks found above the prominence threshold.",
+        )
+
+    # Keep the strongest n_modes peaks, then order them by ascending frequency.
+    order_by_strength = np.argsort(props["prominences"])[::-1]
+    kept = peaks[order_by_strength][: max(1, n_modes)]
+    kept = kept[np.argsort(freqs[kept])]
+
+    frequencies: list[float] = []
+    shapes: list[list[float]] = []
+    dampings: list[float] = []
+    for idx in kept:
+        frequencies.append(float(freqs[idx]))
+        shapes.append([float(v) for v in shape_fn(int(idx))])
+        dampings.append(_half_power_damping(freqs, spectrum, int(idx)))
+
+    n_found = len(frequencies)
+    if n_found < n_modes:
+        message = f"Found {n_found} of {n_modes} requested modes."
+    else:
+        message = f"Found {n_found} modes."
+
+    return ExperimentalModalResult(
+        frequencies_hz=frequencies,
+        mode_shapes_sensor=shapes,
+        damping_ratios=dampings,
+        fdd_freqs=freqs,
+        fdd_spectrum=spectrum,
+        method=method,
+        n_modes_found=n_found,
+        success=n_found > 0,
+        message=message,
+    )
+
+
+def _identify_fdd(work, fs, nperseg, noverlap, *, f_min, f_max, n_modes, prominence_db):
+    """FDD: SVD of the cross-spectral-density matrix → signed mode shapes."""
+    n_sensors = work.shape[0]
 
     # Build the cross-spectral-density matrix G(f), shape (nf, ns, ns).
     freqs, _ = signal.csd(work[0], work[0], fs=fs, nperseg=nperseg, noverlap=noverlap)
@@ -205,64 +232,117 @@ def identify_modes(
         s1[k] = S[0]
         u1[k] = U[:, 0]
 
-    band = (freqs >= f_min) & (freqs <= f_max)
-    if not np.any(band):
-        return ExperimentalModalResult(
-            fdd_freqs=freqs,
-            fdd_spectrum=s1,
-            success=False,
-            message=f"No spectral lines in [{f_min}, {f_max}] Hz.",
-        )
+    def shape_fn(idx: int) -> np.ndarray:
+        return _normalize_signed(_align_phase_real(u1[idx]))
 
-    # Peak-pick on the dB spectrum within the band.
-    floor = np.max(s1[band]) * 1e-9 + 1e-30
-    s1_db = 10.0 * np.log10(np.maximum(s1, floor))
-    band_idx = np.where(band)[0]
-    min_distance = max(1, int(round(0.25 / (freqs[1] - freqs[0])))) if nf > 1 else 1
-    peaks_local, props = signal.find_peaks(
-        s1_db[band_idx], prominence=prominence_db, distance=min_distance
+    return _pick_peaks_and_build(
+        freqs, s1, shape_fn, f_min=f_min, f_max=f_max,
+        n_modes=n_modes, prominence_db=prominence_db, method="fdd",
     )
-    peaks = band_idx[peaks_local]
 
-    if peaks.size == 0:
+
+def _identify_fft(work, fs, nperseg, noverlap, *, f_min, f_max, n_modes, prominence_db):
+    """FFT: sensor-averaged Welch PSD → frequencies; magnitude-only mode shapes.
+
+    PSD magnitude is always positive, so the resulting shapes are unsigned (the
+    sign of out-of-phase floors cannot be recovered). This is the natural fit for
+    frequency-only calibration; use FDD when signed shapes are needed.
+    """
+    n_sensors = work.shape[0]
+    psd = []
+    freqs = np.empty(0)
+    for i in range(n_sensors):
+        freqs, pxx = signal.welch(work[i], fs=fs, nperseg=nperseg, noverlap=noverlap)
+        psd.append(pxx)
+    psd = np.asarray(psd)               # (n_sensors, nf)
+    psd_avg = psd.mean(axis=0)          # combined FFT spectrum
+
+    def shape_fn(idx: int) -> np.ndarray:
+        mag = np.sqrt(np.maximum(psd[:, idx], 0.0))
+        return _normalize_signed(mag)
+
+    return _pick_peaks_and_build(
+        freqs, psd_avg, shape_fn, f_min=f_min, f_max=f_max,
+        n_modes=n_modes, prominence_db=prominence_db, method="fft",
+    )
+
+
+def identify_modes(
+    data: np.ndarray,
+    fs: float,
+    *,
+    f_min: float = 0.5,
+    f_max: float = 20.0,
+    n_modes: int = 3,
+    nperseg: int | None = None,
+    prominence_db: float = 3.0,
+    detrend: bool = True,
+    method: str = "fdd",
+) -> ExperimentalModalResult:
+    """Identify natural frequencies and mode shapes from sensor acceleration.
+
+    Parameters
+    ----------
+    data : np.ndarray, shape ``(n_sensors, n_samples)``
+        Acceleration time series, one ``ax`` channel per sensor, already
+        resampled onto a common uniform time grid.
+    fs : float
+        Sampling rate in Hz.
+    f_min, f_max : float
+        Frequency band to search for modes.
+    n_modes : int
+        Maximum number of modes to return (strongest peaks, sorted by frequency).
+    nperseg : int, optional
+        CSD/Welch segment length. Auto-chosen if None.
+    prominence_db : float
+        Peak prominence threshold on the dB spectrum.
+    method : {"fdd", "fft"}
+        ``"fdd"`` (default) — SVD of the cross-spectral-density matrix; gives
+        *signed* mode shapes. ``"fft"`` — sensor-averaged Welch PSD peak-picking;
+        simpler and more transparent, but mode shapes are magnitude-only.
+    """
+    data = np.atleast_2d(np.asarray(data, dtype=float))
+    n_sensors, n_samples = data.shape
+
+    method = str(method).lower()
+    if method not in ("fdd", "fft"):
         return ExperimentalModalResult(
-            fdd_freqs=freqs,
-            fdd_spectrum=s1,
-            n_modes_found=0,
-            success=False,
-            message="No spectral peaks found above the prominence threshold.",
+            success=False, message=f"Unknown identification method: {method!r}.",
         )
 
-    # Keep the strongest n_modes peaks, then order them by ascending frequency.
-    order_by_strength = np.argsort(props["prominences"])[::-1]
-    kept = peaks[order_by_strength][: max(1, n_modes)]
-    kept = kept[np.argsort(freqs[kept])]
+    if not np.isfinite(fs) or fs <= 0:
+        return ExperimentalModalResult(
+            method=method, success=False, message="Invalid sampling rate.")
+    duration = n_samples / fs
+    if duration < MIN_DURATION_S:
+        return ExperimentalModalResult(
+            method=method,
+            success=False,
+            message=(
+                f"Recording too short: {duration:.1f} s < {MIN_DURATION_S:.0f} s minimum. "
+                "Record a longer segment (30 s recommended)."
+            ),
+        )
+    if f_max >= fs / 2.0:
+        f_max = 0.95 * (fs / 2.0)
 
-    frequencies: list[float] = []
-    shapes: list[list[float]] = []
-    dampings: list[float] = []
-    for idx in kept:
-        frequencies.append(float(freqs[idx]))
-        shape = _normalize_signed(_align_phase_real(u1[idx]))
-        shapes.append([float(v) for v in shape])
-        dampings.append(_half_power_damping(freqs, s1, int(idx)))
+    work = data
+    if detrend:
+        work = signal.detrend(work, axis=1, type="linear")
 
-    n_found = len(frequencies)
-    success = n_found > 0
-    if n_found < n_modes:
-        message = f"Found {n_found} of {n_modes} requested modes."
-    else:
-        message = f"Found {n_found} modes."
+    if nperseg is None:
+        nperseg = _choose_nperseg(n_samples)
+    nperseg = int(min(nperseg, n_samples))
+    noverlap = nperseg // 2
 
-    return ExperimentalModalResult(
-        frequencies_hz=frequencies,
-        mode_shapes_sensor=shapes,
-        damping_ratios=dampings,
-        fdd_freqs=freqs,
-        fdd_spectrum=s1,
-        n_modes_found=n_found,
-        success=success,
-        message=message,
+    if method == "fft":
+        return _identify_fft(
+            work, fs, nperseg, noverlap,
+            f_min=f_min, f_max=f_max, n_modes=n_modes, prominence_db=prominence_db,
+        )
+    return _identify_fdd(
+        work, fs, nperseg, noverlap,
+        f_min=f_min, f_max=f_max, n_modes=n_modes, prominence_db=prominence_db,
     )
 
 
