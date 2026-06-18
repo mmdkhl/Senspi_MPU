@@ -1079,7 +1079,7 @@ def _render_identified_shapes_png(story_data: "modal_id.StoryModalData",
 
 
 def _render_param_history_png(history: list[dict[str, Any]]) -> bytes:
-    """Mode B evolution: E % change and identified frequencies vs cycle."""
+    """Mode B evolution: E % change and calibrated floor masses vs cycle."""
     fig = Figure(figsize=(6.6, 4.8))
     ax1 = fig.add_subplot(2, 1, 1)
     ax2 = fig.add_subplot(2, 1, 2)
@@ -1091,15 +1091,15 @@ def _render_param_history_png(history: list[dict[str, Any]]) -> bytes:
         ax1.set_title("Calibrated stiffness vs cycle")
         ax1.grid(True, alpha=0.3)
 
-        n_freq = max((len(h.get("freqs", [])) for h in history), default=0)
-        for k in range(n_freq):
-            ys = [h["freqs"][k] if k < len(h.get("freqs", [])) else np.nan for h in history]
-            ax2.plot(cycles, ys, "-o", linewidth=1.4, color=_mode_color(k), label=f"f{k + 1}")
-        ax2.set_ylabel("Identified freq (Hz)")
+        n_mass = max((len(h.get("masses", [])) for h in history), default=0)
+        for k in range(n_mass):
+            ys = [h["masses"][k] if k < len(h.get("masses", [])) else np.nan for h in history]
+            ax2.plot(cycles, ys, "-o", linewidth=1.4, color=_mode_color(k), label=f"m{k + 1}")
+        ax2.set_ylabel("Floor mass")
         ax2.set_xlabel("Cycle")
         ax2.grid(True, alpha=0.3)
-        if n_freq:
-            ax2.legend(loc="upper right", fontsize=8, ncol=n_freq)
+        if n_mass:
+            ax2.legend(loc="upper right", fontsize=8, ncol=n_mass)
     fig.tight_layout()
     return _fig_to_png(fig)
 
