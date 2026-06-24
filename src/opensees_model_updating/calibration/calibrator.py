@@ -16,7 +16,7 @@ from scipy.optimize import least_squares
 
 from ..analysis.modal import extract_modal_results
 from ..io.loaders import EXPERIMENTAL_MODAL_JSON, load_experimental_modal_data
-from ..utils.math_utils import normalize_mode_maxabs, align_mode_sign
+from ..utils.math_utils import normalize_mode_maxabs, align_mode_sign, pair_modes_by_mac
 
 
 def prepare_experimental_modal_data(params):
@@ -117,37 +117,89 @@ def modal_residuals(x, base_params, exp_data, w_freq=1.0, w_mode=0.35, show_info
     exp_data : dict
         Experimental data from prepare_experimental_modal_data().
     w_freq : float
-        Weight for frequency residuals.
+        Term-balancing weight on the frequency residual block (default 1.0).
     w_mode : float
-        Weight for mode-shape residuals.
+        Term-balancing weight on the mode-shape residual block (default 0.35).
     show_info : bool
         Print debug info on failure.
 
     Returns
     -------
     np.ndarray : residual vector
+
+    Weighting convention (B3 / GAP-MU-3)
+    ------------------------------------
+    ``w_freq`` and ``w_mode`` are **relative term-balancing weights, NOT
+    measurement-noise standard deviations.** The frequency block holds ``n_use``
+    *relative* errors ``(fn - ft) / ft`` (each ~O(1e-2)); the mode-shape block
+    holds ``n_use x n_measured`` shape differences (each ~O(1e-1..1)). The default
+    ``w_mode = 0.35 < w_freq = 1.0`` down-weights the more numerous, larger-
+    magnitude shape terms so neither block dominates the least-squares cost.
+    These are distinct from the physical likelihood scale ``sigma_data_scale``
+    used by the Bayesian path (``bayesian.py``), which forms ``(d - g)/sigma_d``;
+    do not conflate the two. Defaults mirror the GUI panel spinboxes
+    (``tab_model_updating.py`` Frequency/Mode-shape weight). Adjust only if a
+    freq+shape run shows one block dominating.
     """
     try:
         p = apply_calibration_vector(base_params, x)
         modal = extract_modal_results(p, normalize_modes=True, show_info=False)
 
         n_use = exp_data["n_modes_used"]
+        use_shapes = exp_data["use_mode_shapes"]
+        measured_dofs = np.asarray(exp_data.get("measured_dof_indices") or [], dtype=int)
 
-        num_freqs = np.asarray(modal["freqs"][:n_use], dtype=float)
+        modal_freqs = np.asarray(modal["freqs"], dtype=float)
         exp_freqs = np.asarray(exp_data["freqs"][:n_use], dtype=float)
 
-        res = []
+        def _slice_model_shape(j):
+            # Partial coverage (B1): slice a full-length model shape to the measured
+            # stories and RE-NORMALIZE on that support so it matches how phi_exp was
+            # normalized (RISK-MU-2). Full coverage leaves it untouched (slice
+            # skipped), keeping results byte-identical.
+            s = np.asarray(modal["mode_shapes_ux_master"][j], dtype=float)
+            if 0 < measured_dofs.size < s.size:
+                s = s[measured_dofs]
+                peak = float(np.max(np.abs(s))) if s.size else 0.0
+                if peak > 0.0:
+                    s = s / peak
+            return s
 
-        for fn, ft in zip(num_freqs, exp_freqs):
+        # Mode pairing (B2): match each experimental mode to the model mode whose
+        # (measured) shape is most similar by MAC, so a swapped or missed
+        # identification cannot corrupt the fit via frequency order. Falls back to
+        # frequency order without shapes or with < 3 measured DOFs (MAC degenerate).
+        # A non-swapped case yields the identity perm == the prior behavior.
+        if use_shapes:
+            exp_shapes = [np.asarray(exp_data["modes"][i], dtype=float) for i in range(n_use)]
+            model_shapes_cmp = [_slice_model_shape(j) for j in range(len(modal_freqs))]
+            perm = pair_modes_by_mac(model_shapes_cmp, exp_shapes)
+        else:
+            perm = list(range(n_use))
+
+        res = []
+        for i in range(n_use):
+            fn = float(modal_freqs[perm[i]])
+            ft = float(exp_freqs[i])
             res.append(w_freq * (fn - ft) / ft)
 
-        if exp_data["use_mode_shapes"]:
+        if use_shapes:
             for i in range(n_use):
-                phi_num = np.asarray(modal["mode_shapes_ux_master"][i], dtype=float)
-                phi_exp = np.asarray(exp_data["modes"][i], dtype=float)
-                a = align_mode_sign(phi_num, phi_exp)
-                mode_diff = w_mode * (a - phi_exp)
-                res.extend(list(mode_diff))
+                phi_num = _slice_model_shape(perm[i])
+                a = align_mode_sign(phi_num, exp_shapes[i])
+                res.extend(list(w_mode * (a - exp_shapes[i])))
+
+        # R2 temporal-smoothness (MU-13): optional block toward the previous accepted
+        # estimate, OFF by default. Mode B's non-recursive paths set
+        # base_params["temporal_anchor"] = (theta_prev, weight); recursive Bayesian
+        # gets R2 from the prior instead, so it leaves this unset (no double-count).
+        anchor = base_params.get("temporal_anchor")
+        if anchor is not None:
+            theta_prev, w_smooth = anchor
+            theta_prev = np.asarray(theta_prev, dtype=float)
+            xv = np.asarray(x, dtype=float)
+            if w_smooth and theta_prev.size == xv.size:
+                res.extend(list(float(w_smooth) * (xv - theta_prev)))
 
         return np.array(res, dtype=float)
 
@@ -155,8 +207,25 @@ def modal_residuals(x, base_params, exp_data, w_freq=1.0, w_mode=0.35, show_info
         if show_info:
             print("Calibration trial failed. Penalizing this point.")
             traceback.print_exc()
-        n_mode_terms = exp_data["n_modes_used"] * base_params["nStory"] if exp_data["use_mode_shapes"] else 0
-        return np.ones(exp_data["n_modes_used"] + n_mode_terms, dtype=float) * 1.0e3
+        # BLOCKER-7: the penalty vector MUST match the success-branch length on
+        # every call (least_squares requires a fixed residual length). Under
+        # partial coverage the shape block has one term per MEASURED DOF, not per
+        # story — derive the per-mode length from measured_dof_indices (falls back
+        # to nStory for full coverage / no indices).
+        if exp_data["use_mode_shapes"]:
+            measured_dofs = exp_data.get("measured_dof_indices")
+            n_per_mode = len(measured_dofs) if measured_dofs else base_params["nStory"]
+            n_mode_terms = exp_data["n_modes_used"] * n_per_mode
+        else:
+            n_mode_terms = 0
+        # Match the success branch if the R2 temporal-smoothness block is active.
+        n_anchor = 0
+        anchor = base_params.get("temporal_anchor")
+        if anchor is not None:
+            theta_prev, w_smooth = anchor
+            if w_smooth and np.asarray(theta_prev).size == (1 + base_params["nStory"]):
+                n_anchor = 1 + base_params["nStory"]
+        return np.ones(exp_data["n_modes_used"] + n_mode_terms + n_anchor, dtype=float) * 1.0e3
 
 
 def run_calibration(base_params, exp_data, show_info=False):

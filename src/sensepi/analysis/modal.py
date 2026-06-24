@@ -56,16 +56,19 @@ class ExperimentalModalResult:
 class StoryModalData:
     """Sensor result mapped onto stories — ready for the OpenSees calibrator.
 
-    ``mode_shapes_ux`` is only populated (and ``mode_shapes_available`` True)
-    when every story has at least one sensor. Otherwise the calibration must
-    run frequency-only, but ``measured_points`` still carries what was measured
-    so the GUI can plot identified points over the FEM mode shape.
+    ``mode_shapes_ux`` is populated (and ``mode_shapes_available`` True) whenever
+    at least one story has a sensor — the vector then carries one entry per
+    *measured* story, ordered by ``coverage_stories`` (B1, partial coverage).
+    ``full_coverage`` says whether every story was measured. ``measured_points``
+    still carries what was measured so the GUI can plot identified points over
+    the FEM mode shape.
     """
 
     frequencies_hz: list[float] = field(default_factory=list)
     mode_shapes_ux: dict[str, list[float]] = field(default_factory=dict)
     mode_shapes_available: bool = False
     coverage_stories: list[int] = field(default_factory=list)
+    full_coverage: bool = False
     n_story: int = 0
     # Per mode: {story: measured value} for the stories that have sensors.
     measured_points: list[dict[int, float]] = field(default_factory=list)
@@ -364,6 +367,7 @@ def map_to_stories(
     out = StoryModalData(
         frequencies_hz=list(result.frequencies_hz),
         coverage_stories=coverage,
+        full_coverage=full_coverage,
         n_story=n_story,
     )
 
@@ -384,12 +388,18 @@ def map_to_stories(
                 if len(vals) > 1:
                     out.torsion_indicator[story] = float(np.max(vals) - np.min(vals))
 
-        if full_coverage:
-            vec = np.array([measured[s] for s in range(1, n_story + 1)], dtype=float)
+        # B1 (partial coverage): emit the mode-shape vector over the MEASURED
+        # stories, ordered by sorted ``coverage`` and normalized on that measured
+        # support. Unmeasured interior stories are simply omitted (never
+        # interpolated). Full coverage is the special case where every story is
+        # measured, and produces the same vector as before. ``measured`` always
+        # holds exactly the coverage stories, so the guard is a safety net.
+        if coverage and all(s in measured for s in coverage):
+            vec = np.array([measured[s] for s in coverage], dtype=float)
             vec = _normalize_signed(vec)
             mode_shapes_ux[str(m + 1)] = [float(v) for v in vec]
 
-    if full_coverage and mode_shapes_ux:
+    if mode_shapes_ux:
         out.mode_shapes_ux = mode_shapes_ux
         out.mode_shapes_available = True
 
@@ -401,7 +411,12 @@ def to_experimental_dict(story_data: StoryModalData, notes: str = "") -> dict:
 
     Matches the ``experimental_modal_data.json`` schema and the structure that
     ``ModelUpdatingTab._build_exp_data_from_gui_values`` consumes:
-    ``{"frequencies_hz": [...], "mode_shapes_ux": {...}, "notes": "..."}``.
+    ``{"frequencies_hz": [...], "mode_shapes_ux": {...},
+    "measured_dof_indices": [...], "notes": "..."}``.
+
+    Under partial coverage the shape vectors only span the measured stories, so
+    ``measured_dof_indices`` (0-based, in the same sorted-story order) tells the
+    calibrator which model DOFs to compare against (B1 / BLOCKER-8).
     """
     data: dict = {
         "frequencies_hz": list(story_data.frequencies_hz),
@@ -409,4 +424,7 @@ def to_experimental_dict(story_data: StoryModalData, notes: str = "") -> dict:
     }
     if story_data.mode_shapes_available:
         data["mode_shapes_ux"] = dict(story_data.mode_shapes_ux)
+        # 0-based DOF indices the shape vectors correspond to, same order as
+        # mode_shapes_ux. Always safe to include; full coverage → [0..n_story-1].
+        data["measured_dof_indices"] = [s - 1 for s in story_data.coverage_stories]
     return data

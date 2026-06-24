@@ -10,11 +10,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Deque, Dict, Optional, Tuple
 
-from PySide6.QtCore import QObject, QMetaObject, QThread, Qt, Signal, Slot
+from datetime import datetime
+
+from PySide6.QtCore import QObject, QMetaObject, QThread, QTimer, Qt, Signal, Slot
 
 from .config.acquisition_state import GuiAcquisitionConfig, SensorSelectionConfig
 from ..analysis.rate import RateController
-from ..config.app_config import HostConfig, HostInventory, SensorDefaults
+from ..config.app_config import AppPaths, HostConfig, HostInventory, SensorDefaults
+from ..dataio.smart_recorder import SmartRecorder
 from ..config.pi_logger_config import PiLoggerConfig
 from ..config.sampling import GuiSamplingDisplay, SamplingConfig
 from ..core.live_stream import select_parser
@@ -25,6 +28,43 @@ from ..remote.ssh_client import Host
 from ..sensors.mpu6050 import MpuSample
 
 logger = logging.getLogger(__name__)
+
+
+def _per_sensor_hz_from_times(probe_times: dict[int, list[float]]) -> tuple[float, dict[int, float]]:
+    """Per-sensor rate from probe-window timestamps via each sensor's MEDIAN dt.
+
+    The shared RateController counts all sensors interleaved (~N x per-sensor) and is
+    inflated by the startup burst — the audit (2026-06-24) showed it mislabels ~41 Hz as
+    ~160 Hz and triggers spurious decimation. The median inter-sample dt of each sensor's
+    OWN stream is robust to the burst and to occasional gaps. Returns
+    ``(representative_per_sensor_hz, {sensor_id: hz})``. Pure — unit-testable without Qt.
+    """
+    import statistics
+    rates: dict[int, float] = {}
+    for sid, ts in (probe_times or {}).items():
+        ordered = sorted(t for t in ts if t is not None)
+        if len(ordered) < 5:
+            continue
+        dts = [b - a for a, b in zip(ordered, ordered[1:]) if b > a]
+        if not dts:
+            continue
+        med = statistics.median(dts)
+        if med > 0:
+            rates[int(sid)] = 1.0 / med
+    rep = statistics.median(rates.values()) if rates else 0.0
+    return float(rep), rates
+
+
+def _decimate_for(measured_hz: float, requested_hz: float) -> int:
+    """Decimation factor that NEVER drops the written rate below the request (audit fix).
+
+    Uses a FLOOR (not round): decimate only when the device genuinely exceeds the request
+    by >=2x, and ``written = measured / decimate`` then stays >= requested. The device
+    usually under-delivers (PRE-3), so this is normally 1 (record everything).
+    """
+    if requested_hz <= 0 or measured_hz <= 0:
+        return 1
+    return max(1, int(measured_hz // requested_hz))
 
 
 @dataclass
@@ -119,6 +159,9 @@ class RecorderController(QObject):
     recording_stopped = Signal()
     sensorSelectionChanged = Signal(SensorSelectionConfig)
     recording_error = Signal(str)
+    # Smart Recording (Front C): human-readable rate warning + phase narration.
+    rate_warning = Signal(str)
+    recording_status = Signal(str)
 
     def __init__(
         self,
@@ -158,6 +201,17 @@ class RecorderController(QObject):
         self._sample_queue: queue.Queue[object] = queue.Queue(maxsize=10_000)
         self._current_sensor_selection = SensorSelectionConfig()
         self._current_gui_acquisition_config: GuiAcquisitionConfig | None = None
+
+        # Smart Recording (Front C): PC-side probe -> writer -> fixed duration.
+        self._smart_recorder: SmartRecorder | None = None
+        self._smart_ctx: dict | None = None
+        self._probe_timer: QTimer | None = None
+        self._record_duration_timer: QTimer | None = None
+        self._probe_seconds: float = 5.0
+        # Per-sensor timestamp collector active only during the probe window. The shared
+        # RateController counts all sensors interleaved (~N x per-sensor), so we measure
+        # each sensor's own stream here for an accurate per-sensor probe (audit 2026-06-24).
+        self._probe_times: dict[int, list[float]] | None = None
 
         # Long-window store for modal capture (Mode B). Independent of the 6 s
         # GUI buffer above; written on the GUI thread, read by the modal worker.
@@ -315,7 +369,7 @@ class RecorderController(QObject):
             extra_cli["session_name"] = session_name
 
         if gui_config.limit_duration and gui_config.duration_s > 0:
-            extra_cli["duration"] = max(1, min(120, int(round(gui_config.duration_s))))
+            extra_cli["duration"] = max(1, min(600, int(round(gui_config.duration_s))))  # Rec-length max
 
         if sel.active_sensors:
             extra_cli["sensors"] = ",".join(str(s) for s in sel.active_sensors)
@@ -359,6 +413,7 @@ class RecorderController(QObject):
                 thread.wait(max(0, int(wait_timeout_ms)))
 
     def _stop_stream(self) -> None:
+        self._finalize_smart_recorder()  # close any active PC recording first
         worker = self._ingest_worker
         if worker is not None:
             self._stop_requested = True
@@ -377,6 +432,135 @@ class RecorderController(QObject):
             self.streaming_stopped.emit()
             self.stream_stopped.emit()
             self.recording_stopped.emit()
+
+    # --------------------------------------------------------------- smart recording
+    def start_smart_recording(
+        self,
+        *,
+        gui_config: GuiAcquisitionConfig,
+        host_cfg: HostConfig,
+        session_name: str | None,
+        duration_s: float,
+    ) -> None:
+        """Front C: start a live stream, probe the real rate for ~5 s, then write a
+        PC-authoritative, PC-clock, fixed-duration recording (Pi-side recording off).
+
+        Additive: reuses the normal live-stream machinery; the PC writer is fed from
+        ``_on_samples_batch`` via a non-blocking queue (no read-loop changes).
+        """
+        if self._ingest_worker is not None:
+            self.report_error("A stream is already running; stop it before recording.")
+            return
+        # Live stream only — the PC writes the authoritative file; the Pi just streams.
+        self.start_live_stream(
+            recording_enabled=False, gui_config=gui_config,
+            host_cfg=host_cfg, session_name=session_name)
+        requested_hz = float(getattr(gui_config.sampling, "device_rate_hz", 0.0) or 0.0)
+        self._smart_ctx = {
+            "host": host_cfg,
+            "session": session_name,
+            "duration_s": max(1.0, float(duration_s)),
+            "requested_hz": requested_hz,
+            "selection": gui_config.sensor_selection,
+        }
+        self._probe_times = {}   # begin per-sensor probe collection
+        probe_msg = f"Probing sample rate for {self._probe_seconds:.0f} s"
+        if requested_hz > 0:
+            probe_msg += f" (requested {requested_hz:.0f} Hz)"
+        self.recording_status.emit(probe_msg + "...")
+        self._probe_timer = QTimer(self)
+        self._probe_timer.setSingleShot(True)
+        self._probe_timer.timeout.connect(self._on_probe_complete)
+        self._probe_timer.start(int(self._probe_seconds * 1000))
+
+    @Slot()
+    def _on_probe_complete(self) -> None:
+        ctx = self._smart_ctx
+        if ctx is None or self._ingest_worker is None:
+            return
+        sel = ctx["selection"]
+        sensor_ids = (list(sel.active_sensors) if sel and sel.active_sensors
+                      else (self._data_buffer.get_sensor_ids()
+                            if self._data_buffer is not None else []))
+        if not sensor_ids:
+            sensor_ids = [1, 2, 3]
+
+        # Accurate PER-SENSOR rate (audit fix). Keep the combined estimate as a
+        # diagnostic; fall back to combined/N only if the per-sensor measure was sparse.
+        per_sensor_hz, _per = _per_sensor_hz_from_times(self._probe_times or {})
+        combined = float(self._rate_controllers["mpu6050"].estimate().hz_effective)
+        measured = per_sensor_hz if per_sensor_hz > 0 else combined / max(1, len(sensor_ids))
+        self._probe_times = None   # stop collecting
+        requested = float(ctx["requested_hz"]) or measured
+
+        # Decimate ONLY when the device genuinely exceeds the request, by a FLOOR factor
+        # so the WRITTEN rate never drops below the requested rate (audit fix / IMP-1).
+        # The device usually under-delivers here, so this is normally decimate=1.
+        decimate = _decimate_for(measured, requested)
+        if decimate > 1:
+            msg = (f"Device {measured:.1f} Hz/sensor > requested {requested:.1f} Hz "
+                   f"-> decimating x{decimate} (writing ~{measured / decimate:.1f} Hz).")
+        elif measured < requested * 0.90:
+            msg = (f"Requested {requested:.1f} Hz - device delivers {measured:.1f} Hz/sensor "
+                   f"(hardware ceiling). Recording all of it at {measured:.1f} Hz.")
+        else:
+            msg = f"Recording at {measured:.1f} Hz/sensor (~ requested {requested:.1f} Hz)."
+        self.rate_warning.emit(msg)
+
+        host = ctx["host"]
+        out_dir = AppPaths().raw_data / host.name / "mpu"
+        self._smart_recorder = SmartRecorder(
+            out_dir=out_dir, session_name=ctx["session"], sensor_ids=sensor_ids,
+            start_dt=datetime.now(), requested_hz=requested, actual_hz=measured,
+            decimate=decimate, host_name=host.name, probe_seconds=self._probe_seconds,
+            probe_combined_hz=combined)
+        self._smart_recorder.start()
+        self.recording_started.emit()
+        # SF-4: PC-controlled fixed duration.
+        self._record_duration_timer = QTimer(self)
+        self._record_duration_timer.setSingleShot(True)
+        self._record_duration_timer.timeout.connect(self.stop_smart_recording)
+        self._record_duration_timer.start(int(ctx["duration_s"] * 1000))
+        # Comprehensive recording feed: requested vs detected vs effective (written)
+        # rate, decimation, sensor count and duration. The single-line status label
+        # is overwritten by each message, so this persistent "Recording..." line
+        # carries the full rate story (the earlier rate_warning would be hidden).
+        effective_hz = measured / max(1, decimate)
+        detail = f"requested {requested:.0f} Hz · detected {measured:.0f} Hz/sensor"
+        if decimate > 1:
+            detail += f" ÷{decimate} → ~{effective_hz:.0f} Hz written"
+        self._smart_summary = (
+            f"~{effective_hz:.0f} Hz, {ctx['duration_s']:.0f} s")
+        self.recording_status.emit(
+            f"Recording {len(sensor_ids)} sensor(s) "
+            f"({detail}) for {ctx['duration_s']:.0f} s...")
+
+    @Slot()
+    def stop_smart_recording(self) -> None:
+        self._finalize_smart_recorder()
+        self.stop_live_stream()
+
+    def _finalize_smart_recorder(self) -> None:
+        for attr in ("_probe_timer", "_record_duration_timer"):
+            timer = getattr(self, attr, None)
+            if timer is not None:
+                timer.stop()
+                setattr(self, attr, None)
+        rec = self._smart_recorder
+        self._smart_recorder = None
+        self._smart_ctx = None
+        self._probe_times = None
+        if rec is not None:
+            try:
+                written = rec.stop()
+                total = sum(written.values()) if written else 0
+                summary = getattr(self, "_smart_summary", "")
+                suffix = f" at {summary}" if summary else ""
+                self.recording_status.emit(f"Saved recording ({total} samples{suffix}).")
+            except Exception:
+                logger.exception("Failed to finalize smart recorder")
+            finally:
+                self._smart_summary = ""
 
     # --------------------------------------------------------------- start helpers
     def _create_streaming_buffer(
@@ -514,6 +698,12 @@ class RecorderController(QObject):
 
             # Feed ALL sample times so estimated_hz reflects samples/sec, not batches/sec.
             rc.feed_times(_to_seconds(s) for s in batch if isinstance(s, MpuSample))
+            # During a Smart-Recording probe, also collect PER-SENSOR times for an
+            # accurate per-sensor rate estimate (the RateController above is combined).
+            if self._probe_times is not None:
+                for s in batch:
+                    if isinstance(s, MpuSample) and s.sensor_id is not None:
+                        self._probe_times.setdefault(int(s.sensor_id), []).append(_to_seconds(s))
             stream_rate_hz = float(rc.estimate().hz_effective)
             self.stream_rate_updated.emit("mpu6050", stream_rate_hz)
             if self._data_buffer is not None:
@@ -525,6 +715,11 @@ class RecorderController(QObject):
                 self._modal_buffer.add_batch(batch)  # type: ignore[arg-type]
             except Exception:
                 logger.exception("RecorderController: failed to add samples to modal buffer")
+            # Smart Recording (Front C): non-blocking enqueue to the PC writer thread
+            # (G4-safe — the disk I/O happens off the GUI thread inside SmartRecorder).
+            rec = self._smart_recorder
+            if rec is not None:
+                rec.submit(batch)
         for sample in batch:
             self.sample_received.emit(sample)
 

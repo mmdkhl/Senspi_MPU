@@ -20,6 +20,54 @@ from ..utils.formatters import (
 from ..utils.math_utils import align_mode_sign, safe_percent_error
 
 
+# ── Partial-coverage mode-shape helpers (T8.3 / B1) ───────────────────────────
+# Experimental shapes may cover only the MEASURED stories (partial coverage). The
+# model shape is full-length, so model-vs-measured comparison and plotting must
+# both happen on the measured support, with one shared normalization (RISK-MU-2).
+
+def _measured_dofs(exp_data, n_story):
+    """0-based DOF indices the experimental shapes cover (all stories if full)."""
+    dofs = exp_data.get("measured_dof_indices")
+    if dofs:
+        return np.asarray(dofs, dtype=int)
+    return np.arange(int(n_story), dtype=int)
+
+
+def _align_norm_on_support(model_full, phi_exp, idx):
+    """Sign-align a FULL-length model shape to ``phi_exp`` on the measured support
+    ``idx`` and normalize the full vector by its measured-support max-abs, so the
+    model line and the measured markers share one normalization. Returns the full
+    aligned/normalized vector (length = len(model_full))."""
+    model_full = np.asarray(model_full, dtype=float)
+    phi_exp = np.asarray(phi_exp, dtype=float)
+    support = model_full[idx]
+    sign = -1.0 if float(np.dot(support, phi_exp)) < 0.0 else 1.0
+    v = sign * model_full
+    peak = float(np.max(np.abs(v[idx]))) if idx.size else 0.0
+    return v / peak if peak > 0.0 else v
+
+
+def _plot_measured_vs_model(ax, exp_data, modal_before, modal_after, stories, n_use):
+    """Overlay sensor-measured mode shapes (red markers at the MEASURED stories) on
+    the original (black) and calibrated (green) MODEL shapes (full lines). Partial-
+    coverage safe (T8.3): measured points appear only where a sensor exists, and the
+    sensor positions are mapped onto the model's story axis."""
+    idx = _measured_dofs(exp_data, len(stories))
+    meas_stories = [int(d) + 1 for d in idx]
+    line_styles = ['-', '--', ':', '-.']
+    for i in range(n_use):
+        phi_exp = np.asarray(exp_data["modes"][i], dtype=float)
+        before_full = _align_norm_on_support(modal_before["mode_shapes_ux_master"][i], phi_exp, idx)
+        after_full = _align_norm_on_support(modal_after["mode_shapes_ux_master"][i], phi_exp, idx)
+        ls = line_styles[i % len(line_styles)]
+        ax.plot(before_full, stories, color="black", linestyle=ls, marker="s",
+                linewidth=1.6, label=f"Orig M{i+1}")
+        ax.plot(after_full, stories, color="green", linestyle=ls, marker="^",
+                linewidth=1.8, label=f"Calib M{i+1}")
+        ax.plot(phi_exp, meas_stories, color="red", linestyle="none", marker="o",
+                markersize=8, label=f"Measured M{i+1}")
+
+
 def make_modal_comparison_report(exp_data, modal_before, modal_after,
                                   base_params, final_params, calib_result=None):
     """
@@ -90,22 +138,23 @@ def make_modal_comparison_report(exp_data, modal_before, modal_after,
     )
 
     if mode_shapes_can_compare:
+        # Compare on the measured support so partial coverage (B1) doesn't mismatch
+        # lengths: slice the full model shapes to the measured DOFs after aligning.
+        idx = _measured_dofs(exp_data, base_params["nStory"])
         for i in range(n_use):
             phi_exp = np.asarray(exp_data["modes"][i], dtype=float)
-            phi_before = align_mode_sign(
-                np.asarray(modal_before["mode_shapes_ux_master"][i], dtype=float), phi_exp
-            )
-            phi_after = align_mode_sign(
-                np.asarray(modal_after["mode_shapes_ux_master"][i], dtype=float), phi_exp
-            )
+            before_meas = _align_norm_on_support(
+                modal_before["mode_shapes_ux_master"][i], phi_exp, idx)[idx]
+            after_meas = _align_norm_on_support(
+                modal_after["mode_shapes_ux_master"][i], phi_exp, idx)[idx]
 
             mode_shape_comparison.append({
                 "mode": i + 1,
                 "experimental_normalized": phi_exp.tolist(),
-                "before_calibration_normalized": phi_before.tolist(),
-                "after_calibration_normalized": phi_after.tolist(),
-                "before_l2_mismatch": float(np.linalg.norm(phi_before - phi_exp)),
-                "after_l2_mismatch": float(np.linalg.norm(phi_after - phi_exp)),
+                "before_calibration_normalized": before_meas.tolist(),
+                "after_calibration_normalized": after_meas.tolist(),
+                "before_l2_mismatch": float(np.linalg.norm(before_meas - phi_exp)),
+                "after_l2_mismatch": float(np.linalg.norm(after_meas - phi_exp)),
             })
 
     report["mode_shape_comparison_available"] = mode_shapes_can_compare
@@ -289,22 +338,9 @@ def generate_calibration_summary_png(exp_data, modal_before, modal_after,
     )
 
     if mode_shapes_can_plot:
-        line_styles = ["-", "--", ":", "-."]
-        for i in range(n_use):
-            phi_exp = np.asarray(exp_data["modes"][i], dtype=float)
-            phi_before = align_mode_sign(
-                np.asarray(modal_before["mode_shapes_ux_master"][i], dtype=float), phi_exp
-            )
-            phi_after = align_mode_sign(
-                np.asarray(modal_after["mode_shapes_ux_master"][i], dtype=float), phi_exp
-            )
-            ls = line_styles[i % len(line_styles)]
-            ax2.plot(phi_before, stories, color="black", linestyle=ls,
-                     marker="s", linewidth=1.8, label=f"Orig M{i+1}")
-            ax2.plot(phi_exp, stories, color="red", linestyle=ls,
-                     marker="o", linewidth=1.8, label=f"Target M{i+1}")
-            ax2.plot(phi_after, stories, color="green", linestyle=ls,
-                     marker="^", linewidth=1.8, label=f"Calib M{i+1}")
+        # T8.3: measured (sensor) shapes as markers at their stories vs the model
+        # lines; partial-coverage safe via the shared helper.
+        _plot_measured_vs_model(ax2, exp_data, modal_before, modal_after, stories, n_use)
         ax2.set_title("Normalized Mode Shapes (UX)", fontsize=fs + 1)
         ax2.set_xlabel("Normalized amplitude", fontsize=fs)
         ax2.set_ylabel("Story", fontsize=fs)
@@ -406,28 +442,9 @@ def save_calibration_summary_figure(exp_data, modal_before, modal_after,
     )
 
     if mode_shapes_can_plot:
-        original_styles = ['-', '--', ':', '-.']
-        target_styles = ['-', '--', ':', '-.']
-        calibrated_styles = ['-', '--', ':', '-.']
-
-        for i in range(n_use):
-            phi_exp = np.asarray(exp_data["modes"][i], dtype=float)
-            phi_before = align_mode_sign(
-                np.asarray(modal_before["mode_shapes_ux_master"][i], dtype=float), phi_exp
-            )
-            phi_after = align_mode_sign(
-                np.asarray(modal_after["mode_shapes_ux_master"][i], dtype=float), phi_exp
-            )
-
-            ax3.plot(phi_before, stories,
-                     color='black', linestyle=original_styles[i % len(original_styles)],
-                     marker='s', linewidth=1.8, label=f"Original M{i+1}")
-            ax3.plot(phi_exp, stories,
-                     color='red', linestyle=target_styles[i % len(target_styles)],
-                     marker='o', linewidth=1.8, label=f"Target M{i+1}")
-            ax3.plot(phi_after, stories,
-                     color='green', linestyle=calibrated_styles[i % len(calibrated_styles)],
-                     marker='^', linewidth=1.8, label=f"Calibrated M{i+1}")
+        # Partial-coverage safe (B1/T8.3): measured markers at measured stories vs
+        # the full model lines, one shared normalization.
+        _plot_measured_vs_model(ax3, exp_data, modal_before, modal_after, stories, n_use)
 
         ax3.set_title("Normalized Mode Shapes (UX, max abs = 1)", fontsize=14)
         ax3.set_xlabel("Normalized amplitude", fontsize=12)

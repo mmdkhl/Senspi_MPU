@@ -118,6 +118,9 @@ class MainWindow(QMainWindow):
             self._on_start_stream_requested
         )
         self.signals_tab.stop_stream_requested.connect(self._on_stop_stream_requested)
+        self.signals_tab.record_requested.connect(self._on_record_requested)
+        self.recorder_tab.recording_status.connect(self.signals_tab._set_manual_status)
+        self.recorder_tab.rate_warning.connect(self.signals_tab._set_manual_status)
         self.signals_tab.sync_logs_requested.connect(self._on_sync_logs_requested)
         self.recorder_tab.stream_started.connect(self.signals_tab.on_stream_started)
         self.recorder_tab.stream_stopped.connect(self.signals_tab.on_stream_stopped)
@@ -231,6 +234,54 @@ class MainWindow(QMainWindow):
         )
         self._arm_auto_stop_timer(gui_cfg)
 
+    @Slot(str, int)
+    def _on_record_requested(self, session_name: str, duration_s: int) -> None:
+        """Smart Recording (Front C): probe-measured, PC-clock, fixed-duration record.
+
+        Reuses the same config/host prep as Start, but routes to
+        ``start_smart_recording`` (which owns the probe + PC writer + duration timer),
+        and forces ``record_only=False`` (Smart Recording is a stream-based PC path).
+        """
+        acquisition_settings = self.signals_tab.current_acquisition_settings()
+        acquisition_widget = getattr(self.signals_tab, "_acquisition_widget", None)
+        sensor_selection = getattr(self, "_current_sensor_selection", None)
+        if sensor_selection is None:
+            sensor_selection = SensorSelectionConfig(active_sensors=[], active_channels=[])
+        if acquisition_widget is not None:
+            gui_cfg = acquisition_widget.current_gui_acquisition_config(
+                sensor_selection=sensor_selection)
+        else:
+            gui_cfg = GuiAcquisitionConfig(
+                sampling=acquisition_settings.sampling,
+                stream_rate_hz=float(acquisition_settings.effective_stream_rate_hz),
+                record_only=False, sensor_selection=sensor_selection)
+        gui_cfg.record_only = False
+        gui_cfg.calibration = self._current_calibration_offsets
+        self._current_gui_acquisition_config = gui_cfg
+
+        host_cfg_raw = self.settings_tab.current_host_config()
+        if host_cfg_raw is None:
+            self.recorder_tab.report_error("No Raspberry Pi host selected.")
+            return
+        self._current_host = host_cfg_raw
+        host_cfg = self._host_inventory.to_host_config(host_cfg_raw)
+
+        self.recorder_tab.apply_sensor_selection(gui_cfg.sensor_selection)
+        self.recorder_tab.apply_gui_acquisition_config(gui_cfg)
+        self.signals_tab.set_sensor_selection(gui_cfg.sensor_selection)
+        self.signals_tab.apply_gui_acquisition_config(gui_cfg)
+        self.fft_tab.update_sensor_selection(gui_cfg.sensor_selection)
+        self.fft_tab.update_acquisition_config(gui_cfg)
+        device_rate = float(gui_cfg.sampling.device_rate_hz)
+        self.signals_tab.set_sampling_rate_hz(device_rate)
+        self.fft_tab.set_sampling_rate_hz(device_rate)
+        self.fft_tab.set_refresh_interval_ms(acquisition_settings.fft_refresh_ms)
+
+        # PC controls the stop (SF-4) inside the controller; no GUI auto-stop timer here.
+        self.recorder_tab.start_smart_recording(
+            gui_config=gui_cfg, host_cfg=host_cfg,
+            session_name=session_name, duration_s=float(duration_s))
+
     @Slot()
     def _on_stop_stream_requested(self) -> None:
         if getattr(self.recorder_tab, "_recording_mode", False):
@@ -252,7 +303,7 @@ class MainWindow(QMainWindow):
         self._cancel_auto_stop_timer()
         if not cfg.limit_duration:
             return
-        duration_s = max(1.0, min(120.0, float(cfg.duration_s)))
+        duration_s = max(1.0, min(600.0, float(cfg.duration_s)))  # match Rec-length max
         self._auto_stop_timer.start(int(duration_s * 1000))
 
     @Slot()

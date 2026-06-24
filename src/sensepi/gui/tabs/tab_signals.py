@@ -955,6 +955,7 @@ class SignalsTab(QWidget):
 
     start_stream_requested = Signal(str)  # session name
     stop_stream_requested = Signal()
+    record_requested = Signal(str, int)   # Smart Recording: (session name, duration_s)
     fft_refresh_interval_changed = Signal(int)
     acquisitionConfigChanged = Signal(GuiAcquisitionConfig)
     calibrationChanged = Signal(CalibrationOffsets)
@@ -1164,26 +1165,56 @@ class SignalsTab(QWidget):
         self.record_only_check.setToolTip(
             "When enabled, data is recorded on the Pi but not streamed live to this GUI."
         )
-        self.limit_duration_check = QCheckBox("Stop after", top_row_group)
-        self.limit_duration_check.setToolTip(
-            "Automatically stop after the selected recording duration."
-        )
-        self.duration_spin = QSpinBox(top_row_group)
-        self.duration_spin.setRange(1, 120)
-        self.duration_spin.setSingleStep(1)
-        self.duration_spin.setValue(20)
-        self.duration_spin.setSuffix(" s")
-        self.duration_spin.setEnabled(False)
+        # "Stop after" + its own duration box were removed: the recording length is
+        # now driven by the single "Rec length" field for BOTH methods (see
+        # duration_limit_enabled/seconds, which derive from record-only + Rec length).
         self._session_name_edit = QLineEdit(top_row_group)
         self._session_name_edit.setPlaceholderText("Session name (optional)")
         self._session_name_edit.setClearButtonEnabled(True)
         self._session_name_edit.setMaximumWidth(200)
         # Calibration UI has been removed from the Signals tab.
 
-        # Start/stop
+        # Start/stop. Start = live feed; if "Record only" is checked it instead runs
+        # the ORIGINAL Pi-side recording for the Rec-length duration (auto-stops).
         self.start_button = QPushButton("Start", top_row_group)
+        self.start_button.setToolTip(
+            "Live feed. If 'Record only' is checked, records via the original Pi-side "
+            "method for the 'Rec length' duration, then auto-stops.")
         self.stop_button = QPushButton("Stop", top_row_group)
         self.stop_button.setEnabled(False)
+
+        # Rec length drives BOTH methods: the original record-only (Start) and Smart
+        # Record. Smart Record probes the real rate for ~5 s then writes a PC-clock,
+        # fixed-duration, byte-compatible recording on the PC.
+        self.record_length_spin = QSpinBox(top_row_group)
+        self.record_length_spin.setRange(1, 600)
+        self.record_length_spin.setValue(60)
+        self.record_length_spin.setSuffix(" s")
+        self.record_length_spin.setToolTip(
+            "Recording length — used by BOTH Smart Record and 'Record only' (Start).")
+        # Requested sampling rate (Hz). This is THE single device rate (G3),
+        # surfaced here for convenience and kept in sync with the Acquisition
+        # section's "Sampling rate [Hz]". Smart Record asks the Pi for this rate and
+        # then probes the actual delivered rate.
+        self.record_rate_spin = QSpinBox(top_row_group)
+        self.record_rate_spin.setRange(1, 1000)
+        self.record_rate_spin.setSingleStep(10)
+        try:
+            _init_rate = int(round(
+                self._acquisition_widget.current_sampling_config().device_rate_hz))
+        except Exception:
+            _init_rate = 100
+        self.record_rate_spin.setValue(max(1, _init_rate))
+        self.record_rate_spin.setSuffix(" Hz")
+        self.record_rate_spin.setToolTip(
+            "Requested sampling rate sent to the Pi for recording (the single device "
+            "rate). Smart Record probes the actual delivered rate.")
+        self.record_rate_spin.valueChanged.connect(self._on_record_rate_changed)
+        self.record_button = QPushButton("Smart Record", top_row_group)
+        self.record_button.setToolTip(
+            "Smart Record: probe the real rate (~5 s) -> record for the Rec length "
+            "with a PC clock -> save (cap/decimate to the true rate).")
+        self.record_button.clicked.connect(self._on_record_clicked)
 
         # Small info labels: stream rate + plot refresh
         self._stream_rate_label = QLabel("Stream rate: -- Hz", top_row_group)
@@ -1206,16 +1237,18 @@ class SignalsTab(QWidget):
         self.start_button.clicked.connect(self._on_start_clicked)
         self.stop_button.clicked.connect(self._on_stop_clicked)
         self.record_only_check.stateChanged.connect(self._on_record_only_toggled)
-        self.limit_duration_check.toggled.connect(self.duration_spin.setEnabled)
         self.sync_logs_button.clicked.connect(self._on_sync_logs_clicked)
 
         top_row.addWidget(self.record_only_check)
-        top_row.addWidget(self.limit_duration_check)
-        top_row.addWidget(self.duration_spin)
         top_row.addWidget(QLabel("Session:", top_row_group))
         top_row.addWidget(self._session_name_edit)
         top_row.addWidget(self.start_button)
         top_row.addWidget(self.stop_button)
+        top_row.addWidget(QLabel("Rec length:", top_row_group))
+        top_row.addWidget(self.record_length_spin)
+        top_row.addWidget(QLabel("Rate:", top_row_group))
+        top_row.addWidget(self.record_rate_spin)
+        top_row.addWidget(self.record_button)
         top_row.addWidget(self.sync_logs_button)
         top_row.addStretch()
 
@@ -1278,8 +1311,23 @@ class SignalsTab(QWidget):
             self._acquisition_section.setCollapsed(True)
 
     @Slot()
+    def _on_record_clicked(self) -> None:
+        """Smart Recording: probe -> PC-clock fixed-duration recording (Front C)."""
+        self.start_button.setEnabled(False)
+        self.record_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
+        self._set_stream_status("Recording (probing rate)...", force=True)
+        session = self.session_name()
+        self.record_requested.emit(session, int(self.record_length_spin.value()))
+        if self._recording_section is not None:
+            self._recording_section.setCollapsed(True)
+        if self._acquisition_section is not None:
+            self._acquisition_section.setCollapsed(True)
+
+    @Slot()
     def _on_stop_clicked(self) -> None:
         self.start_button.setEnabled(True)
+        self.record_button.setEnabled(True)
         self.stop_button.setEnabled(False)
         self._set_manual_status("Stopping...")
         self.stop_stream_requested.emit()
@@ -1361,14 +1409,20 @@ class SignalsTab(QWidget):
         return self.session_name()
 
     def duration_limit_enabled(self) -> bool:
-        if not hasattr(self, "limit_duration_check"):
-            return False
-        return bool(self.limit_duration_check.isChecked())
+        """Bridge for the original recording path: 'Record only' acts as the old
+        'Stop after' — when it's checked, the recording auto-stops after the
+        Rec-length duration (main_window arms the PC timer + passes the Pi duration).
+        A plain live view (record-only unchecked) runs until Stop.
+        """
+        cb = getattr(self, "record_only_check", None)
+        return bool(cb is not None and cb.isChecked())
 
     def duration_limit_seconds(self) -> int:
-        if not hasattr(self, "duration_spin"):
-            return 20
-        return int(self.duration_spin.value())
+        """Single source of recording duration for BOTH methods = the Rec-length
+        field (replaces the removed 'Stop after' box)."""
+        if not hasattr(self, "record_length_spin"):
+            return 60
+        return int(self.record_length_spin.value())
 
     def calibrate_from_buffer(self, window_s: float | None = None) -> None:
         self._plot.calibrate_from_buffer(window_s=window_s)
@@ -1465,7 +1519,34 @@ class SignalsTab(QWidget):
         return self._current_gui_acquisition_config
 
     def _on_acquisition_widget_changed(self, *_args) -> None:
+        self._sync_record_rate_spin()
         self._rebuild_gui_acquisition_config()
+
+    @Slot(int)
+    def _on_record_rate_changed(self, hz: int) -> None:
+        """Push the recording-row rate into THE single device rate (G3): update the
+        acquisition widget's SamplingConfig so both stream and recording use it."""
+        aw = getattr(self, "_acquisition_widget", None)
+        if aw is None:
+            return
+        cur = aw.current_sampling_config()
+        if abs(float(cur.device_rate_hz) - float(hz)) < 1e-6:
+            return
+        aw.set_sampling_config(
+            SamplingConfig(device_rate_hz=float(hz), mode_key=cur.mode_key))
+        self._rebuild_gui_acquisition_config()
+
+    def _sync_record_rate_spin(self) -> None:
+        """Keep the recording-row Rate box in step with the Acquisition section's
+        device rate (one rate, surfaced in two places — G3)."""
+        spin = getattr(self, "record_rate_spin", None)
+        aw = getattr(self, "_acquisition_widget", None)
+        if spin is None or aw is None:
+            return
+        hz = float(aw.current_sampling_config().device_rate_hz)
+        if abs(spin.value() - hz) > 1e-6:
+            with QSignalBlocker(spin):
+                spin.setValue(int(round(hz)))
 
     def set_record_only_mode(self, enabled: bool) -> None:
         """

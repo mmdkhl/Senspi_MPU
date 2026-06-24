@@ -138,14 +138,22 @@ class TestMapToStories(unittest.TestCase):
         # Story-2 mode-1 value should equal sensor-2 value (1:1 mapping), normalized.
         self.assertAlmostEqual(max(abs(v) for v in out.mode_shapes_ux["1"]), 1.0, places=6)
 
-    def test_partial_coverage_frequency_only(self):
+    def test_partial_coverage_builds_partial_shapes(self):
         # 3 sensors but two share the top story -> only stories {1,3} covered.
+        # B1: partial coverage now emits mode shapes on the MEASURED stories.
         out = modal.map_to_stories(self._result(), sensor_story_map=[1, 3, 3], n_story=3)
-        self.assertFalse(out.mode_shapes_available)
-        self.assertEqual(out.mode_shapes_ux, {})
+        self.assertTrue(out.mode_shapes_available)
+        self.assertFalse(out.full_coverage)
         self.assertEqual(out.coverage_stories, [1, 3])
+        # One entry per MEASURED story (2), ordered by sorted coverage, |max|=1.
+        self.assertEqual(len(out.mode_shapes_ux["1"]), 2)
+        self.assertAlmostEqual(max(abs(v) for v in out.mode_shapes_ux["1"]), 1.0, places=6)
         # Torsion indicator recorded for the doubled story.
         self.assertIn(3, out.torsion_indicator)
+
+    def test_full_coverage_flag_set(self):
+        out = modal.map_to_stories(self._result(), sensor_story_map=[1, 2, 3], n_story=3)
+        self.assertTrue(out.full_coverage)
 
     def test_two_sensors_one_story_averaged(self):
         res = modal.ExperimentalModalResult(
@@ -177,18 +185,24 @@ class TestToExperimentalDict(unittest.TestCase):
         d = modal.to_experimental_dict(out)
         self.assertIn("frequencies_hz", d)
         self.assertIn("mode_shapes_ux", d)
+        # Full coverage -> all DOFs, 0-based, in sorted-story order.
+        self.assertEqual(d["measured_dof_indices"], [0, 1])
 
-    def test_omits_shapes_when_partial(self):
+    def test_includes_partial_shapes_and_dofs(self):
+        # Stories {1,2} of a 3-story structure -> partial coverage (B1).
         out = modal.map_to_stories(
             modal.ExperimentalModalResult(
                 frequencies_hz=[2.3], mode_shapes_sensor=[[0.3, 1.0]],
                 n_modes_found=1, success=True,
             ),
-            sensor_story_map=[1, 1], n_story=3,
+            sensor_story_map=[1, 2], n_story=3,
         )
         d = modal.to_experimental_dict(out)
         self.assertIn("frequencies_hz", d)
-        self.assertNotIn("mode_shapes_ux", d)
+        self.assertIn("mode_shapes_ux", d)
+        # measured_dof_indices is 0-based, matches the partial shape order/length.
+        self.assertEqual(d["measured_dof_indices"], [0, 1])
+        self.assertEqual(len(d["mode_shapes_ux"]["1"]), 2)
 
 
 if __name__ == "__main__":
