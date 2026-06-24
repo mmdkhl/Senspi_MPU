@@ -47,6 +47,7 @@ from PySide6.QtWidgets import (
 
 
 from ...analysis import modal as modal_id
+from ...analysis import modal_tracker as modal_trk
 from ...dataio import modal_session_loader as msl
 
 
@@ -58,12 +59,21 @@ _OPENSEES_INPUT_DIR = Path(__file__).resolve().parents[3] / "opensees_model_upda
 # Default experimental modal data — mirrors experimental_modal_data.json.
 # These are used to pre-populate the manual-input fields on first open so
 # the user always sees sensible starting values rather than zeros.
+# ⚠ NS-2 (nStory generalization): these are EXAMPLE defaults for the current
+# 3-story rig, NOT a structural assumption. They are consumed only as per-cell
+# fallbacks with bounds checks (`if i < len(...)`), so any story/mode count works
+# — cells beyond these examples default to 0 and are user-editable. The single
+# source of truth for the structure size is the Stories spinbox (`nStory`).
 _DEFAULT_EXP_FREQUENCIES: list[float] = [2.32, 6.5, 9.1]
 _DEFAULT_EXP_MODE_SHAPES: list[list[float]] = [
     [ 0.30,  0.75,  1.00],   # mode 1 (story 1, 2, 3)
     [-1.00,  0.10,  0.95],   # mode 2
     [ 1.00, -0.85,  0.30],   # mode 3
 ]
+# Example default for the auto-set number of calibration modes (NS-2). Not a hard
+# limit — the spinbox accepts 1–20; this only caps the value auto-chosen after a
+# sensor identification so a typical rig doesn't over-request modes.
+_DEFAULT_CALIB_MODES_CAP: int = 3
 
 
 def _default_workspace_dir() -> Path:
@@ -108,7 +118,7 @@ class _StructurePreview(QWidget):
         super().__init__(parent)
         self.setMinimumSize(300, 400)
         self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self._n_story = 3
+        self._n_story = 3   # NS-2: example default for the preview; set from nStory
         self._lx = 0.245
         self._ly = 0.230
         self._columns: dict[int, list[bool]] = {}
@@ -583,10 +593,31 @@ class _ModelUpdatingWorker(QObject):
                     self.log.emit(f"  Mass scale bounds:   [{params['m_scale_lb']:.3f}, {params['m_scale_ub']:.3f}] × m_prior\n")
                     self.log.emit(f"  Frequency tolerance: {params['freq_tol_percent']:.2f}%\n")
                     self.log.emit(f"  Max evaluations:     {params['max_nfev']}\n")
+                    method = params.get("calibration_method", "bayesian")
+                    self.log.emit(f"  Method:              {method}\n")
                     self.log.emit("\nRunning calibration optimizer...\n")
-                    calib_result, calibrated_params = run_calibration(
-                        original_params, exp_data, show_info=params["show_info"]
-                    )
+                    if method == "bayesian":
+                        from opensees_model_updating.calibration.bayesian import (  # type: ignore
+                            run_bayesian_calibration,
+                        )
+                        calib_result, calibrated_params = run_bayesian_calibration(
+                            original_params, exp_data,
+                            sigma_data_scale=params.get("sigma_data_scale", 0.02),
+                            sigma_E=params.get("sigma_prior_E", 0.30),
+                            sigma_m=params.get("sigma_prior_m", 0.15),
+                            mass_similarity_weight=params.get("mass_similarity_weight", 0.5),
+                            show_info=params["show_info"],
+                        )
+                        self.log.emit(
+                            "  Posterior mean ±1σ:  "
+                            + ", ".join(f"{m:.3f}±{s:.3f}"
+                                        for m, s in zip(calib_result.mean, calib_result.sigma))
+                            + "\n"
+                        )
+                    else:
+                        calib_result, calibrated_params = run_calibration(
+                            original_params, exp_data, show_info=params["show_info"]
+                        )
                     self.log.emit(f"  Result:       {'Converged' if calib_result.success else 'Did not converge'}\n")
                     self.log.emit(f"  Evaluations:  {calib_result.nfev}\n")
                     self.log.emit(f"  Message:      {calib_result.message}\n")
@@ -876,6 +907,10 @@ def _build_exp_data_from_gui_values(params: dict[str, Any]) -> dict[str, Any]:
         "modes": exp_modes,
         "use_mode_shapes": use_shapes and mode_shapes_available,
         "mode_shapes_available": mode_shapes_available,
+        # Partial-coverage DOF passthrough (B1 / BLOCKER-8): the calibrator slices
+        # phi_num by these when the shapes span only the measured stories. None for
+        # full coverage / manual full vectors (treated as all DOFs downstream).
+        "measured_dof_indices": raw.get("measured_dof_indices"),
         "source_file": "Manual input (SensePi GUI)",
         "raw_data": raw,
         "n_modes_used": n_calib,
@@ -913,6 +948,9 @@ def _load_exp_data_from_json_path(json_path: str, params: dict[str, Any]) -> dic
         "modes": exp_modes,
         "use_mode_shapes": params["use_mode_shapes"] and mode_shapes_available,
         "mode_shapes_available": mode_shapes_available,
+        # Partial-coverage DOF passthrough (B1 / BLOCKER-8) — present only if the
+        # JSON carried it; full-coverage JSON files leave it None (= all DOFs).
+        "measured_dof_indices": (loaded.get("raw_data") or {}).get("measured_dof_indices"),
         "source_file": json_path,
         "raw_data": loaded["raw_data"],
         "n_modes_used": n_calib,
@@ -969,6 +1007,9 @@ def _make_calibration_signature(params: dict[str, Any]) -> str:
         "gmFile",
         "dtGM",
         "enable_calibration",
+        # GAP-MU-2: NEW key (NOT sensor_method, which is the FDD/FFT axis). Switching
+        # engines or any Bayesian knob must invalidate the cached result.
+        "calibration_method",
         "use_mode_shapes",
         "mass_calibration_scope",
         "nCalibModes",
@@ -980,6 +1021,10 @@ def _make_calibration_signature(params: dict[str, Any]) -> str:
         "m_scale_lb",
         "m_scale_ub",
         "max_nfev",
+        "sigma_prior_E",
+        "sigma_prior_m",
+        "sigma_data_scale",
+        "mass_similarity_weight",
         "story_column_layout",
         "column_orientation_layout",
         "additional_masses",
@@ -1079,27 +1124,103 @@ def _render_identified_shapes_png(story_data: "modal_id.StoryModalData",
 
 
 def _render_param_history_png(history: list[dict[str, Any]]) -> bytes:
-    """Mode B evolution: E % change and calibrated floor masses vs cycle."""
+    """Mode B evolution: E % change and calibrated floor masses vs cycle.
+
+    Draws the recursive track with a ±1σ confidence band (Bayesian) and overlays the
+    per-cycle one-shot estimate as markers, so a step change (e.g. a real mass change)
+    stays visible and is not smoothed away (Q-E). Deterministic runs carry no σ / one-
+    shot keys, so the band and markers are simply omitted (graceful via ``.get``).
+    """
     fig = Figure(figsize=(6.6, 4.8))
     ax1 = fig.add_subplot(2, 1, 1)
     ax2 = fig.add_subplot(2, 1, 2)
     cycles = [h["cycle"] for h in history]
     if cycles:
+        # ── E stiffness ──────────────────────────────────────────────────────
         e_pct = [h.get("E_pct", 0.0) for h in history]
-        ax1.plot(cycles, e_pct, "-o", color="#dc2626", linewidth=1.6)
+        e_sig = [h.get("E_pct_sigma", 0.0) for h in history]
+        ax1.plot(cycles, e_pct, "-o", color="#dc2626", linewidth=1.6, label="recursive")
+        if any(s > 0 for s in e_sig):
+            lo = [v - s for v, s in zip(e_pct, e_sig)]
+            hi = [v + s for v, s in zip(e_pct, e_sig)]
+            ax1.fill_between(cycles, lo, hi, color="#dc2626", alpha=0.18, label="±1σ")
+        os_e = [h.get("E_oneshot_pct") for h in history]
+        if any(v is not None for v in os_e):
+            ax1.plot(cycles, [v if v is not None else np.nan for v in os_e],
+                     "x", color="#475569", markersize=6, label="one-shot")
         ax1.set_ylabel("E change (%)")
         ax1.set_title("Calibrated stiffness vs cycle")
         ax1.grid(True, alpha=0.3)
+        ax1.legend(loc="best", fontsize=7)
 
+        # ── Floor masses ─────────────────────────────────────────────────────
         n_mass = max((len(h.get("masses", [])) for h in history), default=0)
         for k in range(n_mass):
+            c = _mode_color(k)
             ys = [h["masses"][k] if k < len(h.get("masses", [])) else np.nan for h in history]
-            ax2.plot(cycles, ys, "-o", linewidth=1.4, color=_mode_color(k), label=f"m{k + 1}")
+            ax2.plot(cycles, ys, "-o", linewidth=1.4, color=c, label=f"m{k + 1}")
+            sg = [h.get("masses_sigma", [])[k] if k < len(h.get("masses_sigma", [])) else 0.0
+                  for h in history]
+            if any(s > 0 for s in sg):
+                lo = [y - s for y, s in zip(ys, sg)]
+                hi = [y + s for y, s in zip(ys, sg)]
+                ax2.fill_between(cycles, lo, hi, color=c, alpha=0.15)
+            osm = [h.get("masses_oneshot", [])[k] if k < len(h.get("masses_oneshot", [])) else np.nan
+                   for h in history]
+            if any(np.isfinite(v) for v in osm):
+                ax2.plot(cycles, osm, "x", color=c, markersize=5)
         ax2.set_ylabel("Floor mass")
         ax2.set_xlabel("Cycle")
         ax2.grid(True, alpha=0.3)
         if n_mass:
             ax2.legend(loc="upper right", fontsize=8, ncol=n_mass)
+    fig.tight_layout()
+    return _fig_to_png(fig)
+
+
+def _render_freq_tracking_png(history: list[dict[str, Any]]) -> bytes:
+    """Stage-1 frequency tracking: consolidated f_hat ± sigma per mode vs cycle, with
+    the raw per-cycle identifications overlaid as scatter dots (the "6/10 win" made
+    visible — dots cluster on the band, outliers sit off it, the band tightens as
+    evidence accumulates). Worker-rendered PNG (BUG-1 pattern; G1/G4).
+    """
+    fig = Figure(figsize=(6.6, 4.8))
+    ax = fig.add_subplot(1, 1, 1)
+    cycles = [h["cycle"] for h in history]
+    if cycles:
+        n_modes = max((len(h.get("f_hat", [])) for h in history), default=0)
+        for k in range(n_modes):
+            c = _mode_color(k)
+            # Consolidated track + band (only cycles where this mode exists).
+            xs, ys, sg = [], [], []
+            for h in history:
+                fh = h.get("f_hat", [])
+                fs = h.get("f_sigma", [])
+                if k < len(fh):
+                    xs.append(h["cycle"])
+                    ys.append(fh[k])
+                    sg.append(fs[k] if k < len(fs) else 0.0)
+            if not xs:
+                continue
+            ax.plot(xs, ys, "-", color=c, linewidth=1.8, label=f"mode {k + 1}", zorder=3)
+            if any(s > 0 for s in sg):
+                lo = [y - s for y, s in zip(ys, sg)]
+                hi = [y + s for y, s in zip(ys, sg)]
+                ax.fill_between(xs, lo, hi, color=c, alpha=0.18, zorder=1)
+        # Raw per-cycle peaks as faint scatter (every identified peak, any mode).
+        rx, ry = [], []
+        for h in history:
+            for f in h.get("raw_freqs", []):
+                rx.append(h["cycle"])
+                ry.append(f)
+        if rx:
+            ax.scatter(rx, ry, s=10, color="#64748b", alpha=0.45, zorder=2,
+                       label="raw peaks")
+        ax.set_xlabel("Cycle")
+        ax.set_ylabel("Frequency (Hz)")
+        ax.set_title("Tracked modal frequencies (consolidated ±1σ) vs raw identifications")
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="best", fontsize=7, ncol=2)
     fig.tight_layout()
     return _fig_to_png(fig)
 
@@ -1226,12 +1347,18 @@ class _IdentifyWorker(QObject):
 
             # ── COVERAGE ──────────────────────────────────────────────
             self.log.emit("\nCOVERAGE\n")
-            mode = "full → mode shapes WILL be used" if story_data.mode_shapes_available \
-                else "partial → FREQUENCY-ONLY calibration"
+            if not story_data.mode_shapes_available:
+                mode = "no mode shapes → FREQUENCY-ONLY calibration"
+            elif story_data.full_coverage:
+                mode = "full → mode shapes (all stories) WILL be used"
+            else:
+                mode = "partial → mode shapes on the MEASURED stories WILL be used"
             self.log.emit(f"  Stories with a sensor: {story_data.coverage_stories} "
                           f"of {story_data.n_story}  ({mode})\n")
             if not story_data.mode_shapes_available:
-                self.log.emit("  (interior stories have no sensor; mode shapes are not sent to the optimizer)\n")
+                self.log.emit("  (no story has a usable sensor shape; mode shapes are not sent to the optimizer)\n")
+            elif not story_data.full_coverage:
+                self.log.emit("  (unmeasured stories are omitted from the shape residual, not interpolated)\n")
             if story_data.torsion_indicator:
                 self.log.emit("  Torsion check (spread between sensors on the same story):\n")
                 for s, spread in story_data.torsion_indicator.items():
@@ -1263,7 +1390,18 @@ class _IdentifyWorker(QObject):
 
 
 class _ContinuousUpdateWorker(QObject):
-    """Mode B: capture → FDD → calibrate from fixed prior → repeat."""
+    """Mode B (two-stage digital twin): capture → identify → Stage-1 tracker →
+    Stage-2 Bayesian calibration to the *consolidated* estimate → repeat.
+
+    The loop **never hard-stops on disagreement** (the old gates were a regression,
+    D1). A noisy/outlier reading is down-weighted by the Stage-1 robust tracker, not
+    rejected; only a *no-measurement* cycle (capture not ready / 0 peaks) waits and
+    retries — indefinitely. The accumulation lives in Stage 1 (measurement space),
+    so Stage 2 fits **once per cycle** from the fixed initial prior to a *stable*
+    target, with per-mode σ_data taken from the tracker's observed scatter — the band
+    shrinks as evidence clusters and widens with scatter (genuine prior→posterior
+    convergence over many runs).
+    """
 
     log = Signal(str)
     result = Signal(object)   # per-cycle figure/state payload
@@ -1286,23 +1424,59 @@ class _ContinuousUpdateWorker(QObject):
     def run(self) -> None:
         try:
             from opensees_model_updating.calibration.calibrator import run_calibration  # type: ignore
+            from opensees_model_updating.calibration import bayesian as bayes  # type: ignore
         except Exception as exc:
             self.error.emit(f"OpenSees not available for continuous calibration: {exc}")
             self.finished.emit()
             return
 
-        original_params = copy.deepcopy(self._params)
+        initial_params = copy.deepcopy(self._params)   # NEVER mutated (fixed Stage-2 prior)
         duration = float(self._settings["duration_s"])
         interval = float(self._settings["interval_s"])
-        max_failures = int(self._settings["max_failures"])
-        failures = 0
-        cycle = 0
-        elapsed_wait = 0.0
 
-        self.log.emit("Continuous update started. Press Stop to end.\n")
+        # Settings/params override the coded default (settings win, then params).
+        s, p = self._settings, self._params
+
+        def g(key, default):
+            if key in s:
+                return s[key]
+            if key in p:
+                return p[key]
+            return default
+
+        method = str(g("calibration_method", "bayesian"))
+        is_bayes = (method == "bayesian")
+        sigma_data = float(g("sigma_data_scale", bayes.DEFAULT_SIGMA_DATA))
+        sigma_E = float(g("sigma_prior_E", bayes.DEFAULT_SIGMA_E))
+        sigma_m = float(g("sigma_prior_m", bayes.DEFAULT_SIGMA_M))
+        mass_sim_w = float(g("mass_similarity_weight", bayes.DEFAULT_MASS_SIMILARITY_WEIGHT))
+        max_cycles = int(g("max_cycles", 0))   # 0 = unlimited (tests bound it)
+
+        # Stage-1 tracker knobs (CU-9 exposes λ and c; the rest use spec defaults).
+        trk_lambda = float(g("tracker_forgetting", modal_trk.DEFAULT_FORGETTING))
+        trk_c = float(g("tracker_robust_scale", modal_trk.DEFAULT_ROBUST_SCALE))
+        n_modes = int(self._params.get("sensor_n_modes", 3))
+        want_shapes = bool(self._params.get("use_mode_shapes", False))
+
+        initial_prior = bayes.build_prior(initial_params, sigma_E=sigma_E, sigma_m=sigma_m)
+        e_prior = float(initial_params["E"])
+        n_story = int(initial_params["nStory"])
+        e_lb = float(initial_params["E_scale_lb"]); e_ub = float(initial_params["E_scale_ub"])
+        m_lb = float(initial_params["m_scale_lb"]); m_ub = float(initial_params["m_scale_ub"])
+
+        # Stage 1: fresh tracker each run (restart clears all modal memory).
+        tracker = modal_trk.ModalStateTracker(
+            n_modes, forgetting=trk_lambda, robust_scale=trk_c, track_shapes=want_shapes)
+        cycle = 0
+
+        self.log.emit(
+            f"Continuous update started ({method}, Stage-1 tracker λ={trk_lambda:g}, "
+            f"c={trk_c:g}). The loop runs until you press Stop.\n")
         while self._running:
             cycle += 1
             self.log.emit(f"\n── Cycle {cycle} ──\n")
+
+            # ── No-measurement cycles WAIT and retry — never hard-stop (D1 fix). ──
             session = self._capture_fn(
                 axis=self._params["sensor_axis"], last_seconds=duration,
                 target_fs=self._params.get("sensor_target_fs"),
@@ -1314,83 +1488,185 @@ class _ContinuousUpdateWorker(QObject):
                 continue
 
             exp_dict, fdd, story_data = _build_sensor_exp_dict(session, self._params)
-            if fdd is None or not fdd.success:
-                failures += 1
-                self.log.emit(f"  Identification failed ({fdd.message}). "
-                              f"Failure {failures}/{max_failures}.\n")
-                if failures >= max_failures:
-                    self.error.emit("Too many consecutive identification failures. Loop paused.")
-                    break
+            if fdd is None or not fdd.success or not fdd.frequencies_hz:
+                msg = fdd.message if fdd is not None else "no identification"
+                self.log.emit(f"  No modes identified ({msg}); waiting…\n")
                 if not self._sleep(interval):
                     break
                 continue
 
-            # Sanity: frequencies within band.
-            in_band = all(self._params["sensor_f_min"] <= f <= self._params["sensor_f_max"]
-                          for f in fdd.frequencies_hz)
-            if not in_band:
-                failures += 1
-                self.log.emit(f"  Peak outside frequency bounds. Failure {failures}/{max_failures}.\n")
-                if failures >= max_failures:
-                    self.error.emit("Too many out-of-band cycles. Loop paused.")
-                    break
+            # ── STAGE 1 — robust modal state tracker (accumulate, never reject) ───
+            raw_freqs = [float(f) for f in fdd.frequencies_hz]
+            cov_stories = list(story_data.coverage_stories)
+            use_shapes_cycle = bool(want_shapes and story_data.mode_shapes_available)
+            shapes_list = None
+            if use_shapes_cycle:
+                shapes_list = [story_data.mode_shapes_ux.get(str(j + 1)) for j in range(len(raw_freqs))]
+            consolidated = tracker.update(
+                raw_freqs, shapes=shapes_list,
+                coverage_stories=cov_stories if use_shapes_cycle else None)
+            self._log_stage1(raw_freqs, consolidated)
+
+            f_hat = consolidated.frequencies
+            f_sig = consolidated.freq_sigma
+            if not f_hat:
+                self.log.emit("  Tracker holds no modes yet; waiting…\n")
                 if not self._sleep(interval):
                     break
                 continue
 
-            failures = 0
-            # Re-fit from the FIXED prior each cycle (decided 2026-06-01).
-            cycle_params = copy.deepcopy(original_params)
-            n_found = len(fdd.frequencies_hz)
-            cycle_params["nCalibModes"] = min(cycle_params["nCalibModes"], n_found)
-            cycle_params["use_mode_shapes"] = bool(
-                cycle_params["use_mode_shapes"] and story_data.mode_shapes_available
-            )
+            # ── Build the consolidated experimental dict for Stage 2. ────────────
+            n_use = min(int(initial_params["nCalibModes"]), len(f_hat))
+            consolidated_exp = {
+                "frequencies_hz": list(f_hat),
+                "notes": f"Stage-1 consolidated estimate (cycle {cycle})",
+            }
+            shapes_for_fit = use_shapes_cycle and consolidated.shapes_available
+            if shapes_for_fit:
+                ux = {}
+                for i, sh in enumerate(consolidated.shapes):
+                    if sh is not None:
+                        ux[str(i + 1)] = sh
+                if ux:
+                    consolidated_exp["mode_shapes_ux"] = ux
+                    consolidated_exp["measured_dof_indices"] = [c - 1 for c in consolidated.coverage_stories]
+                else:
+                    shapes_for_fit = False
+
+            cycle_params = copy.deepcopy(initial_params)
+            cycle_params["nCalibModes"] = n_use
+            cycle_params["use_mode_shapes"] = bool(shapes_for_fit)
             cycle_params["experimental_data_source"] = "manual"
-            cycle_params["experimental_modal_data"] = exp_dict
+            cycle_params["experimental_modal_data"] = consolidated_exp
+
+            # ── STAGE 2 — one calibration to the stable, consolidated target. ────
             try:
                 exp_data = _build_exp_data_from_gui_values(cycle_params)
-                calib_result, calibrated = run_calibration(
-                    cycle_params, exp_data, show_info=False
-                )
+                if is_bayes:
+                    # Per-mode σ_data = Stage-1 relative scatter -> noisy modes weigh less.
+                    sigma_rel = [r for r in consolidated.freq_sigma_rel[:n_use]]
+                    res, calib = bayes.run_bayesian_calibration(
+                        cycle_params, exp_data, prior=initial_prior,
+                        sigma_data_scale=sigma_data, sigma_data_per_mode=sigma_rel,
+                        mass_similarity_weight=mass_sim_w)
+                    theta, cov = np.asarray(res.mean, dtype=float), res.cov
+                    success = res.success
+                else:
+                    result, calib = run_calibration(cycle_params, exp_data, show_info=False)
+                    theta, cov = np.asarray(result.x, dtype=float), None
+                    success = result.success
             except Exception as exc:
-                self.log.emit(f"  Calibration error: {exc}. Keeping previous model.\n")
+                # A calibration failure is NOT fatal — keep the model, wait, retry.
+                self.log.emit(f"  Calibration error: {exc}. Keeping previous model; waiting…\n")
                 if not self._sleep(interval):
                     break
                 continue
 
-            e_prior = float(original_params["E"])
-            e_cal = float(calibrated["E"])
+            # ── Parameters + uncertainty bands. ──────────────────────────────────
+            e_cal = float(calib["E"])
             e_pct = (e_cal - e_prior) / e_prior * 100 if e_prior else 0.0
-            ok = "✓" if calib_result.success else "≈"
-            freq_str = ", ".join(f"{f:.2f}" for f in fdd.frequencies_hz)
+            masses = [float(mm) for mm in calib["floor_masses"]]
+            if cov is not None:
+                sig = np.sqrt(np.clip(np.diag(np.asarray(cov, dtype=float)), 0.0, None))
+                e_pct_sigma = float(sig[0] * 100.0)
+                masses_sigma = [
+                    float(masses[k] * sig[k + 1] / theta[k + 1])
+                    if (k + 1) < sig.size and theta[k + 1] else 0.0
+                    for k in range(len(masses))
+                ]
+            else:
+                e_pct_sigma = 0.0
+                masses_sigma = [0.0] * len(masses)
+
+            # ── CU-8: saturation warning (model can't reach the rig / bounds tight). ──
+            self._warn_saturation(theta, e_lb, e_ub, m_lb, m_ub, n_story)
+
+            ok = "✓" if success else "≈"
+            band = f" ±{e_pct_sigma:.2f}" if e_pct_sigma else ""
             self.log.emit(
-                f"  {freq_str} Hz — Calibrated {ok}  E {e_pct:+.2f}%  "
-                f"(masses { ' '.join(f'{float(m):.3f}' for m in calibrated['floor_masses']) })\n"
+                f"  {method} {ok}  E {e_pct:+.2f}%{band}  "
+                f"(masses {' '.join(f'{mm:.3f}' for mm in masses)})\n"
             )
 
             self._history.append({
                 "cycle": cycle,
                 "E_pct": e_pct,
                 "E": e_cal,
-                "masses": [float(m) for m in calibrated["floor_masses"]],
-                "freqs": list(fdd.frequencies_hz),
-                "success": bool(calib_result.success),
+                "masses": masses,
+                "E_pct_sigma": e_pct_sigma,
+                "masses_sigma": masses_sigma,
+                # CU-7 (atomic with the renderer): Stage-1 track + raw scatter.
+                "f_hat": list(f_hat),
+                "f_sigma": list(f_sig),
+                "raw_freqs": list(raw_freqs),
+                "success": bool(success),
             })
-            self._history = self._history[-20:]  # keep last 20
+            self._history = self._history[-40:]  # keep last 40 cycles for the plots
 
+            # Render BOTH right-panel views every cycle; the GUI checkbox picks which
+            # to show, so toggling is instant and needs no recompute (G1/G4: both are
+            # rendered here in the worker thread, only PNG bytes cross to the GUI).
+            #   fig2_fdd_png   = per-iteration FDD spectrum with this cycle's modes (old view)
+            #   fig2_track_png = consolidated f̂±σ tracks + raw scatter (new view)
             self.result.emit({
                 "fig1_png": _render_param_history_png(self._history),
-                "fig2_png": _render_fdd_spectrum_png(
+                "fig2_fdd_png": _render_fdd_spectrum_png(
                     fdd, self._params["sensor_f_min"], self._params["sensor_f_max"]),
+                "fig2_track_png": _render_freq_tracking_png(self._history),
                 "cycle": cycle,
             })
 
+            if max_cycles and cycle >= max_cycles:
+                break
             if not self._sleep(max(0.0, interval - duration)):
                 break
 
         self.log.emit("\nContinuous update stopped.\n")
         self.finished.emit()
+
+    def _log_stage1(self, raw_freqs, consolidated) -> None:
+        """Transparent per-cycle log (CU-6): raw peaks, each reading's fate, f̂±σ."""
+        self.log.emit("  raw peaks: " + ", ".join(f"{f:.2f}" for f in raw_freqs) + " Hz\n")
+        for d in consolidated.diagnostics:
+            if d.note == "unassociated":
+                self.log.emit(f"    {d.freq:.2f} Hz → unassociated (spurious or new mode)\n")
+            elif d.note == "shift-watch":
+                self.log.emit(f"    {d.freq:.2f} Hz → watching (possible shift on mode {d.track + 1})\n")
+            elif d.note == "shift":
+                self.log.emit(f"    mode {d.track + 1} re-locked to {d.freq:.2f} Hz (persistent shift)\n")
+            elif d.note == "seeded":
+                self.log.emit(f"    mode {d.track + 1} seeded at {d.freq:.2f} Hz\n")
+            else:  # folded / outlier
+                tag = "OUTLIER, folded (not dropped)" if d.note == "outlier" else "folded"
+                self.log.emit(
+                    f"    mode {d.track + 1} {d.freq:.2f} (r={d.residual:+.1f}σ, "
+                    f"w={d.weight:.2f}, {tag})\n")
+        consolidated_str = ", ".join(
+            f"{f:.2f}±{s:.2f}" for f, s in zip(consolidated.frequencies, consolidated.freq_sigma))
+        self.log.emit(f"  consolidated: f̂ = {consolidated_str} Hz\n")
+
+    def _warn_saturation(self, theta, e_lb, e_ub, m_lb, m_ub, n_story) -> None:
+        """CU-8: flag parameters pinned at a bound — the model may not reach the rig."""
+        tol = 1e-3
+        pinned = []
+        if theta.size:
+            if theta[0] <= e_lb + tol:
+                pinned.append(f"E at lower bound {e_lb:g}")
+            elif theta[0] >= e_ub - tol:
+                pinned.append(f"E at upper bound {e_ub:g}")
+        for k in range(n_story):
+            if (k + 1) >= theta.size:
+                break
+            v = theta[k + 1]
+            if v <= m_lb + tol:
+                pinned.append(f"m{k + 1} at lower bound {m_lb:g}")
+            elif v >= m_ub - tol:
+                pinned.append(f"m{k + 1} at upper bound {m_ub:g}")
+        if pinned:
+            self.log.emit(
+                "  ⚠ parameter(s) hit a bound: " + "; ".join(pinned) +
+                " — widen the bounds or move the PRIOR model closer to the rig "
+                "(the filter cannot reach frequencies the model physically can't produce).\n")
 
     def _sleep(self, seconds: float) -> bool:
         """Sleep in small slices so Stop is responsive. Returns False if stopped."""
@@ -1447,8 +1723,17 @@ class ModelUpdatingTab(QWidget):
         self._build_output_tab()
 
         actions = QHBoxLayout()
+        # FEM-driven actions (use the Calibration tab's method + scope selectors).
+        actions.addWidget(QLabel("Model:", self))
         self._calibrate_btn = QPushButton("Calibrate", self)
+        self._calibrate_btn.setToolTip(
+            "Update the FEM to the target modal data using the selected Calibration "
+            "method (Bayesian or Least-squares) and analysis scope (frequency only / "
+            "+ mode shapes)."
+        )
         self._run_btn = QPushButton("Run Analysis", self)
+        self._run_btn.setToolTip("Run the (calibrated) FEM and show frequencies, mode shapes, "
+                                 "and the transient response.")
         actions.addWidget(self._calibrate_btn)
         actions.addWidget(self._run_btn)
 
@@ -1457,6 +1742,8 @@ class ModelUpdatingTab(QWidget):
         sep.setFrameShadow(QFrame.Sunken)
         actions.addWidget(sep)
 
+        # Sensor-driven actions (identify modal data from recordings / live stream).
+        actions.addWidget(QLabel("Sensors:", self))
         self._identify_btn = QPushButton("Load && Identify", self)
         self._identify_btn.setToolTip("Identify modes from a recorded session and load them into Manual input (no OpenSees).")
         self._identify_analyze_btn = QPushButton("Identify && Analyze", self)
@@ -1510,8 +1797,8 @@ class ModelUpdatingTab(QWidget):
         self._lx = self._double_spin(0.001, 100.0, 0.245, 4)
         self._ly = self._double_spin(0.001, 100.0, 0.230, 4)
         self._story_count = QSpinBox(self)
-        self._story_count.setRange(1, 20)
-        self._story_count.setValue(3)
+        self._story_count.setRange(1, 20)   # nStory is the single source of truth (NS-1)
+        self._story_count.setValue(3)       # NS-2: example default for the current rig
         self._t_column = self._double_spin(0.0001, 10.0, 0.001, 5)
         self._b_column = self._double_spin(0.0001, 10.0, 0.006, 5)
         self._b_beam = self._double_spin(0.0001, 10.0, 0.001, 5)
@@ -1683,8 +1970,13 @@ class ModelUpdatingTab(QWidget):
 
         self._enable_calibration = QCheckBox(self)
         self._enable_calibration.setChecked(True)
-        self._use_mode_shapes = QCheckBox(self)
-        self._use_mode_shapes.setChecked(False)
+        # Method selector (Q-F): Bayesian is the v26.1.1 default digital-twin engine;
+        # deterministic least-squares stays selectable as the safe fallback.
+        self._calibration_method = QComboBox(self)
+        self._calibration_method.addItems(["Bayesian (Gaussian)", "Least-squares (current)"])
+        # Analysis scope (B4): replaces the old "use mode shapes" checkbox.
+        self._analysis_scope = QComboBox(self)
+        self._analysis_scope.addItems(["Frequency only", "Frequency + mode shapes"])
         self._mass_scope = QComboBox(self)
         self._mass_scope.addItems(
             ["Self-weight mass only", "Total mass including additional masses"]
@@ -1695,21 +1987,29 @@ class ModelUpdatingTab(QWidget):
         self._freq_tol = self._double_spin(0.0, 100.0, 5.0, 3)
         self._w_freq = self._double_spin(0.0, 1000.0, 1.0, 4)
         self._w_mode = self._double_spin(0.0, 1000.0, 0.35, 4)
-        self._e_lb = self._double_spin(0.001, 1000.0, 0.70, 4)
-        self._e_ub = self._double_spin(0.001, 1000.0, 1.30, 4)
-        self._m_lb = self._double_spin(0.001, 1000.0, 0.70, 4)
-        self._m_ub = self._double_spin(0.001, 1000.0, 1.30, 4)
+        # CU-8: default scale bounds widened to ±50% so the optimizer is not pinned
+        # at ±30% when the prior model sits far from the rig (a saturation warning
+        # still fires from the worker if a param parks at a bound). User-adjustable.
+        self._e_lb = self._double_spin(0.001, 1000.0, 0.50, 4)
+        self._e_ub = self._double_spin(0.001, 1000.0, 1.50, 4)
+        self._m_lb = self._double_spin(0.001, 1000.0, 0.50, 4)
+        self._m_ub = self._double_spin(0.001, 1000.0, 1.50, 4)
         self._max_nfev = QSpinBox(self)
         self._max_nfev.setRange(1, 100000)
         self._max_nfev.setValue(200)
+        # Bayesian knobs (R3 / GAP-MU-3 / R1) — provisional defaults until PRE-3 grounded.
+        self._sigma_prior_E = self._double_spin(0.001, 100.0, 0.30, 4)
+        self._sigma_prior_m = self._double_spin(0.001, 100.0, 0.15, 4)
+        self._sigma_data_scale = self._double_spin(0.0001, 100.0, 0.02, 4)
+        self._mass_similarity_weight = self._double_spin(0.0, 1000.0, 0.50, 4)
         self._show_uncalibrated_response = QCheckBox(self)
         self._show_uncalibrated_response.setChecked(True)
 
         form.addRow("Enable calibration:", self._enable_calibration)
-        form.addRow("Use mode shapes:", self._use_mode_shapes)
+        form.addRow("Calibration method:", self._calibration_method)
+        form.addRow("Analysis scope:", self._analysis_scope)
         form.addRow("Mass calibration target:", self._mass_scope)
         form.addRow("Calibration modes:", self._n_calib_modes)
-        form.addRow("Frequency tolerance (%):", self._freq_tol)
         form.addRow("Frequency weight:", self._w_freq)
         form.addRow("Mode-shape weight:", self._w_mode)
         form.addRow("E scale lower bound:", self._e_lb)
@@ -1720,10 +2020,54 @@ class ModelUpdatingTab(QWidget):
         form.addRow("Store uncalibrated response:", self._show_uncalibrated_response)
         layout.addWidget(group)
 
+        # --- Method-specific settings -------------------------------------
+        # Each engine's own controls live in a group shown ONLY for that method, so
+        # selecting Bayesian hides the least-squares options and vice-versa. The
+        # shared fit settings above (modes, weights, bounds, max-eval, scope) apply
+        # to both engines and stay visible regardless of method.
+        self._lsq_group = QGroupBox("Least-squares settings", self)
+        lsq_form = QFormLayout(self._lsq_group)
+        self._freq_tol.setToolTip(
+            "Frequency match tolerance (%) used for the least-squares pass/fail report.")
+        lsq_form.addRow("Frequency tolerance (%):", self._freq_tol)
+        layout.addWidget(self._lsq_group)
+
+        self._bayesian_group = QGroupBox("Bayesian settings", self)
+        bayes_form = QFormLayout(self._bayesian_group)
+        self._sigma_prior_E.setToolTip(
+            "Prior std-dev on E_scale (fraction of 1.0). Larger = let the data move E "
+            "more; smaller = trust the model's E. Default 0.30.")
+        self._sigma_prior_m.setToolTip(
+            "Prior std-dev on each floor mass scale. Larger = masses freer to change; "
+            "smaller = stay near the defined masses. Default 0.15.")
+        self._sigma_data_scale.setToolTip(
+            "Measurement-noise scale on the modal data (fractional, e.g. 0.02 = 2%). "
+            "Sets the width of the posterior confidence bands. Provisional until the "
+            "Pi under-sampling (PRE-3) is grounded.")
+        self._mass_similarity_weight.setToolTip(
+            "Mass-regularization weight (R1): discourages non-physical floor-to-floor "
+            "mass spread without modal evidence. 0 disables it. Default 0.50.")
+        bayes_form.addRow("Prior σ on E:", self._sigma_prior_E)
+        bayes_form.addRow("Prior σ on masses:", self._sigma_prior_m)
+        bayes_form.addRow("Data noise σ (frac):", self._sigma_data_scale)
+        bayes_form.addRow("Mass-similarity weight:", self._mass_similarity_weight)
+        layout.addWidget(self._bayesian_group)
+
         self._build_exp_data_section(layout)
         layout.addStretch(1)
 
         self._n_calib_modes.valueChanged.connect(self._rebuild_exp_data_widgets)
+        self._calibration_method.currentTextChanged.connect(self._update_method_visibility)
+        self._update_method_visibility()
+
+    def _update_method_visibility(self, *_args: object) -> None:
+        """Show only the selected engine's settings group: Bayesian hides the
+        least-squares options and vice-versa. Shared fit settings stay visible."""
+        is_bayes = self._calibration_method.currentText().startswith("Bayesian")
+        if hasattr(self, "_bayesian_group"):
+            self._bayesian_group.setVisible(is_bayes)
+        if hasattr(self, "_lsq_group"):
+            self._lsq_group.setVisible(not is_bayes)
 
     # ------------------------------------------------------------------
     # Experimental modal data section
@@ -1793,7 +2137,11 @@ class ModelUpdatingTab(QWidget):
         self._rebuild_exp_data_widgets()
         self._on_exp_source_changed()
 
-    # Sensor IDs available from the hardware (fixed at 3 MPU6050 units).
+    # Sensor IDs available from the hardware (fixed at 3 MPU6050 units). This is a
+    # HARDWARE fact, not a story-count assumption (NS-5): when nStory > 3 the rig
+    # cannot fully instrument every floor, so calibration falls back to PARTIAL
+    # coverage (measured floors only) or frequency-only — handled by B1 + the
+    # 3-state coverage message. nStory itself is unconstrained (Stories spinbox 1–20).
     _SENSOR_IDS = (1, 2, 3)
 
     def _build_sensors_panel(self) -> QWidget:
@@ -1843,7 +2191,10 @@ class ModelUpdatingTab(QWidget):
         id_form.addRow("Method:", self._sensor_method)
         self._sensor_window = self._double_spin(modal_id.MIN_DURATION_S, 600.0, 30.0, 1)
         self._sensor_fmin = self._double_spin(0.05, 500.0, 0.5, 3)
-        self._sensor_fmax = self._double_spin(0.10, 1000.0, 20.0, 3)
+        # CU-9 / D2: default upper band 12 Hz (was 20) so the picker ignores the
+        # 13–20 Hz noise region that out-prominenced the real ~8 Hz mode. The band is
+        # independent of the Spectrum tab's band — both are user-adjustable.
+        self._sensor_fmax = self._double_spin(0.10, 1000.0, 12.0, 3)
         self._sensor_nmodes = QSpinBox(self)
         self._sensor_nmodes.setRange(1, 12)
         self._sensor_nmodes.setValue(3)
@@ -2116,6 +2467,22 @@ class ModelUpdatingTab(QWidget):
     def _build_output_tab(self) -> None:
         outer = QVBoxLayout(self._output_tab)
 
+        # Continuous Update right-panel toggle (like the Spectrum tab's view switch).
+        # Both panels are rendered each cycle; this only swaps which is shown.
+        self._cont_fig2_fdd: bytes | None = None      # per-iteration FDD spectrum
+        self._cont_fig2_track: bytes | None = None     # consolidated frequency tracking
+        self._cont_view_active = False                 # True while Mode-B results are shown
+        header = QHBoxLayout()
+        header.addStretch(1)
+        self._cont_track_view = QCheckBox("Show frequency tracking (Continuous Update right panel)", self)
+        self._cont_track_view.setToolTip(
+            "Continuous Update — right panel view:\n"
+            "  unchecked = per-cycle FDD spectrum (this window's identified modes)\n"
+            "  checked   = consolidated f̂ ±1σ tracks + raw per-cycle identifications")
+        self._cont_track_view.toggled.connect(self._on_cont_view_toggled)
+        header.addWidget(self._cont_track_view)
+        outer.addLayout(header)
+
         # Left side: static PNG (calibrate) or live roof response curves (run).
         self._fig1_label = _ScaledImageLabel(
             "Run Calibrate or Analysis\nto see results here.", self
@@ -2339,7 +2706,8 @@ class ModelUpdatingTab(QWidget):
         if hasattr(self, "_num_modes"):
             self._num_modes.setValue(target_modes)
         if hasattr(self, "_n_calib_modes"):
-            self._n_calib_modes.setValue(max(1, min(3, target_modes, n_story)))
+            self._n_calib_modes.setValue(
+                max(1, min(_DEFAULT_CALIB_MODES_CAP, target_modes, n_story)))
         self._rebuild_exp_data_widgets()
 
     def _set_all_orientations(self, value: str) -> None:
@@ -2443,7 +2811,14 @@ class ModelUpdatingTab(QWidget):
             "show_info": bool(self._show_info.isChecked()),
             "run_transient": bool(self._run_transient.isChecked()),
             "enable_calibration": bool(self._enable_calibration.isChecked()),
-            "use_mode_shapes": bool(self._use_mode_shapes.isChecked()),
+            "calibration_method": (
+                "bayesian"
+                if self._calibration_method.currentText().startswith("Bayesian")
+                else "least_squares"
+            ),
+            "use_mode_shapes": (
+                self._analysis_scope.currentText() == "Frequency + mode shapes"
+            ),
             "mass_calibration_scope": (
                 "total_mass"
                 if self._mass_scope.currentText() == "Total mass including additional masses"
@@ -2458,6 +2833,11 @@ class ModelUpdatingTab(QWidget):
             "m_scale_lb": float(self._m_lb.value()),
             "m_scale_ub": float(self._m_ub.value()),
             "max_nfev": int(self._max_nfev.value()),
+            # Bayesian knobs (used by the Bayesian engine + Mode B worker).
+            "sigma_prior_E": float(self._sigma_prior_E.value()),
+            "sigma_prior_m": float(self._sigma_prior_m.value()),
+            "sigma_data_scale": float(self._sigma_data_scale.value()),
+            "mass_similarity_weight": float(self._mass_similarity_weight.value()),
             "show_uncalibrated_response": bool(self._show_uncalibrated_response.isChecked()),
             "story_column_layout": story_column_layout,
             "column_orientation_layout": column_orientation_layout,
@@ -2600,6 +2980,7 @@ class ModelUpdatingTab(QWidget):
     @Slot(object)
     def _on_worker_finished(self, result: dict[str, Any]) -> None:
         action = result.get("action")
+        self._cont_view_active = False   # calibrate/run own the right panel now
         self._tabs.setCurrentWidget(self._output_tab)
 
         if action == "run" and result.get("transient_response") is not None:
@@ -2805,6 +3186,7 @@ class ModelUpdatingTab(QWidget):
 
     @Slot(object)
     def _on_identify_finished(self, result: dict[str, Any]) -> None:
+        self._cont_view_active = False   # identify owns the right panel now
         self._tabs.setCurrentWidget(self._output_tab)
         self._live_response_canvas.hide()
         self._run_right_widget.hide()
@@ -2847,7 +3229,7 @@ class ModelUpdatingTab(QWidget):
                 spin.setValue(float(freqs[i]))
 
         shapes = exp_dict.get("mode_shapes_ux", {})
-        self._use_mode_shapes.setChecked(bool(shapes_available and shapes))
+        self._analysis_scope.setCurrentIndex(1 if (shapes_available and shapes) else 0)
         if shapes_available and shapes:
             for c in range(self._exp_mode_table.columnCount()):
                 key = str(c + 1)
@@ -2929,12 +3311,22 @@ class ModelUpdatingTab(QWidget):
         form = QFormLayout(dlg)
         dur = self._double_spin(modal_id.MIN_DURATION_S, 600.0, float(self._sensor_window.value()), 1)
         interval = self._double_spin(modal_id.MIN_DURATION_S, 3600.0, 60.0, 1)
-        maxfail = QSpinBox(dlg)
-        maxfail.setRange(1, 50)
-        maxfail.setValue(3)
+        # Two-stage redesign (CU-9): the disagreement gates are GONE — the loop never
+        # hard-stops on noise, so there is no "max failures". The accumulation lives in
+        # the Stage-1 modal tracker; its two main knobs are exposed here. (Method +
+        # Bayesian-prior knobs come from the Calibration tab params.)
+        forgetting = self._double_spin(0.5, 1.0, modal_trk.DEFAULT_FORGETTING, 4)
+        forgetting.setToolTip(
+            "Stage-1 forgetting λ (0.5–1.0): higher = steadier band, slower to track a "
+            "real change; lower = more responsive, noisier.")
+        robust_c = self._double_spin(1.0, 10.0, modal_trk.DEFAULT_ROBUST_SCALE, 3)
+        robust_c.setToolTip(
+            "Stage-1 robust scale c: a reading beyond c·σ is treated as an outlier and "
+            "down-weighted (never rejected). Smaller = more aggressive outlier rejection.")
         form.addRow("Recording duration per cycle (s):", dur)
         form.addRow("Update interval (s):", interval)
-        form.addRow("Max consecutive failures:", maxfail)
+        form.addRow("Stage-1 forgetting λ:", forgetting)
+        form.addRow("Stage-1 robust scale c:", robust_c)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, dlg)
         form.addRow(buttons)
         buttons.accepted.connect(dlg.accept)
@@ -2944,7 +3336,8 @@ class ModelUpdatingTab(QWidget):
         return {
             "duration_s": float(dur.value()),
             "interval_s": float(interval.value()),
-            "max_failures": int(maxfail.value()),
+            "tracker_forgetting": float(forgetting.value()),
+            "tracker_robust_scale": float(robust_c.value()),
         }
 
     @Slot(object)
@@ -2954,7 +3347,24 @@ class ModelUpdatingTab(QWidget):
         self._fig1_label.show()
         self._fig2_label.show()
         self._display_png(self._fig1_label, payload.get("fig1_png"))
-        self._display_png(self._fig2_label, payload.get("fig2_png"))
+        # Cache both right-panel renders; show whichever the checkbox selects.
+        self._cont_fig2_fdd = payload.get("fig2_fdd_png") or payload.get("fig2_png")
+        self._cont_fig2_track = payload.get("fig2_track_png")
+        self._cont_view_active = True
+        self._show_cont_fig2()
+
+    def _show_cont_fig2(self) -> None:
+        """Display the right-panel view the checkbox selects (cached PNG, no recompute)."""
+        show_track = self._cont_track_view.isChecked()
+        png = self._cont_fig2_track if show_track else self._cont_fig2_fdd
+        # Graceful fallback if one view is missing (e.g. very first cycle).
+        self._display_png(self._fig2_label, png or self._cont_fig2_fdd or self._cont_fig2_track)
+
+    @Slot(bool)
+    def _on_cont_view_toggled(self, _checked: bool) -> None:
+        """Swap the Continuous-Update right panel (pure GUI, G1 — just re-shows a cached PNG)."""
+        if self._cont_view_active:
+            self._show_cont_fig2()
 
     @Slot(str)
     def _on_continuous_error(self, message: str) -> None:

@@ -7,24 +7,25 @@ import time
 from typing import Dict, Optional, Sequence, Tuple, TYPE_CHECKING
 
 import numpy as np
-from PySide6.QtCore import QTimer, Slot
+import pyqtgraph as pg
+from PySide6.QtCore import QObject, QThread, QTimer, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QSizePolicy,
+    QSpinBox,
+    QSplitter,
     QVBoxLayout,
     QWidget,
 )
 
-from matplotlib.axes import Axes
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
-from matplotlib.lines import Line2D
-
 from ...analysis import filters
+from ...analysis import modal as modal_id
 from ..config.acquisition_state import (
     CalibrationOffsets,
     GuiAcquisitionConfig,
@@ -33,6 +34,8 @@ from ..config.acquisition_state import (
 from ...config.app_config import AppConfig, PlotPerformanceConfig
 from ...core.ringbuffer import RingBuffer
 from ...data import StreamingDataBuffer
+# (eigen capture now uses RecorderController.snapshot_modal_capture, which aligns
+# internally — no direct align_per_sensor_series call here.)
 from ...tools.debug import debug_enabled
 from . import LayoutSignature, SampleKey
 
@@ -50,7 +53,96 @@ MAX_FFT_UPDATE_MS = 2000
 
 DEFAULT_MAX_FREQUENCY_HZ = 200.0  # cap plotted frequency if useful
 
+# The spectrum shows only the structural horizontal axes (T11.1).
+SPECTRUM_CHANNELS: tuple[str, ...] = ("ax", "ay")
+# Window 2 eigen-frequency identification uses a rolling batch of this length.
+# It must exceed identify_modes' MIN_DURATION_S = 10 s with margin (alignment can
+# trim a little), so 12 s. Captured from the controller's 120 s modal buffer (NOT
+# the 6 s display buffer — that was why the panel stayed empty).
+EIGEN_BATCH_S = 12.0
+# How often Window 2 recomputes (rolling/overlapping → faster perceived updates;
+# "as fast as possible" once the first 12 s of data has accumulated).
+EIGEN_UPDATE_S = 4.0
+# Distinct colours for the (up to) three identified natural frequencies — also
+# reused to mark those frequencies on the per-sensor grid (Window 1).
+_EIGEN_COLORS = ("#ff5252", "#448aff", "#69f0ae")
+
 logger = logging.getLogger(__name__)
+
+
+class _EigenFreqWorker(QObject):
+    """Identify the structure's natural frequencies from a live modal-capture batch.
+
+    Pure compute off the GUI thread (G4); emits plain floats only (G1). Captures a
+    rolling batch from the controller's **120 s modal buffer** via the supplied
+    ``capture_fn`` (``RecorderController.snapshot_modal_capture`` — the SAME source
+    Model Updating's Mode B uses; the 6 s display buffer could never supply the
+    >= 10 s identify_modes needs). Reuses the shared ``identify_modes`` engine (D2);
+    the ``method`` ("fdd"|"fft") chooses the algorithm. Guards the degenerate
+    FDD-with-one-sensor case.
+    """
+
+    result = Signal(object)      # dict: freqs + identification-spectrum curve
+    collecting = Signal(float)   # seconds available so far (< MIN_DURATION_S)
+    failed = Signal(str)
+    finished = Signal()
+
+    def __init__(self, capture_fn, fs, method, f_min, f_max, n_modes, batch_s,
+                 placement=None, n_story=0):
+        super().__init__()
+        self._capture_fn = capture_fn
+        self._fs = fs
+        self._method = method
+        self._f_min = f_min
+        self._f_max = f_max
+        self._n_modes = n_modes
+        self._batch_s = batch_s
+        self._placement = dict(placement or {})  # {sensor_id: floor}
+        self._n_story = int(n_story)
+
+    @Slot()
+    def run(self) -> None:
+        try:
+            session = self._capture_fn(
+                axis="ax", last_seconds=self._batch_s, target_fs=self._fs)
+            data = getattr(session, "data", None)
+            if data is None or data.size == 0 or data.shape[0] == 0:
+                self.collecting.emit(0.0)
+                return
+            if session.duration_s < modal_id.MIN_DURATION_S:
+                # Not enough buffered yet — report progress, not an error.
+                self.collecting.emit(float(session.duration_s))
+                return
+            if self._method == "fdd" and data.shape[0] < 2:
+                self.failed.emit("FDD needs ≥ 2 sensors; switch to FFT")
+                return
+            res = modal_id.identify_modes(
+                data, session.fs, method=self._method, n_modes=self._n_modes,
+                f_min=self._f_min, f_max=self._f_max)
+            if res.success:
+                payload = {
+                    "freqs": [float(f) for f in res.frequencies_hz],
+                    "spec_f": np.asarray(res.fdd_freqs, dtype=float),
+                    "spec_v": np.asarray(res.fdd_spectrum, dtype=float),
+                    "signed": self._method == "fdd",
+                }
+                # Map the per-sensor shapes onto floors when a placement + floor
+                # count are available (mode-shape view). map_to_stories is pure/cheap.
+                if self._placement and self._n_story > 0:
+                    story_map = [int(self._placement.get(int(sid), 0))
+                                 for sid in session.sensor_ids]
+                    story_data = modal_id.map_to_stories(res, story_map, self._n_story)
+                    payload["mode_shapes_ux"] = dict(story_data.mode_shapes_ux)
+                    payload["coverage_stories"] = list(story_data.coverage_stories)
+                    payload["n_story"] = self._n_story
+                    payload["full_coverage"] = bool(story_data.mode_shapes_available)
+                self.result.emit(payload)
+            else:
+                self.failed.emit(res.message or "Identification failed")
+        except Exception as exc:  # pragma: no cover - defensive
+            self.failed.emit(str(exc))
+        finally:
+            self.finished.emit()
 
 
 class FftTab(QWidget):
@@ -94,8 +186,8 @@ class FftTab(QWidget):
         self._stream_active: bool = False
         self._last_rendered_latest_ts: Optional[float] = None
         self._force_next_update: bool = True
-        self._fft_axes: Dict[SampleKey, Axes] = {}
-        self._fft_lines: Dict[SampleKey, Line2D] = {}
+        self._psd_plots: Dict[SampleKey, "pg.PlotItem"] = {}
+        self._psd_curves: Dict[SampleKey, "pg.PlotDataItem"] = {}
         self._current_layout: tuple | None = None
         # Bound how many samples each FFT uses so the GUI stays responsive.
         self._max_fft_samples = 4096
@@ -104,42 +196,119 @@ class FftTab(QWidget):
         self._fft_sample_rate_hz: float = 1.0
         self._fft_freqs = np.fft.rfftfreq(self._fft_size, 1.0 / self._fft_sample_rate_hz)
         self._fft_window = np.hanning(self._fft_size)
-        self._default_ylim = (0.0, 1.0)
 
-        # Figure / canvas -------------------------------------------------------
-        self._figure = Figure(figsize=(5, 3), tight_layout=True)
-        self._canvas = FigureCanvasQTAgg(self._figure)
+        # Window 1: per-sensor PSD grid (pyqtgraph — D1, matches Live Signals) ---
+        # Black background + bright white spectra, like the Live Signals tab
+        # (pyqtgraph's default dark theme; the previous white bg + thin blue line
+        # looked faded).
+        pg.setConfigOptions(antialias=True)
+        self._glw = pg.GraphicsLayoutWidget()
+        self._glw.setBackground("k")
+        self._psd_pen = pg.mkPen("w", width=1.3)
+        # Identified-mode markers overlaid on each per-sensor cell (Window 1),
+        # driven by the FDD/FFT selector — so the method visibly changes the peaks
+        # shown on the individual sensors too.
+        self._grid_eig_lines: list = []
+        self._last_eigen_freqs: list[float] = []
+
+        # Window 2: identification spectrum + identified eigen-frequencies -------
+        self._eig_glw = pg.GraphicsLayoutWidget()
+        self._eig_glw.setBackground("k")
+        self._eig_plot = self._eig_glw.addPlot()
+        self._eig_plot.setLabel("bottom", "Frequency", units="Hz")
+        self._eig_plot.setLabel("left", "Response")
+        self._eig_plot.showGrid(x=True, y=True, alpha=0.3)
+        self._eig_plot.setMouseEnabled(x=True, y=True)
+        self._eig_plot.enableAutoRange(y=True)
+        # The identification spectrum curve (FDD = 1st singular value of the CSD;
+        # FFT = sensor-averaged Welch PSD) — white like Live Signals; the coloured
+        # mode lines are drawn on top. This curve is what visibly differs between
+        # FDD and FFT even when the picked peaks coincide.
+        self._eig_curve = self._eig_plot.plot([], [], pen=pg.mkPen("w", width=1.3))
+        self._eig_items: list = []
+
+        # Window 2 (alt view): per-floor mode shapes (optional, toggled). amplitude
+        # (x) vs floor (y); one coloured profile per mode. Built from the identified
+        # per-sensor shapes via map_to_stories (needs the sensor→floor placement).
+        self._shape_glw = pg.GraphicsLayoutWidget()
+        self._shape_glw.setBackground("k")
+        self._shape_plot = self._shape_glw.addPlot()
+        self._shape_plot.setLabel("bottom", "Modal amplitude (|max|=1)")
+        self._shape_plot.setLabel("left", "Floor")
+        self._shape_plot.showGrid(x=True, y=True, alpha=0.3)
+        self._shape_plot.addLine(x=0.0, pen=pg.mkPen("#888", width=1.0))  # zero ref
+        self._shape_items: list = []
+        self._last_shape_data: dict | None = None
+        # Sensor→floor placement (only meaningful for mode shapes). Fixed rig set.
+        self._shape_sensor_ids = (1, 2, 3)
+        # Rolling/overlapping cadence for Window 2 (recompute every EIGEN_UPDATE_S
+        # using the last EIGEN_BATCH_S of data from the 120 s modal buffer).
+        self._eig_timer = QTimer(self)
+        self._eig_timer.setInterval(int(EIGEN_UPDATE_S * 1000))
+        self._eig_timer.timeout.connect(self._launch_eigen_compute)
+        self._eig_thread: QThread | None = None
+        self._eig_worker: _EigenFreqWorker | None = None
 
         # Controls --------------------------------------------------------------
-        controls_group = QGroupBox("FFT settings")
-        form = QFormLayout(controls_group)
+        # T11.7 (compact): FDD and FFT share every input, so ALL params live in one
+        # compact band at the top (two short rows) — this keeps the figures large.
+        # The method selector still picks the Window-2 algorithm (FDD = SVD of the
+        # cross-spectral-density matrix → signed shapes; FFT = averaged Welch PSD →
+        # magnitude shapes); the PSD grid (Window 1) is unaffected (U1).
+        controls_group = QGroupBox("Spectrum settings")
+        controls_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        controls_v = QVBoxLayout(controls_group)
 
-        # FFT window length (seconds)
+        # Row 1 — method selector + eigen-identification params (Window 2).
+        self.method_combo = QComboBox()
+        self.method_combo.addItems(["FDD", "FFT"])  # FDD default (M2)
+        self.method_combo.setToolTip(
+            "FDD: SVD of the cross-spectral-density matrix — signed mode shapes.\n"
+            "FFT: sensor-averaged Welch PSD peak-picking — magnitude-only shapes.\n"
+            "Both use the same frequency band + mode count; only the algorithm differs."
+        )
+        self._eig_fmin = QDoubleSpinBox()
+        self._eig_fmin.setRange(0.05, 500.0)
+        self._eig_fmin.setDecimals(2)
+        self._eig_fmin.setValue(0.5)
+        self._eig_fmax = QDoubleSpinBox()
+        self._eig_fmax.setRange(0.10, 1000.0)
+        self._eig_fmax.setDecimals(2)
+        self._eig_fmax.setValue(20.0)  # structural band default (modes are low-freq)
+        self._eig_nmodes = QSpinBox()
+        self._eig_nmodes.setRange(1, 12)
+        self._eig_nmodes.setValue(3)
+        self._method_hint = QLabel("")
+        self._method_hint.setStyleSheet("color: #888;")
+
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel("Eigen method:"))
+        row1.addWidget(self.method_combo)
+        row1.addSpacing(18)
+        row1.addWidget(QLabel("Freq band (Hz):"))
+        row1.addWidget(self._eig_fmin)
+        row1.addWidget(QLabel("–"))
+        row1.addWidget(self._eig_fmax)
+        row1.addSpacing(14)
+        row1.addWidget(QLabel("Modes:"))
+        row1.addWidget(self._eig_nmodes)
+        row1.addSpacing(18)
+        row1.addWidget(self._method_hint)
+        row1.addStretch()
+        controls_v.addLayout(row1)
+
+        # Row 2 — spectrum display params (Window-1 grid; method-independent).
         self.window_spin = QDoubleSpinBox()
         self.window_spin.setRange(MIN_FFT_WINDOW_S, MAX_FFT_WINDOW_S)
         self.window_spin.setSingleStep(0.5)
-        default_window_s = self._plot_perf_config.normalized_time_window_s()
-        self.window_spin.setValue(default_window_s)
-        form.addRow("Window (s):", self.window_spin)
-
-        # Detrend / lowpass options
+        self.window_spin.setValue(self._plot_perf_config.normalized_time_window_s())
         self.detrend_check = QCheckBox("Detrend")
         self.detrend_check.setChecked(True)
-        self.lowpass_check = QCheckBox("Low-pass filter")
-
+        self.lowpass_check = QCheckBox("Low-pass")
         self.lowpass_cutoff = QDoubleSpinBox()
         self.lowpass_cutoff.setRange(0.1, 5000.0)
         self.lowpass_cutoff.setSingleStep(1.0)
         self.lowpass_cutoff.setValue(100.0)
-        form.addRow(self.detrend_check)
-        row_lp = QHBoxLayout()
-        row_lp.addWidget(self.lowpass_check)
-        row_lp.addWidget(QLabel("Cutoff (Hz):"))
-        row_lp.addWidget(self.lowpass_cutoff)
-        row_lp.addStretch()
-        form.addRow(row_lp)
-
-        # FFT refresh control (decoupled from window length)
         self.fft_interval_spin = QDoubleSpinBox()
         self.fft_interval_spin.setRange(MIN_FFT_UPDATE_MS, MAX_FFT_UPDATE_MS)
         self.fft_interval_spin.setSingleStep(50.0)
@@ -149,15 +318,65 @@ class FftTab(QWidget):
         self.fft_interval_spin.valueChanged.connect(
             lambda ms: self.set_refresh_interval_ms(int(ms))
         )
-        form.addRow("FFT refresh:", self.fft_interval_spin)
 
-        # Status label
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel("Window (s):"))
+        row2.addWidget(self.window_spin)
+        row2.addSpacing(14)
+        row2.addWidget(self.detrend_check)
+        row2.addSpacing(14)
+        row2.addWidget(self.lowpass_check)
+        row2.addWidget(QLabel("Cutoff (Hz):"))
+        row2.addWidget(self.lowpass_cutoff)
+        row2.addSpacing(14)
+        row2.addWidget(QLabel("FFT refresh:"))
+        row2.addWidget(self.fft_interval_spin)
+        row2.addStretch()
+        controls_v.addLayout(row2)
+
+        # Status labels
         self._status_label = QLabel("Waiting for data...")
+        self._eig_status = QLabel("Eigen-frequencies: waiting for 10 s of data…")
+
+        # Two-panel layout (T11.6): Window 1 (PSD grid) | Window 2 (eigen-freqs), 50/50.
+        windows = QSplitter(Qt.Horizontal)
+        left_panel = QWidget()
+        left_v = QVBoxLayout(left_panel)
+        left_v.setContentsMargins(0, 0, 0, 0)
+        left_v.addWidget(QLabel("Per-sensor spectra (ax, ay)"))
+        left_v.addWidget(self._glw)
+        right_panel = QWidget()
+        right_v = QVBoxLayout(right_panel)
+        right_v.setContentsMargins(0, 0, 0, 0)
+        # Right-panel view toggle: natural frequencies (default) vs mode shapes.
+        view_row = QHBoxLayout()
+        self._right_title = QLabel("Identified natural frequencies")
+        self._show_shapes_check = QCheckBox("Show mode shapes")
+        self._show_shapes_check.setToolTip(
+            "Toggle the right panel between the identification spectrum + natural\n"
+            "frequencies and the per-floor mode shapes (needs the sensor→floor map\n"
+            "below; FDD gives signed shapes, FFT magnitude-only).")
+        self._show_shapes_check.toggled.connect(self._on_view_toggled)
+        view_row.addWidget(self._right_title)
+        view_row.addStretch()
+        view_row.addWidget(self._show_shapes_check)
+        right_v.addLayout(view_row)
+        # Sensor→floor placement (only shown/used in mode-shape view).
+        self._shape_placement_widget = self._build_shape_placement()
+        self._shape_placement_widget.setVisible(False)
+        right_v.addWidget(self._shape_placement_widget)
+        right_v.addWidget(self._eig_glw)         # frequencies view (default)
+        right_v.addWidget(self._shape_glw)        # mode-shape view (toggled)
+        self._shape_glw.setVisible(False)
+        right_v.addWidget(self._eig_status)
+        windows.addWidget(left_panel)
+        windows.addWidget(right_panel)
+        windows.setSizes([500, 500])
 
         # Layout ---------------------------------------------------------------
         layout = QVBoxLayout(self)
         layout.addWidget(controls_group)
-        layout.addWidget(self._canvas)
+        layout.addWidget(windows, stretch=1)
         layout.addWidget(self._status_label)
 
         # NOTE: This timer drives the legacy FFT refresh cadence. Align with the
@@ -189,8 +408,30 @@ class FftTab(QWidget):
         self.detrend_check.toggled.connect(self._on_controls_changed)
         self.lowpass_check.toggled.connect(self._on_controls_changed)
         self.lowpass_cutoff.valueChanged.connect(self._on_controls_changed)
+        # T11.7: method selector swaps the method-specific group (Window 2 only).
+        self.method_combo.currentTextChanged.connect(self._on_method_changed)
+        self._on_method_changed()  # set initial visibility
         self._update_fft_timer_interval()
         self._draw_waiting()
+
+    @Slot()
+    def _on_method_changed(self, *_: object) -> None:
+        """T11.7: update the inline method hint when FDD/FFT changes (pure GUI, G1).
+
+        FDD and FFT share every input, so there are no controls to swap — only the
+        one-line description updates. Governs Window 2 (eigen identification); the
+        PSD grid (Window 1) is unaffected (U1) and picks up the method on its next
+        10 s batch.
+        """
+        if self.method_combo.currentText() == "FDD":
+            self._method_hint.setText(
+                "SVD of the cross-spectral-density matrix — signed mode shapes.")
+        else:
+            self._method_hint.setText(
+                "Sensor-averaged Welch PSD peak-picking — magnitude-only shapes.")
+        # Recompute immediately so the spectrum curve + peaks reflect the new method
+        # without waiting for the next rolling tick (the worker guards re-entrancy).
+        self._launch_eigen_compute()
 
     def apply_gui_acquisition_config(self, cfg: GuiAcquisitionConfig) -> None:
         """Backward-compatible alias for :meth:`update_acquisition_config`."""
@@ -381,6 +622,10 @@ class FftTab(QWidget):
                 "FftTab: starting FFT timer at %d ms", self._refresh_interval_ms
             )
             self._timer.start(self._refresh_interval_ms)
+        if not self._eig_timer.isActive() and not self._is_record_only():
+            self._eig_timer.start()
+            self._eig_status.setText(
+                f"Eigen-frequencies: collecting first {EIGEN_BATCH_S:.0f} s of data…")
 
     @Slot()
     def on_stream_stopped(self) -> None:
@@ -390,9 +635,239 @@ class FftTab(QWidget):
         if self._timer.isActive():
             logger.debug("FftTab: stopping FFT timer")
             self._timer.stop()
+        if self._eig_timer.isActive():
+            self._eig_timer.stop()
         self._status_label.setText("Stopped")
         self._last_rendered_latest_ts = None
-        self._canvas.draw_idle()
+
+    # ----------------------------------------------------- Window 2 (eigen-freq)
+    def _launch_eigen_compute(self) -> None:
+        """Identify the structure's natural frequencies in a worker (Window 2).
+
+        Captures the last ``EIGEN_BATCH_S`` from the controller's 120 s modal
+        buffer (``snapshot_modal_capture`` — the same source Model Updating uses),
+        not the 6 s display buffer. Skips if a batch is still running.
+        """
+        if self._eig_thread is not None:
+            return  # previous batch still running; skip this tick
+        if self._is_record_only() or not self._stream_active:
+            return
+        capture_fn = getattr(self._recorder_tab, "snapshot_modal_capture", None)
+        if capture_fn is None:
+            return
+        fs = self._device_rate_hz or self._measured_rate_hz or None
+        method = "fdd" if self.method_combo.currentText() == "FDD" else "fft"
+        worker = _EigenFreqWorker(
+            capture_fn, fs, method,
+            float(self._eig_fmin.value()),
+            float(self._eig_fmax.value()),
+            int(self._eig_nmodes.value()),
+            EIGEN_BATCH_S,
+            placement=self._shape_sensor_story_map(),
+            n_story=int(self._shape_floors.value()),
+        )
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.result.connect(self._on_eigen_result)
+        worker.collecting.connect(self._on_eigen_collecting)
+        worker.failed.connect(self._on_eigen_failed)
+        worker.finished.connect(self._on_eigen_finished)
+        self._eig_worker = worker
+        self._eig_thread = thread
+        thread.start()
+
+    @Slot(object)
+    def _on_eigen_result(self, payload) -> None:
+        flist = [float(f) for f in payload.get("freqs", [])]
+        self._last_eigen_freqs = flist
+        self._render_eigen_frequencies(
+            flist, payload.get("spec_f"), payload.get("spec_v"))
+        self._render_grid_eigen_markers(flist)  # mirror onto the per-sensor grid
+        if "mode_shapes_ux" in payload:
+            self._last_shape_data = payload
+        method = self.method_combo.currentText()
+        if self._show_shapes_check.isChecked():
+            # Mode-shape view active: render shapes; status set inside the renderer.
+            self._render_mode_shapes(self._last_shape_data or payload)
+        elif flist:
+            txt = ", ".join(f"f{i + 1}={f:.2f} Hz" for i, f in enumerate(flist))
+            self._eig_status.setText(f"Eigen-frequencies ({method}): {txt}")
+        else:
+            self._eig_status.setText(f"Eigen-frequencies ({method}): none identified")
+
+    @Slot(float)
+    def _on_eigen_collecting(self, available_s: float) -> None:
+        need = modal_id.MIN_DURATION_S
+        self._eig_status.setText(
+            f"Eigen-frequencies: collecting {available_s:.0f}/{need:.0f} s of data…")
+
+    @Slot(str)
+    def _on_eigen_failed(self, message: str) -> None:
+        self._eig_status.setText(f"Eigen-frequencies: {message}")
+
+    @Slot()
+    def _on_eigen_finished(self) -> None:
+        thread = self._eig_thread
+        worker = self._eig_worker
+        self._eig_worker = None
+        self._eig_thread = None
+        if thread is not None:
+            thread.quit()
+            thread.wait()
+            thread.deleteLater()      # don't accumulate a QThread per 10 s cycle
+        if worker is not None:
+            worker.deleteLater()
+
+    def _render_eigen_frequencies(self, freqs: Sequence[float],
+                                  spec_f=None, spec_v=None) -> None:
+        """Draw the identification-spectrum curve (FDD 1st singular value / FFT
+        averaged PSD) plus the identified natural frequencies as distinct-coloured
+        vertical lines. The curve is what visibly changes between FDD and FFT."""
+        # Spectrum response curve, band-limited to [f_min, f_max] for a clean view.
+        if spec_f is not None and spec_v is not None and len(spec_f) and len(spec_v):
+            sf = np.asarray(spec_f, dtype=float)
+            sv = np.asarray(spec_v, dtype=float)
+            fmin = float(self._eig_fmin.value())
+            fmax = float(self._eig_fmax.value())
+            band = (sf >= fmin) & (sf <= fmax)
+            if band.any():
+                sf, sv = sf[band], sv[band]
+            self._eig_curve.setData(sf, sv)
+            x_hi = float(sf[-1]) if sf.size else (max(freqs) * 1.3 + 1.0 if freqs else 1.0)
+        else:
+            self._eig_curve.setData([], [])
+            x_hi = max(freqs) * 1.3 + 1.0 if freqs else 1.0
+        for item in self._eig_items:
+            self._eig_plot.removeItem(item)
+        self._eig_items.clear()
+        for i, f in enumerate(freqs):
+            color = _EIGEN_COLORS[i % len(_EIGEN_COLORS)]
+            line = pg.InfiniteLine(
+                pos=float(f), angle=90, pen=pg.mkPen(color, width=2.0),
+                label=f"f{i + 1}={f:.2f} Hz",
+                labelOpts={"position": 0.92, "color": color})
+            self._eig_plot.addItem(line)
+            self._eig_items.append(line)
+        self._eig_plot.setXRange(0.0, x_hi, padding=0.02)
+
+    def _render_grid_eigen_markers(self, freqs: Sequence[float]) -> None:
+        """Overlay the identified mode frequencies onto every per-sensor cell of the
+        Window-1 grid as thin coloured vertical lines. Because these come from the
+        selected FDD/FFT identification, switching the method visibly moves the peaks
+        marked on the individual sensors (the per-sensor spectrum itself is the same
+        magnitude curve; only the marked structural modes change)."""
+        # Remove previous markers (guard against cells destroyed by a layout rebuild).
+        for line in self._grid_eig_lines:
+            try:
+                line.getViewBox().removeItem(line)
+            except Exception:
+                pass
+        self._grid_eig_lines.clear()
+        plots = list(getattr(self, "_psd_plots", {}).values())
+        if not plots:
+            return
+        for plot in plots:
+            for i, f in enumerate(freqs):
+                color = _EIGEN_COLORS[i % len(_EIGEN_COLORS)]
+                line = pg.InfiniteLine(
+                    pos=float(f), angle=90,
+                    pen=pg.mkPen(color, width=1.0, style=Qt.DashLine))
+                plot.addItem(line)
+                self._grid_eig_lines.append(line)
+
+    # ---------------------------------------------- mode shapes (optional view)
+    def _build_shape_placement(self) -> QWidget:
+        """Compact sensor→floor placement: a floor count + one combo per sensor.
+
+        Mode shapes are spatial, so they need to know which floor each sensor sits
+        on (frequencies don't — see §7). Mirrors the Model Updating tab's mapping
+        but local + lightweight.
+        """
+        w = QWidget()
+        row = QHBoxLayout(w)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.addWidget(QLabel("Floors:"))
+        self._shape_floors = QSpinBox()
+        self._shape_floors.setRange(1, 20)
+        self._shape_floors.setValue(3)
+        self._shape_floors.valueChanged.connect(self._refresh_shape_floor_combos)
+        row.addWidget(self._shape_floors)
+        row.addSpacing(12)
+        self._shape_combos: dict[int, QComboBox] = {}
+        for sid in self._shape_sensor_ids:
+            row.addWidget(QLabel(f"S{sid}→"))
+            combo = QComboBox()
+            combo.currentTextChanged.connect(lambda *_: self._launch_eigen_compute())
+            self._shape_combos[sid] = combo
+            row.addWidget(combo)
+        row.addStretch()
+        self._refresh_shape_floor_combos()
+        return w
+
+    def _refresh_shape_floor_combos(self) -> None:
+        n = int(self._shape_floors.value())
+        for i, (sid, combo) in enumerate(self._shape_combos.items()):
+            prev = combo.currentText()
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems([str(s) for s in range(1, n + 1)])
+            options = [str(s) for s in range(1, n + 1)]
+            combo.setCurrentText(prev if prev in options else str(min(i + 1, n)))
+            combo.blockSignals(False)
+
+    def _shape_sensor_story_map(self) -> dict[int, int]:
+        """{sensor_id: 1-based floor} from the placement combos."""
+        out: dict[int, int] = {}
+        for sid, combo in getattr(self, "_shape_combos", {}).items():
+            if combo.count():
+                out[sid] = int(combo.currentText())
+        return out
+
+    @Slot(bool)
+    def _on_view_toggled(self, show_shapes: bool) -> None:
+        """Swap the right panel between the frequencies view and the mode-shape
+        view (pure GUI, G1)."""
+        self._shape_placement_widget.setVisible(show_shapes)
+        self._shape_glw.setVisible(show_shapes)
+        self._eig_glw.setVisible(not show_shapes)
+        self._right_title.setText(
+            "Identified mode shapes" if show_shapes else "Identified natural frequencies")
+        if show_shapes and self._last_shape_data is not None:
+            self._render_mode_shapes(self._last_shape_data)
+
+    def _render_mode_shapes(self, shape_data: dict) -> None:
+        """Draw per-floor mode shapes: amplitude (x) vs floor (y), one coloured
+        profile per mode, anchored at the ground (floor 0, amplitude 0)."""
+        for item in self._shape_items:
+            self._shape_plot.removeItem(item)
+        self._shape_items.clear()
+        shapes = shape_data.get("mode_shapes_ux") or {}
+        n_story = int(shape_data.get("n_story", 0))
+        signed = bool(shape_data.get("signed", True))
+        full = bool(shape_data.get("full_coverage", False))
+        # Floors that actually have a sensor (sorted); shape values map to these.
+        coverage = [int(s) for s in shape_data.get("coverage_stories", [])]
+        if not shapes or not coverage:
+            self._eig_status.setText(
+                "Mode shapes: need ≥1 sensor per measured floor — set the sensor→floor map.")
+            return
+        for k in sorted(shapes.keys(), key=lambda s: int(s)):
+            vals = [float(v) for v in shapes[k]]
+            if len(vals) != len(coverage):
+                continue
+            color = _EIGEN_COLORS[(int(k) - 1) % len(_EIGEN_COLORS)]
+            # Ground anchor at floor 0 (fixed base); plot each value at its floor.
+            xs = [0.0] + vals
+            ys = [0] + coverage
+            curve = self._shape_plot.plot(
+                xs, ys, pen=pg.mkPen(color, width=2.0),
+                symbol="o", symbolBrush=color, symbolSize=8, name=f"f{k}")
+            self._shape_items.append(curve)
+        self._shape_plot.setYRange(0, max(1, n_story), padding=0.1)
+        kind = "signed (FDD)" if signed else "magnitude (FFT)"
+        cov = "full coverage" if full else f"partial ({len(coverage)}/{n_story} floors)"
+        self._eig_status.setText(f"Mode shapes — {kind}, {cov}, |max|=1 per mode")
 
     # --------------------------------------------------------------- internals
     @staticmethod
@@ -515,21 +990,16 @@ class FftTab(QWidget):
         self._fft_sample_rate_hz = sample_rate_hz
         self._fft_freqs = np.fft.rfftfreq(self._fft_size, 1.0 / self._fft_sample_rate_hz)
         self._fft_window = np.hanning(self._fft_size)
-        zero_line = np.zeros_like(self._fft_freqs)
-        for line in self._fft_lines.values():
-            line.set_xdata(self._fft_freqs)
-            line.set_ydata(zero_line.copy())
-        for ax in self._fft_axes.values():
-            self._apply_frequency_limits(ax)
+        for plot in self._psd_plots.values():
+            self._apply_frequency_limits(plot)
 
-    def _apply_frequency_limits(self, ax: Axes) -> None:
+    def _apply_frequency_limits(self, plot: "pg.PlotItem") -> None:
         max_freq = float(DEFAULT_MAX_FREQUENCY_HZ)
         if self._fft_freqs.size > 0:
             max_freq = min(max_freq, float(self._fft_freqs[-1]))
         if max_freq <= 0.0 or not np.isfinite(max_freq):
             max_freq = 1.0
-        ax.set_xlim(0.0, max_freq)
-        ax.set_ylim(*self._default_ylim)
+        plot.setXRange(0.0, max_freq, padding=0.02)
 
     def _compute_fft_magnitude(self, signal: np.ndarray) -> np.ndarray:
         """Return FFT magnitudes for the most recent fft_size samples."""
@@ -561,7 +1031,8 @@ class FftTab(QWidget):
         if selection is not None and selection.active_channels:
             channels = list(selection.active_channels)
         else:
-            channels = ["ax", "ay", "gz"]
+            channels = ["ax", "ay"]
+        channels = [ch for ch in channels if ch in ("ax", "ay")]  # T11.1: structural axes only
         if not channels:
             return []
 
@@ -694,13 +1165,14 @@ class FftTab(QWidget):
         if selection is not None and selection.active_channels:
             channels = list(selection.active_channels)
         else:
-            channels = ["ax", "ay", "gz"]
+            channels = ["ax", "ay"]
 
+        # Spectrum shows only the structural horizontal axes (T11.1): drop gyro/other
+        # channels even if a global selection includes them, so the grid is 3x2 (ax, ay).
+        channels = [ch for ch in channels if ch in ("ax", "ay")]
         if not channels:
-            logger.warning(
-                "FftTab: channels list empty; falling back to ['ax', 'ay', 'gz']"
-            )
-            channels = ["ax", "ay", "gz"]
+            logger.warning("FftTab: channels list empty; falling back to ['ax', 'ay']")
+            channels = ["ax", "ay"]
 
         window_s = float(self.window_spin.value())
         min_samples = self._min_samples_required(window_s)
@@ -708,7 +1180,6 @@ class FftTab(QWidget):
         if not self._ensure_fft_layout(sensor_ids, channels):
             logger.debug("FftTab: _ensure_fft_layout returned False; skipping update")
             self._status_label.setText("Waiting for layout.")
-            self._canvas.draw_idle()
             return
 
         stats_samples = None
@@ -773,10 +1244,8 @@ class FftTab(QWidget):
             self._status_label.setText("Waiting for data...")
             self._last_rendered_latest_ts = latest_ts
             self._force_next_update = False
-            self._canvas.draw_idle()
             return
 
-        self._canvas.draw_idle()
         self._last_rendered_latest_ts = latest_ts
         self._force_next_update = False
         if stats_samples is not None and stats_fs is not None:
@@ -855,43 +1324,41 @@ class FftTab(QWidget):
             return True
 
         self._current_layout = signature
-        self._fft_axes.clear()
-        self._fft_lines.clear()
-        self._figure.clear()
+        self._psd_plots.clear()
+        self._psd_curves.clear()
+        self._glw.clear()
         self._ensure_fft_frequency_axis()
 
         nrows = len(sensor_list)
-        ncols = len(channel_list)
-        subplot_index = 1
         for row_idx, sensor_id in enumerate(sensor_list):
             for col_idx, ch in enumerate(channel_list):
-                ax = self._figure.add_subplot(nrows, ncols, subplot_index)
-                subplot_index += 1
-                zero_line = np.zeros_like(self._fft_freqs)
-                line, = ax.plot(self._fft_freqs, zero_line, lw=0.9)
-                key = self._make_key(sensor_id, ch)
-                self._fft_axes[key] = ax
-                self._fft_lines[key] = line
-                if row_idx == nrows - 1:
-                    ax.set_xlabel("Frequency [Hz]")
-                if col_idx == 0:
-                    ax.set_ylabel("Magnitude")
+                plot = self._glw.addPlot(row=row_idx, col=col_idx)
+                plot.showGrid(x=True, y=True, alpha=0.3)
                 units = self._channel_units(ch)
                 title = f"S{sensor_id} {ch.upper()}"
                 if units:
                     title = f"{title} [{units}]"
-                ax.set_title(title)
-                ax.grid(True)
-                self._apply_frequency_limits(ax)
-
-        self._figure.tight_layout()
-        self._canvas.draw_idle()
+                plot.setTitle(title)
+                if row_idx == nrows - 1:
+                    plot.setLabel("bottom", "Frequency", units="Hz")
+                if col_idx == 0:
+                    plot.setLabel("left", "Magnitude")
+                curve = plot.plot(self._fft_freqs, np.zeros_like(self._fft_freqs),
+                                  pen=self._psd_pen)
+                key = self._make_key(sensor_id, ch)
+                self._psd_plots[key] = plot
+                self._psd_curves[key] = curve
+                self._apply_frequency_limits(plot)
+        # The previous markers were destroyed by _glw.clear(); re-apply the last
+        # identified modes onto the fresh cells so they survive a layout rebuild.
+        self._grid_eig_lines.clear()
+        if self._last_eigen_freqs:
+            self._render_grid_eigen_markers(self._last_eigen_freqs)
         return True
 
     def _update_fft_line(self, key: SampleKey, magnitude: np.ndarray) -> None:
-        line = self._fft_lines.get(key)
-        ax = self._fft_axes.get(key)
-        if line is None or ax is None:
+        curve = self._psd_curves.get(key)
+        if curve is None:
             return
 
         if magnitude.size != self._fft_freqs.size:
@@ -901,46 +1368,24 @@ class FftTab(QWidget):
                 padded[:count] = magnitude[:count]
             magnitude = padded
 
-        line.set_ydata(magnitude)
-        self._maybe_expand_ylim(ax, magnitude)
+        # pyqtgraph auto-ranges Y; setData updates both axes in one call.
+        curve.setData(self._fft_freqs, magnitude)
 
     def _clear_line(self, sensor_id: int, channel: str) -> None:
         key = self._make_key(sensor_id, channel)
-        line = self._fft_lines.get(key)
-        ax = self._fft_axes.get(key)
-        if line is not None:
-            line.set_ydata(np.zeros_like(self._fft_freqs))
-        if ax is not None:
-            ax.set_ylim(*self._default_ylim)
-
-    def _maybe_expand_ylim(self, ax: Axes, magnitude: np.ndarray) -> None:
-        if magnitude.size == 0:
-            return
-        try:
-            mag_max = float(np.nanmax(magnitude))
-        except ValueError:
-            return
-        if not np.isfinite(mag_max) or mag_max <= 0.0:
-            return
-
-        _current_min, current_max = ax.get_ylim()
-        if current_max <= 0.0 or mag_max > current_max * 0.95:
-            new_max = max(mag_max * 1.1, self._default_ylim[1])
-            ax.set_ylim(self._default_ylim[0], new_max)
+        curve = self._psd_curves.get(key)
+        if curve is not None:
+            curve.setData(self._fft_freqs, np.zeros_like(self._fft_freqs))
 
     def _clear_layout(self) -> None:
-        self._fft_axes.clear()
-        self._fft_lines.clear()
+        self._psd_plots.clear()
+        self._psd_curves.clear()
+        self._grid_eig_lines.clear()  # destroyed by _glw.clear(); drop stale refs
         self._current_layout = None
-        self._figure.clear()
+        self._glw.clear()
 
     def _draw_waiting(self) -> None:
         self._clear_layout()
-        ax = self._figure.add_subplot(111)
-        ax.set_xlabel("Frequency [Hz]")
-        ax.set_ylabel("Magnitude")
-        ax.set_title("Waiting for data...")
-        self._canvas.draw_idle()
         self._status_label.setText("Waiting for data...")
 
     def _window_from_signals_tab(
