@@ -17,8 +17,11 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QPushButton,
     QSizePolicy,
     QSpinBox,
+    QProgressBar,
+    QTextEdit,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -63,6 +66,7 @@ EIGEN_BATCH_S = 12.0
 # How often Window 2 recomputes (rolling/overlapping → faster perceived updates;
 # "as fast as possible" once the first 12 s of data has accumulated).
 EIGEN_UPDATE_S = 4.0
+FINAL_VALUES_BATCH_S = 20.0
 # Distinct colours for the (up to) three identified natural frequencies — also
 # reused to mark those frequencies on the per-sensor grid (Window 1).
 _EIGEN_COLORS = ("#ff5252", "#448aff", "#69f0ae")
@@ -88,7 +92,7 @@ class _EigenFreqWorker(QObject):
     finished = Signal()
 
     def __init__(self, capture_fn, fs, method, f_min, f_max, n_modes, batch_s,
-                 placement=None, n_story=0):
+                 placement=None, n_story=0, damping_sensor_id=3):
         super().__init__()
         self._capture_fn = capture_fn
         self._fs = fs
@@ -99,6 +103,7 @@ class _EigenFreqWorker(QObject):
         self._batch_s = batch_s
         self._placement = dict(placement or {})  # {sensor_id: floor}
         self._n_story = int(n_story)
+        self._damping_sensor_id = int(damping_sensor_id)
 
     @Slot()
     def run(self) -> None:
@@ -124,7 +129,9 @@ class _EigenFreqWorker(QObject):
                     "freqs": [float(f) for f in res.frequencies_hz],
                     "spec_f": np.asarray(res.fdd_freqs, dtype=float),
                     "spec_v": np.asarray(res.fdd_spectrum, dtype=float),
-                    "signed": self._method == "fdd",
+                    "signed": True,
+                    "method": self._method,
+                    "duration_s": float(session.duration_s),
                 }
                 # Map the per-sensor shapes onto floors when a placement + floor
                 # count are available (mode-shape view). map_to_stories is pure/cheap.
@@ -136,6 +143,35 @@ class _EigenFreqWorker(QObject):
                     payload["coverage_stories"] = list(story_data.coverage_stories)
                     payload["n_story"] = self._n_story
                     payload["full_coverage"] = bool(story_data.mode_shapes_available)
+                if res.frequencies_hz and self._damping_sensor_id in session.sensor_ids:
+                    sensor_index = list(session.sensor_ids).index(self._damping_sensor_id)
+                    t = np.arange(data.shape[1], dtype=float) / float(session.fs)
+                    try:
+                        damping = modal_id.estimate_damping_first_mode_real_response(
+                            t,
+                            np.asarray(data[sensor_index], dtype=float),
+                            float(session.fs),
+                            float(res.frequencies_hz[0]),
+                        )
+                        payload["damping"] = {
+                            "sensor_id": self._damping_sensor_id,
+                            "time": t,
+                            "response": np.asarray(damping["real_detrended_response"], dtype=float),
+                            "peak_times": np.asarray(damping["peak_times"], dtype=float),
+                            "peak_amps": np.asarray(damping["peak_amps"], dtype=float),
+                            "fitted_amps": np.asarray(damping["fitted_amps"], dtype=float),
+                            "first_mode_frequency_hz": float(damping["first_mode_frequency_fft_Hz"]),
+                            "damped_frequency_hz": float(damping["damped_frequency_from_real_response_Hz"]),
+                            "natural_frequency_hz": float(damping["natural_frequency_est_Hz"]),
+                            "zeta": float(damping["zeta"]),
+                            "damping_percent": float(damping["damping_percent"]),
+                            "fit_R2": float(damping["fit_R2"]),
+                            "n_peaks_used": int(damping["n_peaks_used"]),
+                        }
+                    except Exception as exc:
+                        payload["damping_error"] = str(exc)
+                elif res.frequencies_hz:
+                    payload["damping_error"] = f"Sensor S{self._damping_sensor_id} is not available in the current capture."
                 self.result.emit(payload)
             else:
                 self.failed.emit(res.message or "Identification failed")
@@ -221,7 +257,7 @@ class FftTab(QWidget):
         self._eig_plot.setMouseEnabled(x=True, y=True)
         self._eig_plot.enableAutoRange(y=True)
         # The identification spectrum curve (FDD = 1st singular value of the CSD;
-        # FFT = sensor-averaged Welch PSD) — white like Live Signals; the coloured
+        # FFT = sensor-averaged Hann FFT amplitude) — white like Live Signals; the coloured
         # mode lines are drawn on top. This curve is what visibly differs between
         # FDD and FFT even when the picked peaks coincide.
         self._eig_curve = self._eig_plot.plot([], [], pen=pg.mkPen("w", width=1.3))
@@ -237,8 +273,28 @@ class FftTab(QWidget):
         self._shape_plot.setLabel("left", "Floor")
         self._shape_plot.showGrid(x=True, y=True, alpha=0.3)
         self._shape_plot.addLine(x=0.0, pen=pg.mkPen("#888", width=1.0))  # zero ref
+        self._shape_legend = self._shape_plot.addLegend(offset=(10, 10))
+        self._style_legend_box(self._shape_legend)
         self._shape_items: list = []
         self._last_shape_data: dict | None = None
+
+        # Window 2 (alt view): damping ratio from one selected sensor response.
+        self._damping_glw = pg.GraphicsLayoutWidget()
+        self._damping_glw.setBackground("k")
+        self._damping_plot = self._damping_glw.addPlot()
+        self._damping_plot.setLabel("bottom", "Time", units="s")
+        self._damping_plot.setLabel("left", "Real detrended response")
+        self._damping_plot.showGrid(x=True, y=True, alpha=0.3)
+        self._damping_legend = self._damping_plot.addLegend(offset=(-10, 10))
+        self._style_legend_box(self._damping_legend)
+        try:
+            self._damping_legend.anchor((1, 0), (1, 0), offset=(-10, 10))
+        except Exception:
+            pass
+        self._damping_items: list = []
+        self._last_damping_data: dict | None = None
+        self._last_damping_error: str = ""
+
         # Sensor→floor placement (only meaningful for mode shapes). Fixed rig set.
         self._shape_sensor_ids = (1, 2, 3)
         # Rolling/overlapping cadence for Window 2 (recompute every EIGEN_UPDATE_S
@@ -248,13 +304,19 @@ class FftTab(QWidget):
         self._eig_timer.timeout.connect(self._launch_eigen_compute)
         self._eig_thread: QThread | None = None
         self._eig_worker: _EigenFreqWorker | None = None
+        self._final_thread: QThread | None = None
+        self._final_worker: _EigenFreqWorker | None = None
+        self._final_collect_started_perf: float | None = None
+        self._final_countdown_timer = QTimer(self)
+        self._final_countdown_timer.setInterval(250)
+        self._final_countdown_timer.timeout.connect(self._on_final_countdown_tick)
 
         # Controls --------------------------------------------------------------
         # T11.7 (compact): FDD and FFT share every input, so ALL params live in one
         # compact band at the top (two short rows) — this keeps the figures large.
         # The method selector still picks the Window-2 algorithm (FDD = SVD of the
-        # cross-spectral-density matrix → signed shapes; FFT = averaged Welch PSD →
-        # magnitude shapes); the PSD grid (Window 1) is unaffected (U1).
+        # cross-spectral-density matrix → signed shapes; FFT = averaged Hann FFT amplitude
+        # with phase-aligned shapes); the PSD grid (Window 1) is unaffected (U1).
         controls_group = QGroupBox("Spectrum settings")
         controls_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         controls_v = QVBoxLayout(controls_group)
@@ -264,7 +326,7 @@ class FftTab(QWidget):
         self.method_combo.addItems(["FDD", "FFT"])  # FDD default (M2)
         self.method_combo.setToolTip(
             "FDD: SVD of the cross-spectral-density matrix — signed mode shapes.\n"
-            "FFT: sensor-averaged Welch PSD peak-picking — magnitude-only shapes.\n"
+            "FFT: sensor-averaged Hann FFT peak-picking — phase-aligned signed mode shapes.\n"
             "Both use the same frequency band + mode count; only the algorithm differs."
         )
         self._eig_fmin = QDoubleSpinBox()
@@ -336,10 +398,12 @@ class FftTab(QWidget):
 
         # Status labels
         self._status_label = QLabel("Waiting for data...")
-        self._eig_status = QLabel("Eigen-frequencies: waiting for 10 s of data…")
+        self._eig_status = QLabel("Live eigen-frequencies: waiting for 10 s of data…")
 
         # Two-panel layout (T11.6): Window 1 (PSD grid) | Window 2 (eigen-freqs), 50/50.
         windows = QSplitter(Qt.Horizontal)
+        self._spectrum_splitter = windows
+        windows.setChildrenCollapsible(False)
         left_panel = QWidget()
         left_v = QVBoxLayout(left_panel)
         left_v.setContentsMargins(0, 0, 0, 0)
@@ -348,29 +412,54 @@ class FftTab(QWidget):
         right_panel = QWidget()
         right_v = QVBoxLayout(right_panel)
         right_v.setContentsMargins(0, 0, 0, 0)
-        # Right-panel view toggle: natural frequencies (default) vs mode shapes.
+        # Right-panel view selector: live values or a frozen 20 s final calculation.
         view_row = QHBoxLayout()
-        self._right_title = QLabel("Identified natural frequencies")
-        self._show_shapes_check = QCheckBox("Show mode shapes")
-        self._show_shapes_check.setToolTip(
-            "Toggle the right panel between the identification spectrum + natural\n"
-            "frequencies and the per-floor mode shapes (needs the sensor→floor map\n"
-            "below; FDD gives signed shapes, FFT magnitude-only).")
-        self._show_shapes_check.toggled.connect(self._on_view_toggled)
+        self._right_title = QLabel("Live natural frequencies")
+        self._right_view_combo = QComboBox()
+        self._right_view_combo.addItems([
+            "Live natural frequencies",
+            "Live mode shapes",
+            "Live damping ratio",
+            "Calculate final values",
+        ])
+        self._right_view_combo.setToolTip(
+            "Choose what the right Spectrum panel displays.")
+        self._right_view_combo.currentTextChanged.connect(self._on_view_changed)
+        self._damping_sensor_label = QLabel("Damping sensor:")
+        self._damping_sensor_combo = QComboBox()
+        for sid in (1, 2, 3):
+            self._damping_sensor_combo.addItem(f"S{sid}", sid)
+        self._damping_sensor_combo.setCurrentIndex(2)  # default top-story sensor S3
+        self._damping_sensor_combo.currentIndexChanged.connect(self._on_damping_sensor_changed)
         view_row.addWidget(self._right_title)
         view_row.addStretch()
-        view_row.addWidget(self._show_shapes_check)
+        view_row.addWidget(QLabel("Show:"))
+        view_row.addWidget(self._right_view_combo)
+        view_row.addSpacing(10)
+        view_row.addWidget(self._damping_sensor_label)
+        view_row.addWidget(self._damping_sensor_combo)
         right_v.addLayout(view_row)
         # Sensor→floor placement (only shown/used in mode-shape view).
         self._shape_placement_widget = self._build_shape_placement()
         self._shape_placement_widget.setVisible(False)
         right_v.addWidget(self._shape_placement_widget)
-        right_v.addWidget(self._eig_glw)         # frequencies view (default)
-        right_v.addWidget(self._shape_glw)        # mode-shape view (toggled)
+        self._final_panel = self._build_final_values_panel()
+        right_v.addWidget(self._eig_glw)          # frequencies view (default)
+        right_v.addWidget(self._shape_glw)        # normalized mode-shape view
+        right_v.addWidget(self._damping_glw)      # damping-ratio view
+        right_v.addWidget(self._final_panel)      # final values view
         self._shape_glw.setVisible(False)
+        self._damping_glw.setVisible(False)
+        self._final_panel.setVisible(False)
+        self._damping_sensor_label.setVisible(False)
+        self._damping_sensor_combo.setVisible(False)
         right_v.addWidget(self._eig_status)
         windows.addWidget(left_panel)
         windows.addWidget(right_panel)
+        left_panel.setMinimumWidth(1)
+        right_panel.setMinimumWidth(1)
+        windows.setStretchFactor(0, 1)
+        windows.setStretchFactor(1, 1)
         windows.setSizes([500, 500])
 
         # Layout ---------------------------------------------------------------
@@ -410,7 +499,8 @@ class FftTab(QWidget):
         self.lowpass_cutoff.valueChanged.connect(self._on_controls_changed)
         # T11.7: method selector swaps the method-specific group (Window 2 only).
         self.method_combo.currentTextChanged.connect(self._on_method_changed)
-        self._on_method_changed()  # set initial visibility
+        self._on_method_changed()  # set initial method hint
+        self._on_view_changed(self._right_view_combo.currentText())
         self._update_fft_timer_interval()
         self._draw_waiting()
 
@@ -428,7 +518,7 @@ class FftTab(QWidget):
                 "SVD of the cross-spectral-density matrix — signed mode shapes.")
         else:
             self._method_hint.setText(
-                "Sensor-averaged Welch PSD peak-picking — magnitude-only shapes.")
+                "Sensor-averaged Hann FFT peak-picking — phase-aligned signed mode shapes.")
         # Recompute immediately so the spectrum curve + peaks reflect the new method
         # without waiting for the next rolling tick (the worker guards re-entrancy).
         self._launch_eigen_compute()
@@ -625,7 +715,7 @@ class FftTab(QWidget):
         if not self._eig_timer.isActive() and not self._is_record_only():
             self._eig_timer.start()
             self._eig_status.setText(
-                f"Eigen-frequencies: collecting first {EIGEN_BATCH_S:.0f} s of data…")
+                f"Live eigen-frequencies: collecting first {EIGEN_BATCH_S:.0f} s of data…")
 
     @Slot()
     def on_stream_stopped(self) -> None:
@@ -665,6 +755,7 @@ class FftTab(QWidget):
             EIGEN_BATCH_S,
             placement=self._shape_sensor_story_map(),
             n_story=int(self._shape_floors.value()),
+            damping_sensor_id=self._selected_damping_sensor_id(),
         )
         thread = QThread(self)
         worker.moveToThread(thread)
@@ -686,25 +777,38 @@ class FftTab(QWidget):
         self._render_grid_eigen_markers(flist)  # mirror onto the per-sensor grid
         if "mode_shapes_ux" in payload:
             self._last_shape_data = payload
+        if "damping" in payload:
+            self._last_damping_data = payload["damping"]
+            self._last_damping_error = ""
+        elif "damping_error" in payload:
+            self._last_damping_data = None
+            self._last_damping_error = str(payload.get("damping_error") or "")
         method = self.method_combo.currentText()
-        if self._show_shapes_check.isChecked():
-            # Mode-shape view active: render shapes; status set inside the renderer.
+        view = self._current_right_view()
+        if view == "shapes":
             self._render_mode_shapes(self._last_shape_data or payload)
+        elif view == "damping":
+            self._render_damping_ratio(self._last_damping_data)
+        elif view == "final":
+            pass
         elif flist:
-            txt = ", ".join(f"f{i + 1}={f:.2f} Hz" for i, f in enumerate(flist))
-            self._eig_status.setText(f"Eigen-frequencies ({method}): {txt}")
+            self._eig_status.setText(f"Live eigen-frequencies ({method})")
         else:
-            self._eig_status.setText(f"Eigen-frequencies ({method}): none identified")
+            self._eig_status.setText(f"Live eigen-frequencies ({method}): none identified")
 
     @Slot(float)
     def _on_eigen_collecting(self, available_s: float) -> None:
         need = modal_id.MIN_DURATION_S
+        if self._current_right_view() == "final":
+            return
         self._eig_status.setText(
-            f"Eigen-frequencies: collecting {available_s:.0f}/{need:.0f} s of data…")
+            f"Live eigen-frequencies: collecting {available_s:.0f}/{need:.0f} s of data…")
 
     @Slot(str)
     def _on_eigen_failed(self, message: str) -> None:
-        self._eig_status.setText(f"Eigen-frequencies: {message}")
+        if self._current_right_view() == "final":
+            return
+        self._eig_status.setText(f"Live eigen-frequencies: {message}")
 
     @Slot()
     def _on_eigen_finished(self) -> None:
@@ -722,7 +826,7 @@ class FftTab(QWidget):
     def _render_eigen_frequencies(self, freqs: Sequence[float],
                                   spec_f=None, spec_v=None) -> None:
         """Draw the identification-spectrum curve (FDD 1st singular value / FFT
-        averaged PSD) plus the identified natural frequencies as distinct-coloured
+        averaged FFT amplitude) plus the identified natural frequencies as distinct-coloured
         vertical lines. The curve is what visibly changes between FDD and FFT."""
         # Spectrum response curve, band-limited to [f_min, f_max] for a clean view.
         if spec_f is not None and spec_v is not None and len(spec_f) and len(spec_v):
@@ -733,7 +837,8 @@ class FftTab(QWidget):
             band = (sf >= fmin) & (sf <= fmax)
             if band.any():
                 sf, sv = sf[band], sv[band]
-            self._eig_curve.setData(sf, sv)
+            plot_f, plot_v = self._smooth_identification_curve_for_display(sf, sv)
+            self._eig_curve.setData(plot_f, plot_v)
             x_hi = float(sf[-1]) if sf.size else (max(freqs) * 1.3 + 1.0 if freqs else 1.0)
         else:
             self._eig_curve.setData([], [])
@@ -805,6 +910,243 @@ class FftTab(QWidget):
         self._refresh_shape_floor_combos()
         return w
 
+
+    def _build_final_values_panel(self) -> QWidget:
+        """Panel that freezes one 20 s modal-identification result for reporting."""
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.setContentsMargins(0, 0, 0, 0)
+
+        row = QHBoxLayout()
+        self._final_start_btn = QPushButton("Start calculating final values")
+        self._final_start_btn.setStyleSheet(
+            "QPushButton { background-color: #eeeeee; color: #111; font-weight: 600; "
+            "padding: 6px 12px; border: 1px solid #c8c8c8; border-radius: 4px; }"
+            "QPushButton:hover { background-color: #e4e4e4; }"
+            "QPushButton:disabled { background-color: #f4f4f4; color: #999; }"
+        )
+        self._final_start_btn.clicked.connect(self._start_final_values_calculation)
+        self._final_countdown_label = QLabel(f"Ready — {FINAL_VALUES_BATCH_S:.0f} s fixed record")
+        row.addWidget(self._final_start_btn)
+        row.addWidget(self._final_countdown_label)
+        row.addStretch()
+
+        self._final_progress = QProgressBar()
+        self._final_progress.setRange(0, 1000)
+        self._final_progress.setValue(0)
+        self._final_progress.setTextVisible(True)
+        self._final_progress.setFormat("%p%")
+
+        self._final_shape_glw = pg.GraphicsLayoutWidget()
+        self._final_shape_glw.setBackground("k")
+        self._final_shape_plot = self._final_shape_glw.addPlot()
+        self._final_shape_plot.setLabel("bottom", "Normalized mode-shape value, φ")
+        self._final_shape_plot.setLabel("left", "Floor")
+        self._final_shape_plot.showGrid(x=True, y=True, alpha=0.3)
+        self._final_shape_plot.setXRange(-2.0, 2.0, padding=0.02)
+        self._final_shape_plot.setYRange(0, 3, padding=0.1)
+        self._final_shape_legend = self._final_shape_plot.addLegend(offset=(10, 10))
+        self._style_legend_box(self._final_shape_legend)
+        self._final_shape_items: list = []
+
+        v.addLayout(row)
+        v.addWidget(self._final_progress)
+        v.addWidget(self._final_shape_glw, stretch=1)
+        return w
+
+    @Slot()
+    def _start_final_values_calculation(self) -> None:
+        if self._final_thread is not None or self._final_countdown_timer.isActive():
+            return
+        if self._is_record_only() or not self._stream_active:
+            self._set_final_status("Final values: start a live stream first.", progress=0.0)
+            return
+        self._final_collect_started_perf = time.perf_counter()
+        self._final_start_btn.setEnabled(False)
+        self._final_start_btn.setText("Collecting…")
+        self._clear_final_shape_plot()
+        self._set_final_status(f"0.0/{FINAL_VALUES_BATCH_S:.0f} s", progress=0.0)
+        self._final_countdown_timer.start()
+
+    def _set_final_status(self, message: str, progress: float | None = None) -> None:
+        label = getattr(self, "_final_countdown_label", None)
+        if label is not None:
+            label.setText(message)
+        progress_bar = getattr(self, "_final_progress", None)
+        if progress_bar is not None and progress is not None:
+            frac = 0.0 if FINAL_VALUES_BATCH_S <= 0 else float(progress) / float(FINAL_VALUES_BATCH_S)
+            progress_bar.setValue(int(round(1000 * min(1.0, max(0.0, frac)))))
+
+    def _clear_final_shape_plot(self) -> None:
+        plot = getattr(self, "_final_shape_plot", None)
+        items = getattr(self, "_final_shape_items", None)
+        if plot is not None and items is not None:
+            self._clear_plot_items(plot, items)
+        legend = getattr(self, "_final_shape_legend", None)
+        if legend is not None:
+            try:
+                legend.clear()
+            except Exception:
+                pass
+        if plot is not None:
+            plot.setTitle("")
+        # Final damping and warnings are drawn inside the plot, not below it.
+
+    @Slot()
+    def _on_final_countdown_tick(self) -> None:
+        started = self._final_collect_started_perf
+        if started is None:
+            self._final_countdown_timer.stop()
+            return
+        elapsed = max(0.0, time.perf_counter() - started)
+        if elapsed >= FINAL_VALUES_BATCH_S:
+            self._final_countdown_timer.stop()
+            self._final_collect_started_perf = None
+            self._set_final_status(
+                f"Calculating final values from the last {FINAL_VALUES_BATCH_S:.0f} s of data…",
+                progress=FINAL_VALUES_BATCH_S,
+            )
+            self._launch_final_compute()
+            return
+        self._set_final_status(f"{elapsed:.1f}/{FINAL_VALUES_BATCH_S:.0f} s", progress=elapsed)
+
+    def _launch_final_compute(self) -> None:
+        if self._final_thread is not None:
+            return
+        capture_fn = getattr(self._recorder_tab, "snapshot_modal_capture", None)
+        if capture_fn is None:
+            self._on_final_failed("No modal capture source is available.")
+            self._on_final_finished()
+            return
+        fs = self._device_rate_hz or self._measured_rate_hz or None
+        method = "fdd" if self.method_combo.currentText() == "FDD" else "fft"
+        worker = _EigenFreqWorker(
+            capture_fn, fs, method,
+            float(self._eig_fmin.value()),
+            float(self._eig_fmax.value()),
+            int(self._eig_nmodes.value()),
+            FINAL_VALUES_BATCH_S,
+            placement=self._shape_sensor_story_map(),
+            n_story=int(self._shape_floors.value()),
+            damping_sensor_id=self._selected_damping_sensor_id(),
+        )
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.result.connect(self._on_final_result)
+        worker.collecting.connect(self._on_final_collecting)
+        worker.failed.connect(self._on_final_failed)
+        worker.finished.connect(self._on_final_finished)
+        self._final_worker = worker
+        self._final_thread = thread
+        thread.start()
+
+    @Slot(object)
+    def _on_final_result(self, payload) -> None:
+        self._set_final_status("Final values calculated.", progress=FINAL_VALUES_BATCH_S)
+        self._render_final_values(payload)
+        self._eig_status.setText("Final values calculated.")
+
+    @Slot(float)
+    def _on_final_collecting(self, available_s: float) -> None:
+        self._set_final_status(
+            f"Final values: only {available_s:.1f} s are available. Keep streaming and run the {FINAL_VALUES_BATCH_S:.0f} s calculation again.",
+            progress=0.0,
+        )
+        self._draw_final_plot_message("No final plot was created because the modal buffer did not contain enough data.")
+
+    @Slot(str)
+    def _on_final_failed(self, message: str) -> None:
+        self._set_final_status(f"Final values failed: {message}", progress=0.0)
+        self._draw_final_plot_message(str(message))
+
+    @Slot()
+    def _on_final_finished(self) -> None:
+        thread = self._final_thread
+        worker = self._final_worker
+        self._final_worker = None
+        self._final_thread = None
+        if thread is not None:
+            thread.quit()
+            thread.wait()
+            thread.deleteLater()
+        if worker is not None:
+            worker.deleteLater()
+        if hasattr(self, "_final_start_btn"):
+            self._final_start_btn.setEnabled(True)
+            self._final_start_btn.setText("Start calculating final values")
+
+    def _render_final_values(self, payload: dict) -> None:
+        method = str(payload.get("method") or ("fdd" if self.method_combo.currentText() == "FDD" else "fft")).upper()
+        duration = float(payload.get("duration_s", FINAL_VALUES_BATCH_S))
+        freqs = [float(f) for f in payload.get("freqs", [])]
+        shapes = payload.get("mode_shapes_ux") or {}
+        coverage = [int(s) for s in payload.get("coverage_stories", [])]
+        n_story = int(payload.get("n_story") or max(coverage or [int(self._shape_floors.value())]))
+        damping = payload.get("damping") or None
+
+        self._clear_final_shape_plot()
+        self._final_shape_plot.setTitle(f"Final mode shapes ({method})")
+        self._final_shape_plot.setXRange(-2.0, 2.0, padding=0.02)
+        self._final_shape_plot.setYRange(0, max(1, n_story), padding=0.1)
+        try:
+            self._final_shape_plot.getAxis("left").setTicks(
+                [[(float(i), f"F{i}") for i in range(1, max(1, n_story) + 1)]]
+            )
+        except Exception:
+            pass
+
+        if freqs and shapes and coverage:
+            for k in sorted(shapes.keys(), key=lambda item: int(item)):
+                mode_i = int(k)
+                vals = self._normalize_for_display([float(v) for v in shapes[k]])
+                if len(vals) != len(coverage):
+                    continue
+                color = _EIGEN_COLORS[(mode_i - 1) % len(_EIGEN_COLORS)]
+                freq_txt = f", f={freqs[mode_i - 1]:.2f} Hz" if mode_i - 1 < len(freqs) else ""
+                curve = self._final_shape_plot.plot(
+                    [0.0] + vals,
+                    [0] + coverage,
+                    pen=pg.mkPen(color, width=2.2),
+                    symbol="o",
+                    symbolBrush=color,
+                    symbolSize=8,
+                )
+                try:
+                    self._final_shape_legend.addItem(curve, f"Mode {mode_i}{freq_txt}")
+                except Exception:
+                    pass
+                self._final_shape_items.append(curve)
+                for floor, value in zip(coverage, vals):
+                    x_offset = 0.035 if value >= 0.0 else -0.035
+                    anchor_x = 0.0 if value >= 0.0 else 1.0
+                    text = pg.TextItem(f"{value:+.2f}", color=color, anchor=(anchor_x, 0.5), fill=(0, 0, 0, 130))
+                    text.setPos(float(value) + x_offset, float(floor))
+                    self._final_shape_plot.addItem(text)
+                    self._final_shape_items.append(text)
+        else:
+            msg = "No mapped mode shapes available — set the sensor→floor map before calculating final values."
+            text = pg.TextItem(msg, color="w", anchor=(0.5, 0.5), fill=(0, 0, 0, 150))
+            text.setPos(0.0, max(1.0, 0.5 * float(n_story)))
+            self._final_shape_plot.addItem(text)
+            self._final_shape_items.append(text)
+
+        if damping:
+            sensor_id = int(damping.get("sensor_id", self._selected_damping_sensor_id()))
+            zeta = float(damping.get("zeta", float("nan")))
+            damp_pct = float(damping.get("damping_percent", float("nan")))
+            r2 = float(damping.get("fit_R2", float("nan")))
+            n_peaks = int(damping.get("n_peaks_used", 0))
+            damping_info = (
+                f"Damping S{sensor_id}\n"
+                f"ζ = {zeta:.5f} ({damp_pct:.2f}%)\n"
+                f"peaks = {n_peaks}\n"
+                f"R² = {r2:.3f}"
+            )
+        else:
+            damping_info = f"Damping\n{str(payload.get('damping_error') or 'No result available.')}"
+        self._add_final_damping_box(damping_info, n_story)
+
     def _refresh_shape_floor_combos(self) -> None:
         n = int(self._shape_floors.value())
         for i, (sid, combo) in enumerate(self._shape_combos.items()):
@@ -824,50 +1166,286 @@ class FftTab(QWidget):
                 out[sid] = int(combo.currentText())
         return out
 
-    @Slot(bool)
-    def _on_view_toggled(self, show_shapes: bool) -> None:
-        """Swap the right panel between the frequencies view and the mode-shape
-        view (pure GUI, G1)."""
-        self._shape_placement_widget.setVisible(show_shapes)
+    def _current_right_view(self) -> str:
+        text = self._right_view_combo.currentText().lower()
+        if "final" in text or "calculate" in text:
+            return "final"
+        if "mode" in text:
+            return "shapes"
+        if "damping" in text:
+            return "damping"
+        return "frequencies"
+
+    def _selected_damping_sensor_id(self) -> int:
+        combo = getattr(self, "_damping_sensor_combo", None)
+        if combo is None:
+            return 3
+        value = combo.currentData()
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            text = combo.currentText().strip().upper().lstrip("S")
+            try:
+                return int(text)
+            except ValueError:
+                return 3
+
+    @staticmethod
+    def _style_legend_box(legend) -> None:
+        """Give pyqtgraph legends a readable boxed background when supported."""
+        if legend is None:
+            return
+        for setter, value in (
+            ("setBrush", pg.mkBrush(0, 0, 0, 185)),
+            ("setPen", pg.mkPen(210, 210, 210, 180)),
+        ):
+            try:
+                getattr(legend, setter)(value)
+            except Exception:
+                pass
+
+    def _draw_final_plot_message(self, message: str) -> None:
+        self._clear_final_shape_plot()
+        try:
+            self._final_shape_plot.setXRange(-2.0, 2.0, padding=0.02)
+        except Exception:
+            pass
+        text = pg.TextItem(str(message), color="w", anchor=(0.5, 0.5), fill=(0, 0, 0, 170))
+        text.setPos(0.0, 1.0)
+        self._final_shape_plot.addItem(text)
+        self._final_shape_items.append(text)
+
+    def _add_final_damping_box(self, text: str, n_story: int) -> None:
+        item = pg.TextItem(str(text), color="w", anchor=(0.0, 1.0), fill=(0, 0, 0, 185))
+        item.setPos(-1.92, 0.25)
+        self._final_shape_plot.addItem(item)
+        self._final_shape_items.append(item)
+
+    @Slot(int)
+    def _on_damping_sensor_changed(self, *_: object) -> None:
+        """Recompute damping when the selected response sensor changes."""
+        self._last_damping_data = None
+        self._last_damping_error = ""
+        if self._current_right_view() == "damping":
+            self._eig_status.setText(
+                f"Damping ratio: recalculating from S{self._selected_damping_sensor_id()}…")
+        self._launch_eigen_compute()
+
+    @Slot(str)
+    def _on_view_changed(self, *_: object) -> None:
+        """Swap the right Spectrum panel using the combo-box view selector."""
+        view = self._current_right_view()
+        show_shapes = view == "shapes"
+        show_damping = view == "damping"
+        show_final = view == "final"
+        self._shape_placement_widget.setVisible(show_shapes or show_final)
         self._shape_glw.setVisible(show_shapes)
-        self._eig_glw.setVisible(not show_shapes)
-        self._right_title.setText(
-            "Identified mode shapes" if show_shapes else "Identified natural frequencies")
-        if show_shapes and self._last_shape_data is not None:
-            self._render_mode_shapes(self._last_shape_data)
+        self._damping_glw.setVisible(show_damping)
+        self._eig_glw.setVisible(view == "frequencies")
+        self._final_panel.setVisible(show_final)
+        self._damping_sensor_label.setVisible(show_damping or show_final)
+        self._damping_sensor_combo.setVisible(show_damping or show_final)
+        splitter = getattr(self, "_spectrum_splitter", None)
+        if splitter is not None:
+            QTimer.singleShot(0, lambda: splitter.setSizes([1, 1]))
+        if show_shapes:
+            self._right_title.setText("Live normalized mode shapes")
+            if self._last_shape_data is not None:
+                self._render_mode_shapes(self._last_shape_data)
+        elif show_damping:
+            self._right_title.setText("Live damping ratio")
+            if self._last_damping_data is not None:
+                self._render_damping_ratio(self._last_damping_data)
+            else:
+                self._render_damping_ratio(None)
+                self._launch_eigen_compute()
+        elif show_final:
+            self._right_title.setText("Final modal values")
+        else:
+            self._right_title.setText("Live natural frequencies")
+            if self._last_eigen_freqs:
+                method = self.method_combo.currentText()
+                self._eig_status.setText(f"Live eigen-frequencies ({method})")
+
+    @staticmethod
+    def _normalize_for_display(vals: Sequence[float]) -> list[float]:
+        arr = np.asarray(vals, dtype=float)
+        if arr.size == 0:
+            return []
+        peak = float(np.nanmax(np.abs(arr)))
+        if not np.isfinite(peak) or peak <= 0.0:
+            return [float(v) for v in arr]
+        return [float(v / peak) for v in arr]
+
+    def _clear_plot_items(self, plot: "pg.PlotItem", items: list) -> None:
+        for item in items:
+            try:
+                plot.removeItem(item)
+            except Exception:
+                pass
+        items.clear()
 
     def _render_mode_shapes(self, shape_data: dict) -> None:
-        """Draw per-floor mode shapes: amplitude (x) vs floor (y), one coloured
-        profile per mode, anchored at the ground (floor 0, amplitude 0)."""
-        for item in self._shape_items:
-            self._shape_plot.removeItem(item)
-        self._shape_items.clear()
+        """Draw normalized per-floor mode shapes with legend and value labels.
+
+        The calculation coming from modal.py is not changed here; this renderer only
+        normalizes the displayed vector to |max|=1 as a safety step and annotates
+        the values on the plot.
+        """
+        self._clear_plot_items(self._shape_plot, self._shape_items)
+        try:
+            self._shape_legend.clear()
+        except Exception:
+            pass
         shapes = shape_data.get("mode_shapes_ux") or {}
         n_story = int(shape_data.get("n_story", 0))
         signed = bool(shape_data.get("signed", True))
         full = bool(shape_data.get("full_coverage", False))
-        # Floors that actually have a sensor (sorted); shape values map to these.
+        freqs = [float(f) for f in shape_data.get("freqs", [])]
         coverage = [int(s) for s in shape_data.get("coverage_stories", [])]
         if not shapes or not coverage:
             self._eig_status.setText(
-                "Mode shapes: need ≥1 sensor per measured floor — set the sensor→floor map.")
+                "Mode shapes: need mapped sensors — set the sensor→floor map.")
             return
-        for k in sorted(shapes.keys(), key=lambda s: int(s)):
-            vals = [float(v) for v in shapes[k]]
+
+        value_lines: list[str] = []
+        for k in sorted(shapes.keys(), key=lambda item: int(item)):
+            vals = self._normalize_for_display([float(v) for v in shapes[k]])
             if len(vals) != len(coverage):
                 continue
-            color = _EIGEN_COLORS[(int(k) - 1) % len(_EIGEN_COLORS)]
-            # Ground anchor at floor 0 (fixed base); plot each value at its floor.
+            mode_i = int(k)
+            color = _EIGEN_COLORS[(mode_i - 1) % len(_EIGEN_COLORS)]
+            freq_txt = f", f={freqs[mode_i - 1]:.2f} Hz" if mode_i - 1 < len(freqs) else ""
+            legend_name = f"Mode {mode_i}{freq_txt}"
             xs = [0.0] + vals
             ys = [0] + coverage
             curve = self._shape_plot.plot(
                 xs, ys, pen=pg.mkPen(color, width=2.0),
-                symbol="o", symbolBrush=color, symbolSize=8, name=f"f{k}")
+                symbol="o", symbolBrush=color, symbolSize=8)
+            try:
+                self._shape_legend.addItem(curve, legend_name)
+            except Exception:
+                pass
             self._shape_items.append(curve)
+            labels = []
+            for floor, value in zip(coverage, vals):
+                labels.append(f"F{floor}={value:.2f}")
+                text = pg.TextItem(f"{value:.2f}", color=color, anchor=(0.0, 0.5))
+                text.setPos(float(value), float(floor))
+                self._shape_plot.addItem(text)
+                self._shape_items.append(text)
+            value_lines.append(f"Mode {mode_i}: " + ", ".join(labels))
+
+        self._shape_plot.setXRange(-1.5, 1.5, padding=0.02)
         self._shape_plot.setYRange(0, max(1, n_story), padding=0.1)
-        kind = "signed (FDD)" if signed else "magnitude (FFT)"
-        cov = "full coverage" if full else f"partial ({len(coverage)}/{n_story} floors)"
-        self._eig_status.setText(f"Mode shapes — {kind}, {cov}, |max|=1 per mode")
+        method = str(shape_data.get("method", "fdd")).upper()
+        cov = "full coverage" if full else f"partial coverage ({len(coverage)}/{n_story} floors)"
+        self._eig_status.setText(f"Live mode shapes ({method}) — {cov}")
+
+    def _render_damping_ratio(self, damping: dict | None) -> None:
+        """Draw damping decay from the selected sensor with legend and values."""
+        self._clear_plot_items(self._damping_plot, self._damping_items)
+        try:
+            self._damping_legend.clear()
+        except Exception:
+            pass
+        if not damping:
+            msg = self._last_damping_error or (
+                f"Damping ratio: waiting for S{self._selected_damping_sensor_id()} data…")
+            self._eig_status.setText(msg)
+            return
+
+        sensor_id = int(damping.get("sensor_id", self._selected_damping_sensor_id()))
+        t = np.asarray(damping.get("time", []), dtype=float)
+        x = np.asarray(damping.get("response", []), dtype=float)
+        peak_t = np.asarray(damping.get("peak_times", []), dtype=float)
+        peak_a = np.asarray(damping.get("peak_amps", []), dtype=float)
+        fit_a = np.asarray(damping.get("fitted_amps", []), dtype=float)
+        if t.size == 0 or x.size == 0:
+            self._eig_status.setText(f"Damping ratio: no response data for S{sensor_id}.")
+            return
+
+        response_curve = self._damping_plot.plot(
+            t, x, pen=pg.mkPen("w", width=1.1), name=f"S{sensor_id}")
+        self._damping_items.append(response_curve)
+        if peak_t.size and peak_a.size:
+            peaks = self._damping_plot.plot(
+                peak_t, peak_a, pen=None, symbol="o", symbolSize=6,
+                symbolBrush=_EIGEN_COLORS[0], name="Peaks")
+            self._damping_items.append(peaks)
+        if peak_t.size and fit_a.size:
+            fit_pos = self._damping_plot.plot(
+                peak_t, fit_a, pen=pg.mkPen(_EIGEN_COLORS[1], width=2.0, style=Qt.DashLine),
+                name="Fit")
+            fit_neg = self._damping_plot.plot(
+                peak_t, -fit_a, pen=pg.mkPen(_EIGEN_COLORS[1], width=2.0, style=Qt.DashLine))
+            self._damping_items.extend([fit_pos, fit_neg])
+
+        zeta = float(damping.get("zeta", float("nan")))
+        damp_pct = float(damping.get("damping_percent", float("nan")))
+        f1 = float(damping.get("first_mode_frequency_hz", float("nan")))
+        fd = float(damping.get("damped_frequency_hz", float("nan")))
+        r2 = float(damping.get("fit_R2", float("nan")))
+        n_peaks = int(damping.get("n_peaks_used", 0))
+        info = (
+            f"S{sensor_id}: ζ={zeta:.5f} ({damp_pct:.2f}%)\n"
+            f"f1={f1:.2f} Hz, fd={fd:.2f} Hz\n"
+            f"R²={r2:.3f}, peaks={n_peaks}"
+        )
+        text = pg.TextItem(info, color="w", anchor=(1.0, 1.0), fill=(0, 0, 0, 150))
+        finite_x = x[np.isfinite(x)]
+        if finite_x.size:
+            ymin = float(np.nanmin(finite_x))
+            ymax = float(np.nanmax(finite_x))
+            if np.isfinite(ymin) and np.isfinite(ymax) and ymax > ymin:
+                yrange = ymax - ymin
+                self._damping_plot.setYRange(ymin - 0.10 * yrange, ymax + 0.18 * yrange, padding=0.02)
+                text_y = ymin - 0.06 * yrange
+            else:
+                text_y = 0.0
+        else:
+            text_y = 0.0
+        text.setPos(float(t[-1]), float(text_y))
+        self._damping_plot.addItem(text)
+        self._damping_items.append(text)
+        self._damping_plot.setXRange(float(t[0]), float(t[-1]), padding=0.02)
+        try:
+            self._damping_legend.anchor((1, 0), (1, 0), offset=(-10, 10))
+        except Exception:
+            pass
+        self._eig_status.setText(f"Live damping ratio from S{sensor_id}")
+
+    @staticmethod
+    def _smooth_identification_curve_for_display(
+        freqs: np.ndarray, values: np.ndarray, target_points: int = 900
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Display-only smoothing/interpolation for the right-side spectrum curve.
+
+        This keeps identified frequencies unchanged; it only makes the plotted curve
+        less angular when the identification spectrum has few frequency bins.
+        """
+        freqs = np.asarray(freqs, dtype=float)
+        values = np.asarray(values, dtype=float)
+        good = np.isfinite(freqs) & np.isfinite(values)
+        freqs = freqs[good]
+        values = values[good]
+        if freqs.size < 4:
+            return freqs, values
+        order = np.argsort(freqs)
+        freqs = freqs[order]
+        values = values[order]
+        if freqs.size < target_points:
+            dense_f = np.linspace(float(freqs[0]), float(freqs[-1]), int(target_points))
+            dense_v = np.interp(dense_f, freqs, values)
+        else:
+            dense_f, dense_v = freqs, values
+        if dense_v.size >= 9:
+            kernel = np.hanning(9)
+            kernel = kernel / np.sum(kernel)
+            pad = kernel.size // 2
+            padded = np.pad(dense_v, (pad, pad), mode="edge")
+            dense_v = np.convolve(padded, kernel, mode="valid")
+        return dense_f, dense_v
 
     # --------------------------------------------------------------- internals
     @staticmethod
@@ -1032,9 +1610,9 @@ class FftTab(QWidget):
             channels = list(selection.active_channels)
         else:
             channels = ["ax", "ay"]
-        channels = [ch for ch in channels if ch in ("ax", "ay")]  # T11.1: structural axes only
+        channels = [ch for ch in channels if ch in ("ax", "ay", "gz")]  # keep live Gz visible when selected
         if not channels:
-            return []
+            channels = ["ax", "ay", "gz"]
 
         window_s = float(self.window_spin.value())
         min_samples = self._min_samples_required(window_s)
@@ -1165,14 +1743,14 @@ class FftTab(QWidget):
         if selection is not None and selection.active_channels:
             channels = list(selection.active_channels)
         else:
-            channels = ["ax", "ay"]
+            channels = ["ax", "ay", "gz"]
 
-        # Spectrum shows only the structural horizontal axes (T11.1): drop gyro/other
-        # channels even if a global selection includes them, so the grid is 3x2 (ax, ay).
-        channels = [ch for ch in channels if ch in ("ax", "ay")]
+        # Keep the live Spectrum grid aligned with the active structural stream
+        # from the Pi: ax, ay, and gz. Other channels remain hidden here.
+        channels = [ch for ch in channels if ch in ("ax", "ay", "gz")]
         if not channels:
-            logger.warning("FftTab: channels list empty; falling back to ['ax', 'ay']")
-            channels = ["ax", "ay"]
+            logger.warning("FftTab: channels list empty; falling back to ['ax', 'ay', 'gz']")
+            channels = ["ax", "ay", "gz"]
 
         window_s = float(self.window_spin.value())
         min_samples = self._min_samples_required(window_s)

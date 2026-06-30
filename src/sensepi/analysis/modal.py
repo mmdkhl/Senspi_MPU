@@ -28,6 +28,13 @@ from scipy import signal
 # too few cycles of the fundamental and the frequency resolution is too coarse.
 MIN_DURATION_S = 10.0
 
+# FFT/damping defaults mirrored from modal_damping_from_csv.py so the GUI Spectrum
+# tab and the standalone CSV analysis identify the same type of peaks.
+FFT_PROMINENCE_RATIO = 0.02
+MIN_FFT_PEAK_SEPARATION_HZ = 0.25
+MIN_PEAK_FRACTION_FOR_DAMPING = 0.08
+MIN_NUMBER_OF_DECAY_PEAKS = 8
+
 
 @dataclass
 class ExperimentalModalResult:
@@ -42,8 +49,10 @@ class ExperimentalModalResult:
     damping_ratios: list[float] = field(default_factory=list)
     # The identification spectrum that gets plotted. For ``method="fdd"`` this is
     # the first singular value of the CSD matrix; for ``method="fft"`` it is the
-    # sensor-averaged Welch PSD. The field names keep the ``fdd_`` prefix for
-    # backward compatibility; ``method`` says which spectrum it actually holds.
+    # sensor-averaged direct Hann-window FFT amplitude spectrum (matching the
+    # standalone modal_damping_from_csv.py workflow). The field names keep the
+    # ``fdd_`` prefix for backward compatibility; ``method`` says which spectrum
+    # it actually holds.
     fdd_freqs: np.ndarray = field(default_factory=lambda: np.empty(0))
     fdd_spectrum: np.ndarray = field(default_factory=lambda: np.empty(0))
     method: str = "fdd"
@@ -89,10 +98,18 @@ def estimate_fs(timestamps_s: np.ndarray) -> float:
 
 
 def _choose_nperseg(n_samples: int) -> int:
-    """Pick a Welch/CSD segment length: power of two, ~3 averaging segments."""
-    target = max(256, n_samples // 3)
+    """Pick a high-resolution Welch/CSD segment length for modal peaks.
+
+    The previous ~3-segment choice produced very sparse right-panel spectra for
+    short live captures. Use the largest power-of-two segment that fits in the
+    record (still capped by the record length) so the frequency grid is denser;
+    the GUI also smooths the displayed curve without changing picked peaks.
+    """
+    if n_samples <= 0:
+        return 1
+    target = max(256, int(n_samples))
     nperseg = 1 << int(math.floor(math.log2(target)))
-    return int(min(nperseg, n_samples))
+    return int(max(1, min(nperseg, n_samples)))
 
 
 def _normalize_signed(vec: np.ndarray) -> np.ndarray:
@@ -115,6 +132,44 @@ def _align_phase_real(u: np.ndarray) -> np.ndarray:
     if ref != 0:
         u = u * np.exp(-1j * np.angle(ref))
     return np.real(u)
+
+
+def _direct_fft_nfft(n_samples: int) -> int:
+    """Dense zero-padded FFT length for smoother spectra and finer peak positions."""
+    if n_samples <= 0:
+        return 1
+    target = max(4096, 4 * int(n_samples))
+    target = min(target, 32768)
+    return int(1 << math.ceil(math.log2(target)))
+
+
+def _direct_hann_fft_amplitudes(work: np.ndarray, fs: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Direct Hann-window FFT values/amplitudes for all sensors and their average.
+
+    This mirrors the standalone CSV script: detrended response -> Hann window ->
+    one-sided ``rfft`` amplitude. The only GUI addition is zero-padding to make
+    the right-panel spectrum visually smooth and to place vertical frequency
+    markers more accurately; it does not add new measured information.
+    """
+    work = np.atleast_2d(np.asarray(work, dtype=float))
+    n_sensors, n_samples = work.shape
+    if n_sensors == 0 or n_samples < 2:
+        return np.empty(0), np.empty((0, 0), dtype=complex), np.empty((0, 0)), np.empty(0)
+
+    n_fft = _direct_fft_nfft(n_samples)
+    window = signal.windows.hann(n_samples, sym=False)
+    freqs = np.fft.rfftfreq(n_fft, d=1.0 / float(fs))
+    fft_rows = []
+    amps = []
+    for row in work:
+        x = signal.detrend(np.asarray(row, dtype=float), type="linear")
+        fft_values = np.fft.rfft(x * window, n=n_fft) / float(n_samples)
+        fft_rows.append(fft_values)
+        amps.append(np.abs(fft_values))
+    fft_by_sensor = np.asarray(fft_rows, dtype=complex)
+    amp_by_sensor = np.asarray(amps, dtype=float)
+    amp_avg = amp_by_sensor.mean(axis=0)
+    return freqs, fft_by_sensor, amp_by_sensor, amp_avg
 
 
 def _half_power_damping(freqs: np.ndarray, spectrum: np.ndarray, peak_idx: int) -> float:
@@ -153,7 +208,7 @@ def _pick_peaks_and_build(
     """Shared tail for FDD and FFT: peak-pick a spectrum and build the result.
 
     ``shape_fn(idx)`` returns the (already normalized) mode-shape vector at the
-    spectral bin ``idx`` — signed for FDD, magnitude-only for FFT.
+    spectral bin ``idx``.
     """
     nf = freqs.size
     band = (freqs >= f_min) & (freqs <= f_max)
@@ -212,6 +267,92 @@ def _pick_peaks_and_build(
     )
 
 
+def _pick_direct_fft_peaks_and_build(
+    freqs: np.ndarray,
+    fft_by_sensor: np.ndarray,
+    amp_by_sensor: np.ndarray,
+    amp_avg: np.ndarray,
+    *,
+    f_min: float,
+    f_max: float,
+    n_modes: int,
+    prominence_ratio: float = FFT_PROMINENCE_RATIO,
+    min_peak_separation_hz: float = MIN_FFT_PEAK_SEPARATION_HZ,
+) -> ExperimentalModalResult:
+    """Peak-pick direct FFT amplitudes and build phase-aligned shapes."""
+    band = (freqs >= f_min) & (freqs <= f_max)
+    if not np.any(band):
+        return ExperimentalModalResult(
+            fdd_freqs=freqs, fdd_spectrum=amp_avg, method="fft",
+            success=False, message=f"No spectral lines in [{f_min}, {f_max}] Hz.",
+        )
+
+    band_idx = np.where(band)[0]
+    f_use = freqs[band_idx]
+    amp_use = amp_avg[band_idx]
+    finite = np.isfinite(amp_use)
+    if f_use.size < 3 or not np.any(finite):
+        return ExperimentalModalResult(
+            fdd_freqs=freqs, fdd_spectrum=amp_avg, method="fft",
+            success=False, message="Frequency range is too narrow or record is too short.",
+        )
+
+    df = float(freqs[1] - freqs[0]) if freqs.size > 1 else min_peak_separation_hz
+    min_distance_bins = max(1, int(round(min_peak_separation_hz / max(df, 1e-12))))
+    max_amp = float(np.nanmax(amp_use))
+    prominence = max(0.0, float(prominence_ratio)) * max_amp
+
+    peaks_local, props = signal.find_peaks(
+        amp_use,
+        prominence=prominence if prominence > 0 else None,
+        distance=min_distance_bins,
+    )
+    if peaks_local.size < n_modes and prominence > 0:
+        peaks_local, props = signal.find_peaks(
+            amp_use,
+            prominence=0.25 * prominence,
+            distance=min_distance_bins,
+        )
+    if peaks_local.size < n_modes:
+        peaks_local, props = signal.find_peaks(amp_use, distance=min_distance_bins)
+
+    if peaks_local.size == 0:
+        return ExperimentalModalResult(
+            fdd_freqs=freqs, fdd_spectrum=amp_avg, method="fft",
+            n_modes_found=0, success=False,
+            message="No FFT peaks found. Try lowering f_min or checking the capture.",
+        )
+
+    # Select the strongest amplitude peaks, then sort the selected modes by frequency.
+    order_by_strength = np.argsort(amp_use[peaks_local])[::-1]
+    kept_local = peaks_local[order_by_strength][: max(1, n_modes)]
+    kept = band_idx[kept_local]
+    kept = kept[np.argsort(freqs[kept])]
+
+    frequencies: list[float] = []
+    shapes: list[list[float]] = []
+    dampings: list[float] = []
+    for idx in kept:
+        frequencies.append(float(freqs[idx]))
+        vec = _align_phase_real(fft_by_sensor[:, idx])
+        shapes.append([float(v) for v in _normalize_signed(vec)])
+        dampings.append(_half_power_damping(freqs, amp_avg, int(idx)))
+
+    n_found = len(frequencies)
+    message = f"Found {n_found} of {n_modes} requested modes." if n_found < n_modes else f"Found {n_found} modes."
+    return ExperimentalModalResult(
+        frequencies_hz=frequencies,
+        mode_shapes_sensor=shapes,
+        damping_ratios=dampings,
+        fdd_freqs=freqs,
+        fdd_spectrum=amp_avg,
+        method="fft",
+        n_modes_found=n_found,
+        success=n_found > 0,
+        message=message,
+    )
+
+
 def _identify_fdd(work, fs, nperseg, noverlap, *, f_min, f_max, n_modes, prominence_db):
     """FDD: SVD of the cross-spectral-density matrix → signed mode shapes."""
     n_sensors = work.shape[0]
@@ -245,28 +386,19 @@ def _identify_fdd(work, fs, nperseg, noverlap, *, f_min, f_max, n_modes, promine
 
 
 def _identify_fft(work, fs, nperseg, noverlap, *, f_min, f_max, n_modes, prominence_db):
-    """FFT: sensor-averaged Welch PSD → frequencies; magnitude-only mode shapes.
+    """Direct FFT: sensor-averaged Hann amplitude → frequencies.
 
-    PSD magnitude is always positive, so the resulting shapes are unsigned (the
-    sign of out-of-phase floors cannot be recovered). This is the natural fit for
-    frequency-only calibration; use FDD when signed shapes are needed.
+    This follows ``modal_damping_from_csv.py`` more closely than the previous
+    Welch-PSD implementation: detrend, Hann-window, direct ``rfft``, relative
+    peak prominence, strongest peaks sorted from low to high frequency. Mode
+    shapes use the complex FFT phase at each selected peak, aligned to the
+    largest component and normalized to ``|max| = 1``.
     """
-    n_sensors = work.shape[0]
-    psd = []
-    freqs = np.empty(0)
-    for i in range(n_sensors):
-        freqs, pxx = signal.welch(work[i], fs=fs, nperseg=nperseg, noverlap=noverlap)
-        psd.append(pxx)
-    psd = np.asarray(psd)               # (n_sensors, nf)
-    psd_avg = psd.mean(axis=0)          # combined FFT spectrum
-
-    def shape_fn(idx: int) -> np.ndarray:
-        mag = np.sqrt(np.maximum(psd[:, idx], 0.0))
-        return _normalize_signed(mag)
-
-    return _pick_peaks_and_build(
-        freqs, psd_avg, shape_fn, f_min=f_min, f_max=f_max,
-        n_modes=n_modes, prominence_db=prominence_db, method="fft",
+    del nperseg, noverlap, prominence_db  # Direct FFT uses the CSV-script controls.
+    freqs, fft_by_sensor, amp_by_sensor, amp_avg = _direct_hann_fft_amplitudes(work, fs)
+    return _pick_direct_fft_peaks_and_build(
+        freqs, fft_by_sensor, amp_by_sensor, amp_avg,
+        f_min=f_min, f_max=f_max, n_modes=n_modes,
     )
 
 
@@ -298,11 +430,13 @@ def identify_modes(
     nperseg : int, optional
         CSD/Welch segment length. Auto-chosen if None.
     prominence_db : float
-        Peak prominence threshold on the dB spectrum.
+        Peak prominence threshold on the dB spectrum for FDD. The FFT method uses
+        the CSV-script relative amplitude prominence instead.
     method : {"fdd", "fft"}
         ``"fdd"`` (default) — SVD of the cross-spectral-density matrix; gives
-        *signed* mode shapes. ``"fft"`` — sensor-averaged Welch PSD peak-picking;
-        simpler and more transparent, but mode shapes are magnitude-only.
+        *signed* mode shapes. ``"fft"`` — sensor-averaged direct Hann FFT
+        peak-picking, matching the standalone CSV workflow; mode-shape signs are
+        estimated from the complex FFT phase at each selected peak.
     """
     data = np.atleast_2d(np.asarray(data, dtype=float))
     n_sensors, n_samples = data.shape
@@ -347,6 +481,140 @@ def identify_modes(
         work, fs, nperseg, noverlap,
         f_min=f_min, f_max=f_max, n_modes=n_modes, prominence_db=prominence_db,
     )
+
+
+def estimate_damping_first_mode_real_response(*args, min_peak_fraction: float = MIN_PEAK_FRACTION_FOR_DAMPING, min_peaks: int = MIN_NUMBER_OF_DECAY_PEAKS) -> dict:
+    """Estimate first-mode damping from one real sensor response.
+
+    Accepts both call styles used by the project:
+
+    - ``estimate_damping_first_mode_real_response(response, fs, first_mode_frequency_hz)``
+    - ``estimate_damping_first_mode_real_response(t, response, fs, first_mode_frequency_hz)``
+
+    The second form is used by the Spectrum tab.  The method mirrors
+    ``modal_damping_from_csv.py``: use the real measured response, apply only
+    linear detrending, select absolute-response decay peaks guided by the first
+    identified mode, fit ``A(t)=A0*exp(-beta*t)``, and compute zeta from beta and
+    the damped frequency inferred from the peak spacing.
+    """
+    if len(args) == 3:
+        response, fs, first_mode_frequency_hz = args
+        x = np.asarray(response, dtype=float).reshape(-1)
+        if not np.isfinite(fs) or float(fs) <= 0:
+            raise ValueError("Invalid sampling rate for damping estimation.")
+        t = np.arange(x.size, dtype=float) / float(fs)
+    elif len(args) == 4:
+        t, response, fs, first_mode_frequency_hz = args
+        t = np.asarray(t, dtype=float).reshape(-1)
+        x = np.asarray(response, dtype=float).reshape(-1)
+        if t.size != x.size:
+            raise ValueError("Time and response arrays must have the same length.")
+        mask = np.isfinite(t) & np.isfinite(x)
+        t = t[mask]
+        x = x[mask]
+    else:
+        raise TypeError(
+            "estimate_damping_first_mode_real_response expects either "
+            "(response, fs, first_mode_frequency_hz) or "
+            "(t, response, fs, first_mode_frequency_hz)."
+        )
+
+    if x.size < 4:
+        raise ValueError("Too few samples for damping estimation.")
+    if not np.isfinite(fs) or float(fs) <= 0:
+        raise ValueError("Invalid sampling rate for damping estimation.")
+    if not np.isfinite(first_mode_frequency_hz) or float(first_mode_frequency_hz) <= 0:
+        raise ValueError("Invalid first-mode frequency for damping estimation.")
+
+    # Start the displayed/fit time from zero, while preserving any non-uniform
+    # time vector supplied by the GUI.
+    t = t - float(t[0])
+    if t.size >= 2:
+        dt = np.diff(t)
+        dt = dt[np.isfinite(dt) & (dt > 0)]
+        if dt.size:
+            fs_for_spacing = 1.0 / float(np.median(dt))
+        else:
+            fs_for_spacing = float(fs)
+    else:
+        fs_for_spacing = float(fs)
+
+    x_real = signal.detrend(x, type="linear")
+    abs_x = np.abs(x_real)
+    max_abs = float(np.max(abs_x)) if abs_x.size else 0.0
+    if max_abs <= 0 or not np.isfinite(max_abs):
+        raise ValueError("Response is zero. Cannot estimate damping.")
+
+    min_distance_samples = max(
+        1, int(0.35 * float(fs_for_spacing) / float(first_mode_frequency_hz))
+    )
+    peaks, _ = signal.find_peaks(
+        abs_x, distance=min_distance_samples, prominence=0.01 * max_abs
+    )
+    if peaks.size < min_peaks:
+        peaks, _ = signal.find_peaks(
+            abs_x, distance=min_distance_samples, prominence=0.003 * max_abs
+        )
+    if peaks.size < max(4, min_peaks // 2):
+        raise ValueError("Too few peaks found for damping estimation; use a free-decay record.")
+
+    peak_times_all = t[peaks]
+    peak_amps_all = abs_x[peaks]
+    start_index = int(np.argmax(peak_amps_all))
+    peak_times = peak_times_all[start_index:]
+    peak_amps = peak_amps_all[start_index:]
+
+    threshold = peak_amps[0] * float(min_peak_fraction)
+    keep = peak_amps >= threshold
+    if int(np.sum(keep)) < min_peaks:
+        keep = peak_amps >= (0.5 * threshold)
+    peak_times = peak_times[keep]
+    peak_amps = peak_amps[keep]
+    if peak_amps.size < max(4, min_peaks // 2):
+        raise ValueError("Too few usable decay peaks after thresholding.")
+
+    log_amps = np.log(peak_amps)
+    slope, intercept = np.polyfit(peak_times, log_amps, 1)
+    beta = float(-slope)
+    fitted_log_amps = intercept + slope * peak_times
+    fitted_amps = np.exp(fitted_log_amps)
+
+    ss_res = float(np.sum((log_amps - fitted_log_amps) ** 2))
+    ss_tot = float(np.sum((log_amps - np.mean(log_amps)) ** 2))
+    fit_r2 = 1.0 - ss_res / ss_tot if ss_tot > 0 else float("nan")
+
+    if peak_times.size >= 3:
+        half_period = float(np.median(np.diff(peak_times)))
+        damped_frequency_hz = 1.0 / (2.0 * half_period) if half_period > 0 else float(first_mode_frequency_hz)
+    else:
+        damped_frequency_hz = float(first_mode_frequency_hz)
+
+    omega_d = 2.0 * math.pi * float(damped_frequency_hz)
+    if beta <= 0 or omega_d <= 0:
+        zeta = float("nan")
+        natural_frequency_hz = float("nan")
+    else:
+        zeta = float(beta / math.sqrt(beta ** 2 + omega_d ** 2))
+        natural_frequency_hz = float(
+            damped_frequency_hz / math.sqrt(max(1e-12, 1.0 - zeta ** 2))
+        )
+
+    return {
+        "success": True,
+        "first_mode_frequency_fft_Hz": float(first_mode_frequency_hz),
+        "damped_frequency_from_real_response_Hz": float(damped_frequency_hz),
+        "natural_frequency_est_Hz": float(natural_frequency_hz),
+        "zeta": float(zeta),
+        "damping_percent": float(100.0 * zeta) if np.isfinite(zeta) else float("nan"),
+        "decay_rate_beta_1_per_s": float(beta),
+        "fit_R2": float(fit_r2),
+        "n_peaks_used": int(peak_times.size),
+        "time": t,
+        "real_detrended_response": x_real,
+        "peak_times": peak_times,
+        "peak_amps": peak_amps,
+        "fitted_amps": fitted_amps,
+    }
 
 
 def map_to_stories(
