@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
+    QMessageBox,
     QLabel,
     QPushButton,
     QSizePolicy,
@@ -194,6 +195,8 @@ class FftTab(QWidget):
       signals tab so spectral analysis follows live data pacing.
     """
 
+    final_values_ready_for_model_updating = Signal(dict)
+
     def __init__(
         self,
         recorder_tab: RecorderController,
@@ -307,6 +310,7 @@ class FftTab(QWidget):
         self._final_thread: QThread | None = None
         self._final_worker: _EigenFreqWorker | None = None
         self._final_collect_started_perf: float | None = None
+        self._last_final_values_payload: dict | None = None
         self._final_countdown_timer = QTimer(self)
         self._final_countdown_timer.setInterval(250)
         self._final_countdown_timer.timeout.connect(self._on_final_countdown_tick)
@@ -926,8 +930,14 @@ class FftTab(QWidget):
             "QPushButton:disabled { background-color: #f4f4f4; color: #999; }"
         )
         self._final_start_btn.clicked.connect(self._start_final_values_calculation)
+
+        self._send_final_to_model_btn = QPushButton("Send to Model Updating")
+        self._send_final_to_model_btn.setEnabled(False)
+        self._send_final_to_model_btn.clicked.connect(self._send_final_values_to_model_updating)
+
         self._final_countdown_label = QLabel(f"Ready — {FINAL_VALUES_BATCH_S:.0f} s fixed record")
         row.addWidget(self._final_start_btn)
+        row.addWidget(self._send_final_to_model_btn)
         row.addWidget(self._final_countdown_label)
         row.addStretch()
 
@@ -961,6 +971,9 @@ class FftTab(QWidget):
         if self._is_record_only() or not self._stream_active:
             self._set_final_status("Final values: start a live stream first.", progress=0.0)
             return
+        self._last_final_values_payload = None
+        if hasattr(self, "_send_final_to_model_btn"):
+            self._send_final_to_model_btn.setEnabled(False)
         self._final_collect_started_perf = time.perf_counter()
         self._final_start_btn.setEnabled(False)
         self._final_start_btn.setText("Collecting…")
@@ -1043,9 +1056,59 @@ class FftTab(QWidget):
 
     @Slot(object)
     def _on_final_result(self, payload) -> None:
+        self._last_final_values_payload = payload
         self._set_final_status("Final values calculated.", progress=FINAL_VALUES_BATCH_S)
         self._render_final_values(payload)
         self._eig_status.setText("Final values calculated.")
+        if hasattr(self, "_send_final_to_model_btn"):
+            self._send_final_to_model_btn.setEnabled(True)
+
+    @Slot()
+    def _send_final_values_to_model_updating(self) -> None:
+        payload = self._last_final_values_payload
+        if not payload:
+            self._set_final_status("No final values available. Calculate final values first.", progress=0.0)
+            return
+
+        freqs = [float(v) for v in payload.get("freqs", [])[:3]]
+        shapes_raw = payload.get("mode_shapes_ux") or {}
+
+        shapes: dict[str, list[float]] = {}
+        for i in range(1, 4):
+            key = str(i)
+            vals = shapes_raw.get(key) or shapes_raw.get(i)
+            if vals is not None:
+                shapes[key] = [float(v) for v in vals]
+
+        if not freqs or not shapes:
+            self._set_final_status(
+                "Final values do not contain frequencies and mode shapes.",
+                progress=FINAL_VALUES_BATCH_S,
+            )
+            return
+
+        damping = payload.get("damping") or {}
+        damping_ratio = damping.get("zeta")
+
+        spectrum_payload = {
+            "frequencies_hz": freqs,
+            "mode_shapes_ux": shapes,
+            "source_file": "Spectrum final values",
+            "notes": "Sent from Spectrum final-values calculation",
+        }
+        if damping_ratio is not None:
+            spectrum_payload["zeta"] = float(damping_ratio)
+
+        self.final_values_ready_for_model_updating.emit(spectrum_payload)
+        self._set_final_status(
+            "Final values sent to Model Updating manual input.",
+            progress=FINAL_VALUES_BATCH_S,
+        )
+        QMessageBox.information(
+            self,
+            "Model Updating",
+            "Final values sent to Model Updating successfully.",
+        )
 
     @Slot(float)
     def _on_final_collecting(self, available_s: float) -> None:
