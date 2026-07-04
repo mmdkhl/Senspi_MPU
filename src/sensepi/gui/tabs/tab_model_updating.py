@@ -3216,6 +3216,36 @@ class ModelUpdatingTab(QWidget):
         self._set_busy(False, "Identification failed.")
         QMessageBox.critical(self, "Identification failed", message)
 
+    @Slot(dict)
+    def apply_spectrum_final_values(self, exp_dict: dict[str, Any]) -> None:
+        freqs = [float(v) for v in exp_dict.get("frequencies_hz", [])[:3]]
+        shapes_raw = exp_dict.get("mode_shapes_ux") or {}
+
+        shapes: dict[str, list[float]] = {}
+        for i in range(1, 4):
+            key = str(i)
+            vals = shapes_raw.get(key) or shapes_raw.get(i)
+            if vals is not None:
+                shapes[key] = [float(v) for v in vals]
+
+        damping_ratio = exp_dict.get("zeta")
+
+        self._apply_identified_to_fields(
+            {
+                "frequencies_hz": freqs,
+                "mode_shapes_ux": shapes,
+                "source_file": "Spectrum final values",
+                "notes": "Loaded from Spectrum final-values calculation",
+            },
+            bool(shapes),
+        )
+
+        if damping_ratio is not None and hasattr(self, "_zeta"):
+            self._zeta.setValue(float(damping_ratio))
+
+        self._exp_source.setCurrentText("Manual input")
+        self._analysis_scope.setCurrentText("Frequency + mode shapes")
+
     def _apply_identified_to_fields(self, exp_dict: dict[str, Any], shapes_available: bool) -> None:
         freqs = exp_dict.get("frequencies_hz", [])
         n = len(freqs)

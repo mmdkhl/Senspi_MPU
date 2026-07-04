@@ -146,6 +146,9 @@ class MainWindow(QMainWindow):
             self.signals_tab.update_stream_rate
         )
         self.recorder_tab.stream_rate_updated.connect(self.fft_tab.update_stream_rate)
+        self.fft_tab.final_values_ready_for_model_updating.connect(
+            self.model_updating_tab.apply_spectrum_final_values
+        )
         if hasattr(self.settings_tab, "acquisitionConfigChanged"):
             self.settings_tab.acquisitionConfigChanged.connect(
                 self.fft_tab.update_acquisition_config
