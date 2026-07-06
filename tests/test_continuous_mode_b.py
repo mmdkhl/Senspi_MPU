@@ -109,7 +109,9 @@ class TestContinuousModeBSmoke(unittest.TestCase):
         }
 
     def _run_worker(self, n_cycles):
-        settings = {"duration_s": 10.0, "interval_s": 10.0, "max_cycles": n_cycles,
+        # duration_s = 0 -> the per-cycle recording wait collapses to nothing, so the
+        # scripted loop runs back-to-back with no real sleep (single-duration model).
+        settings = {"duration_s": 0.0, "max_cycles": n_cycles,
                     "calibration_method": "bayesian"}
         worker = mu._ContinuousUpdateWorker(self._params(), settings,
                                             lambda **kw: _fake_session())
@@ -117,7 +119,7 @@ class TestContinuousModeBSmoke(unittest.TestCase):
         worker.error.connect(errors.append)
         worker.log.connect(logs.append)
         worker.result.connect(lambda payload: None)
-        worker.run()   # synchronous (no QThread); interval==duration -> no real sleep
+        worker.run()   # synchronous (no QThread); duration_s=0 -> no real sleep
         return worker, errors, "".join(logs)
 
     def test_loop_runs_and_tracks(self):
@@ -153,7 +155,7 @@ class TestContinuousModeBSmoke(unittest.TestCase):
 
     def test_least_squares_method_also_runs(self):
         # The deterministic Stage-2 path stays selectable and must not hard-stop.
-        settings = {"duration_s": 10.0, "interval_s": 10.0, "max_cycles": 5,
+        settings = {"duration_s": 0.0, "max_cycles": 5,
                     "calibration_method": "least_squares"}
         worker = mu._ContinuousUpdateWorker(self._params(), settings,
                                             lambda **kw: _fake_session())

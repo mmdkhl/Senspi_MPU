@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import os
+import time
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
@@ -1432,7 +1433,6 @@ class _ContinuousUpdateWorker(QObject):
 
         initial_params = copy.deepcopy(self._params)   # NEVER mutated (fixed Stage-2 prior)
         duration = float(self._settings["duration_s"])
-        interval = float(self._settings["interval_s"])
 
         # Settings/params override the coded default (settings win, then params).
         s, p = self._settings, self._params
@@ -1471,9 +1471,11 @@ class _ContinuousUpdateWorker(QObject):
 
         self.log.emit(
             f"Continuous update started ({method}, Stage-1 tracker λ={trk_lambda:g}, "
-            f"c={trk_c:g}). The loop runs until you press Stop.\n")
+            f"c={trk_c:g}). Each cycle records {duration:g}s, identifies, then updates; "
+            f"the loop runs until you press Stop.\n")
         while self._running:
             cycle += 1
+            cycle_start = time.monotonic()
             self.log.emit(f"\n── Cycle {cycle} ──\n")
 
             # ── No-measurement cycles WAIT and retry — never hard-stop (D1 fix). ──
@@ -1483,7 +1485,7 @@ class _ContinuousUpdateWorker(QObject):
             )
             if not session.success or session.duration_s < modal_id.MIN_DURATION_S:
                 self.log.emit(f"  Capture not ready ({session.message}); waiting…\n")
-                if not self._sleep(min(interval, 5.0)):
+                if not self._wait_cycle(cycle_start, duration):
                     break
                 continue
 
@@ -1491,7 +1493,7 @@ class _ContinuousUpdateWorker(QObject):
             if fdd is None or not fdd.success or not fdd.frequencies_hz:
                 msg = fdd.message if fdd is not None else "no identification"
                 self.log.emit(f"  No modes identified ({msg}); waiting…\n")
-                if not self._sleep(interval):
+                if not self._wait_cycle(cycle_start, duration):
                     break
                 continue
 
@@ -1511,7 +1513,7 @@ class _ContinuousUpdateWorker(QObject):
             f_sig = consolidated.freq_sigma
             if not f_hat:
                 self.log.emit("  Tracker holds no modes yet; waiting…\n")
-                if not self._sleep(interval):
+                if not self._wait_cycle(cycle_start, duration):
                     break
                 continue
 
@@ -1558,7 +1560,7 @@ class _ContinuousUpdateWorker(QObject):
             except Exception as exc:
                 # A calibration failure is NOT fatal — keep the model, wait, retry.
                 self.log.emit(f"  Calibration error: {exc}. Keeping previous model; waiting…\n")
-                if not self._sleep(interval):
+                if not self._wait_cycle(cycle_start, duration):
                     break
                 continue
 
@@ -1618,7 +1620,7 @@ class _ContinuousUpdateWorker(QObject):
 
             if max_cycles and cycle >= max_cycles:
                 break
-            if not self._sleep(max(0.0, interval - duration)):
+            if not self._wait_cycle(cycle_start, duration):
                 break
 
         self.log.emit("\nContinuous update stopped.\n")
@@ -1667,6 +1669,16 @@ class _ContinuousUpdateWorker(QObject):
                 "  ⚠ parameter(s) hit a bound: " + "; ".join(pinned) +
                 " — widen the bounds or move the PRIOR model closer to the rig "
                 "(the filter cannot reach frequencies the model physically can't produce).\n")
+
+    def _wait_cycle(self, cycle_start: float, duration: float) -> bool:
+        """Pad the cycle so it spans ``duration`` wall-seconds measured from
+        ``cycle_start`` — i.e. a fresh, non-overlapping recording window accumulates
+        before the next snapshot. The cycle length IS the recording length (single
+        duration, Spectrum-tab model); processing time is absorbed into the window,
+        so snapshots stay ``duration`` apart with no overlap and nothing skipped.
+        Returns False if stopped."""
+        elapsed = time.monotonic() - cycle_start
+        return self._sleep(max(0.0, duration - elapsed))
 
     def _sleep(self, seconds: float) -> bool:
         """Sleep in small slices so Stop is responsive. Returns False if stopped."""
@@ -3339,8 +3351,16 @@ class ModelUpdatingTab(QWidget):
         dlg = QDialog(self)
         dlg.setWindowTitle("Continuous Update Settings")
         form = QFormLayout(dlg)
+        # Single duration (Spectrum-tab model): the cycle length IS the recording
+        # length. Each cycle records this many seconds of fresh data, identifies the
+        # modes, updates the model, then records the next window — there is no separate
+        # "update interval". The modal buffer is sized to this window in _start_continuous.
         dur = self._double_spin(modal_id.MIN_DURATION_S, 600.0, float(self._sensor_window.value()), 1)
-        interval = self._double_spin(modal_id.MIN_DURATION_S, 3600.0, 60.0, 1)
+        dur.setToolTip(
+            "Length of each record-and-update cycle. The loop records this many seconds "
+            "of fresh data, identifies the modes, updates the model, then records the "
+            "next window. The cycle length is the recording length (no separate update "
+            "interval).")
         # Two-stage redesign (CU-9): the disagreement gates are GONE — the loop never
         # hard-stops on noise, so there is no "max failures". The accumulation lives in
         # the Stage-1 modal tracker; its two main knobs are exposed here. (Method +
@@ -3354,7 +3374,6 @@ class ModelUpdatingTab(QWidget):
             "Stage-1 robust scale c: a reading beyond c·σ is treated as an outlier and "
             "down-weighted (never rejected). Smaller = more aggressive outlier rejection.")
         form.addRow("Recording duration per cycle (s):", dur)
-        form.addRow("Update interval (s):", interval)
         form.addRow("Stage-1 forgetting λ:", forgetting)
         form.addRow("Stage-1 robust scale c:", robust_c)
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, dlg)
@@ -3365,7 +3384,6 @@ class ModelUpdatingTab(QWidget):
             return None
         return {
             "duration_s": float(dur.value()),
-            "interval_s": float(interval.value()),
             "tracker_forgetting": float(forgetting.value()),
             "tracker_robust_scale": float(robust_c.value()),
         }
