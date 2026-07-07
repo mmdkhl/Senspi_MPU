@@ -413,6 +413,7 @@ def identify_modes(
     prominence_db: float = 3.0,
     detrend: bool = True,
     method: str = "fdd",
+    min_duration: float | None = None,
 ) -> ExperimentalModalResult:
     """Identify natural frequencies and mode shapes from sensor acceleration.
 
@@ -437,6 +438,11 @@ def identify_modes(
         *signed* mode shapes. ``"fft"`` — sensor-averaged direct Hann FFT
         peak-picking, matching the standalone CSV workflow; mode-shape signs are
         estimated from the complex FFT phase at each selected peak.
+    min_duration : float, optional
+        Minimum record length (s) required to attempt identification. Defaults to
+        the module-level ``MIN_DURATION_S`` (10 s). Callers that deliberately work
+        with shorter windows (Model Updating continuous mode records exactly the
+        user's chosen duration) may lower it; other callers are unaffected.
     """
     data = np.atleast_2d(np.asarray(data, dtype=float))
     n_sensors, n_samples = data.shape
@@ -451,12 +457,16 @@ def identify_modes(
         return ExperimentalModalResult(
             method=method, success=False, message="Invalid sampling rate.")
     duration = n_samples / fs
-    if duration < MIN_DURATION_S:
+    # Callers may lower the floor for short user-chosen windows (e.g. Model
+    # Updating continuous mode records exactly the user's duration). Defaults to
+    # the shared MIN_DURATION_S so Mode A / Spectrum / other callers are unchanged.
+    floor = MIN_DURATION_S if min_duration is None else float(min_duration)
+    if duration < floor:
         return ExperimentalModalResult(
             method=method,
             success=False,
             message=(
-                f"Recording too short: {duration:.1f} s < {MIN_DURATION_S:.0f} s minimum. "
+                f"Recording too short: {duration:.1f} s < {floor:.1f} s minimum. "
                 "Record a longer segment (30 s recommended)."
             ),
         )
