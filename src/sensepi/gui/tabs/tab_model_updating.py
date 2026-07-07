@@ -1239,6 +1239,9 @@ def _build_sensor_exp_dict(session: "msl.ModalSession", params: dict[str, Any]):
         f_min=params["sensor_f_min"], f_max=params["sensor_f_max"],
         n_modes=params["sensor_n_modes"],
         method=method,
+        # Continuous mode records exactly the user's window and may run below the
+        # default 10 s floor; None leaves the shared default for every other caller.
+        min_duration=params.get("sensor_min_duration"),
     )
     if not result.success:
         return None, result, None
@@ -1390,6 +1393,18 @@ class _IdentifyWorker(QObject):
             self.error.emit(str(exc))
 
 
+# Continuous update records exactly the user's window (Spectrum-tab model). A
+# discrete, multi-sensor trailing snapshot always comes back a little short of the
+# requested span (last sample spans (n-1)·dt, plus the cross-sensor overlap trim),
+# so the readiness gate and the identification floor sit ALIGN_TOL below the request
+# instead of at the hard 10 s default — otherwise a 10 s request could never pass.
+_CONTINUOUS_ALIGN_TOL_S: float = 1.0
+# Absolute sanity floor: below this, FFT/FDD frequency resolution is meaningless.
+_CONTINUOUS_ABS_MIN_S: float = 3.0
+# Smallest window the continuous-update dialog will let the user pick.
+CONTINUOUS_MIN_DURATION_S: float = 5.0
+
+
 class _ContinuousUpdateWorker(QObject):
     """Mode B (two-stage digital twin): capture → identify → Stage-1 tracker →
     Stage-2 Bayesian calibration to the *consolidated* estimate → repeat.
@@ -1433,6 +1448,12 @@ class _ContinuousUpdateWorker(QObject):
 
         initial_params = copy.deepcopy(self._params)   # NEVER mutated (fixed Stage-2 prior)
         duration = float(self._settings["duration_s"])
+        # The delivered window is always slightly short of `duration`; gate + identify
+        # on this floor so the user's chosen window (even a short one) actually runs.
+        capture_floor = max(_CONTINUOUS_ABS_MIN_S, duration - _CONTINUOUS_ALIGN_TOL_S)
+        # Let identify_modes accept the short window (default 10 s floor is bypassed
+        # ONLY for this continuous run; Mode A / Spectrum keep the default).
+        self._params["sensor_min_duration"] = capture_floor
 
         # Settings/params override the coded default (settings win, then params).
         s, p = self._settings, self._params
@@ -1483,8 +1504,11 @@ class _ContinuousUpdateWorker(QObject):
                 axis=self._params["sensor_axis"], last_seconds=duration,
                 target_fs=self._params.get("sensor_target_fs"),
             )
-            if not session.success or session.duration_s < modal_id.MIN_DURATION_S:
-                self.log.emit(f"  Capture not ready ({session.message}); waiting…\n")
+            if not session.success or session.duration_s < capture_floor:
+                have = session.duration_s if session.success else 0.0
+                self.log.emit(
+                    f"  Collecting data ({have:.1f}/{duration:g} s)"
+                    f"{'' if session.success else f' — {session.message}'}; waiting…\n")
                 if not self._wait_cycle(cycle_start, duration):
                     break
                 continue
@@ -3316,7 +3340,11 @@ class ModelUpdatingTab(QWidget):
         settings = self._continuous_settings()
         if settings is None:
             return
-        ctrl.set_modal_window_seconds(settings["duration_s"])
+        # Size the capture buffer WITH HEADROOM over the snapshot window. A buffer
+        # equal to the window can never deliver a full window (the trailing snapshot
+        # and cross-sensor alignment always trim a little), which stalled the loop.
+        # Mirror the Spectrum tab: a generous buffer, decoupled from the window.
+        ctrl.set_modal_window_seconds(max(120.0, float(settings["duration_s"]) + 15.0))
 
         worker = _ContinuousUpdateWorker(params, settings, ctrl.snapshot_modal_capture)
         thread = QThread(self)
@@ -3354,13 +3382,16 @@ class ModelUpdatingTab(QWidget):
         # Single duration (Spectrum-tab model): the cycle length IS the recording
         # length. Each cycle records this many seconds of fresh data, identifies the
         # modes, updates the model, then records the next window — there is no separate
-        # "update interval". The modal buffer is sized to this window in _start_continuous.
-        dur = self._double_spin(modal_id.MIN_DURATION_S, 600.0, float(self._sensor_window.value()), 1)
+        # "update interval". The modal buffer is sized generously in _start_continuous
+        # (decoupled from this window, like the Spectrum tab's 120 s buffer).
+        dur = self._double_spin(
+            CONTINUOUS_MIN_DURATION_S, 600.0, float(self._sensor_window.value()), 1)
         dur.setToolTip(
             "Length of each record-and-update cycle. The loop records this many seconds "
             "of fresh data, identifies the modes, updates the model, then records the "
             "next window. The cycle length is the recording length (no separate update "
-            "interval).")
+            f"interval). Short windows (down to {CONTINUOUS_MIN_DURATION_S:g} s) update "
+            "faster but give coarser frequency resolution; 20–30 s is cleaner.")
         # Two-stage redesign (CU-9): the disagreement gates are GONE — the loop never
         # hard-stops on noise, so there is no "max failures". The accumulation lives in
         # the Stage-1 modal tracker; its two main knobs are exposed here. (Method +
