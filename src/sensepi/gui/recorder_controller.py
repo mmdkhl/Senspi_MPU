@@ -112,7 +112,7 @@ class ModalCaptureBuffer:
                 if dq is None:
                     dq = deque()
                     self._buf[sid] = dq
-                dq.append((t, float(s.ax), float(s.ay), float(s.az)))
+                dq.append((t, float(s.ax), float(s.ay), float(s.az), float(s.gz)))
             self._trim_locked()
 
     def _trim_locked(self) -> None:
@@ -132,9 +132,21 @@ class ModalCaptureBuffer:
             spans = [dq[-1][0] - dq[0][0] for dq in self._buf.values() if len(dq) > 1]
         return min(spans) if spans else 0.0
 
+    _AXIS_COLUMNS = {"ax": 1, "ay": 2, "az": 3, "gz": 4}
+
     def snapshot_series(self, axis: str) -> Dict[int, list[Tuple[float, float]]]:
-        """Return a copied {sensor_id: [(t, axis_value), ...]} (thread-safe)."""
-        col = {"ax": 1, "ay": 2, "az": 3}.get(axis.lower(), 1)
+        """Return a copied {sensor_id: [(t, axis_value), ...]} (thread-safe).
+
+        An unknown axis used to fall back to ``ax`` silently, which let callers
+        believe they were reading a channel they were not. Unknown names now
+        warn loudly before falling back.
+        """
+        key = axis.lower()
+        col = self._AXIS_COLUMNS.get(key)
+        if col is None:
+            logger.warning(
+                "ModalCaptureBuffer: unknown axis %r, falling back to 'ax'", axis)
+            col = 1
         with self._lock:
             return {
                 sid: [(row[0], row[col]) for row in dq]
@@ -288,6 +300,21 @@ class RecorderController(QObject):
     def set_modal_window_seconds(self, seconds: float) -> None:
         """Resize the long-window modal accumulator (Mode B cycle length)."""
         self._modal_buffer.set_window(seconds)
+
+    def modal_window_seconds(self) -> float:
+        """Current accumulator window, so callers can grow it without shrinking it."""
+        return float(getattr(self._modal_buffer, "_window_s", 0.0))
+
+    def require_modal_window_seconds(self, seconds: float) -> None:
+        """Grow the accumulator window if needed, never shrink it.
+
+        Several features share this one buffer (Mode B continuous update and the
+        Sonification tab). Last-writer-wins would let one silently truncate the
+        other's data mid-run, so requesters may only raise the floor.
+        """
+        want = float(seconds)
+        if want > self.modal_window_seconds():
+            self._modal_buffer.set_window(want)
 
     def modal_available_seconds(self) -> float:
         """Seconds of data currently buffered across all sensors (min span)."""
