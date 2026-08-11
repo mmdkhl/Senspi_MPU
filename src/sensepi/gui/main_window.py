@@ -71,6 +71,16 @@ class MainWindow(QMainWindow):
             self._on_sampling_changed(self._app_config.sampling_config)
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        # Stop the sonification workers FIRST. stop_live_stream(wait=True) blocks
+        # the GUI thread, so the queued stream_stopped that would otherwise stop
+        # a tab can never be delivered during shutdown — leaving a running
+        # QThread to be destroyed under us.
+        try:
+            self.sonification_tab.shutdown()
+        except Exception as exc:  # pragma: no cover - best-effort shutdown
+            self.recorder_tab.report_error(
+                f"Failed to stop sonification on close: {exc!r}"
+            )
         try:
             self.recorder_tab.stop_live_stream(wait=True)
         except Exception as exc:  # pragma: no cover - best-effort shutdown
@@ -97,7 +107,13 @@ class MainWindow(QMainWindow):
         # sensor-driven Continuous Update (Mode B). The tab never touches SSH;
         # it only reads thread-safe snapshots from the controller (guardrail G2).
         self.model_updating_tab.set_recorder_controller(self.recorder_tab)
-        self.sonification_tab = SonificationTab(parent=self)
+        # The Sonification tab hosts the sonification models as sub-tabs:
+        # "Bioacoustic Chorus" (built) and "Team Model" (held for the
+        # sonification team). Models pull thread-safe modal snapshots from the
+        # controller inside their own workers; none touches SSH (guardrail G2).
+        self.sonification_tab = SonificationTab(
+            recorder_controller=self.recorder_tab, parent=self
+        )
 
         self._tabs.addTab(self.signals_tab, self.tr("Live Signals"))
         self._tabs.addTab(self.fft_tab, self.tr("Spectrum"))
@@ -126,6 +142,8 @@ class MainWindow(QMainWindow):
         self.recorder_tab.stream_stopped.connect(self.signals_tab.on_stream_stopped)
         self.recorder_tab.stream_started.connect(self.fft_tab.on_stream_started)
         self.recorder_tab.stream_stopped.connect(self.fft_tab.on_stream_stopped)
+        self.recorder_tab.stream_started.connect(self.sonification_tab.on_stream_started)
+        self.recorder_tab.stream_stopped.connect(self.sonification_tab.on_stream_stopped)
         self.recorder_tab.stream_stopped.connect(self._cancel_auto_stop_timer)
         self.recorder_tab.recording_stopped.connect(self._cancel_auto_stop_timer)
         self._auto_stop_timer.timeout.connect(self._on_auto_stop_timeout)
