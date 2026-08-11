@@ -20,6 +20,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+sonification = [
+  "sounddevice>=0.4",
+]
 model-updating = [
   "openseespy==3.5.1.3; platform_system == 'Windows'",
   "openseespywin==3.5.1.12; platform_system == 'Windows'",
@@ -39,3 +42,6 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 exclude = ["archive*"]
+
+[tool.setuptools.package-data]
+"sensepi.sonification.chorus" = ["data/*.json", "data/*.npz", "data/*.md"]

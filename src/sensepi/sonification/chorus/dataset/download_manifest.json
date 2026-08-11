@@ -1,0 +1,4732 @@
+[
+  {
+    "species": "Metholce nigritarsis",
+    "common": "Black-footed Gondwanan Katydid",
+    "url": "https://static.inaturalist.org/sounds/1294362.m4a?1738042360",
+    "license": "cc-by",
+    "observer": "Sockrosma",
+    "observation": "https://www.inaturalist.org/observations/259833868",
+    "file": "tettigoniidae/Metholce_nigritarsis_000.m4a",
+    "bytes": 246767
+  },
+  {
+    "species": "Metholce nigritarsis",
+    "common": "Black-footed Gondwanan Katydid",
+    "url": "https://static.inaturalist.org/sounds/1294867.m4a?1738104559",
+    "license": "cc-by",
+    "observer": "Sockrosma",
+    "observation": "https://www.inaturalist.org/observations/259906459",
+    "file": "tettigoniidae/Metholce_nigritarsis_001.m4a",
+    "bytes": 163605
+  },
+  {
+    "species": "Aglaothorax ovatus",
+    "common": "Ovate Shieldback",
+    "url": "https://static.inaturalist.org/sounds/756831.m4a?1688223428",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/170455208",
+    "file": "tettigoniidae/Aglaothorax_ovatus_002.m4a",
+    "bytes": 194868
+  },
+  {
+    "species": "Aglaothorax ovatus",
+    "common": "Ovate Shieldback",
+    "url": "https://static.inaturalist.org/sounds/812685.m4a?1694754309",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/170455208",
+    "file": "tettigoniidae/Aglaothorax_ovatus_003.m4a",
+    "bytes": 759909
+  },
+  {
+    "species": "Amblycorypha rotundifolia",
+    "common": "Rattler Round-winged Katydid",
+    "url": "https://static.inaturalist.org/sounds/1567995.m4a?1752460467",
+    "license": "cc-by-nc",
+    "observer": "D.J. McNeil",
+    "observation": "https://www.inaturalist.org/observations/297773873",
+    "file": "tettigoniidae/Amblycorypha_rotundifolia_004.m4a",
+    "bytes": 84562
+  },
+  {
+    "species": "Amblycorypha rotundifolia",
+    "common": "Rattler Round-winged Katydid",
+    "url": "https://static.inaturalist.org/sounds/1575025.m4a?1752978269",
+    "license": "cc-by-nc",
+    "observer": "Kyle Aldinger",
+    "observation": "https://www.inaturalist.org/observations/299388790",
+    "file": "tettigoniidae/Amblycorypha_rotundifolia_005.m4a",
+    "bytes": 175300
+  },
+  {
+    "species": "Pterophylla camellifolia",
+    "common": "Common True Katydid",
+    "url": "https://static.inaturalist.org/sounds/1604793.m4a?1755230451",
+    "license": "cc-by-nc",
+    "observer": "Kyle Aldinger",
+    "observation": "https://www.inaturalist.org/observations/306409669",
+    "file": "tettigoniidae/Pterophylla_camellifolia_006.m4a",
+    "bytes": 94902
+  },
+  {
+    "species": "Pterophylla camellifolia",
+    "common": "Common True Katydid",
+    "url": "https://static.inaturalist.org/sounds/495853.mp3?1657459324",
+    "license": "cc-by-nc-sa",
+    "observer": "Lee Elliott",
+    "observation": "https://www.inaturalist.org/observations/125603471",
+    "file": "tettigoniidae/Pterophylla_camellifolia_007.mp3",
+    "bytes": 874440
+  },
+  {
+    "species": "Neoconocephalus ensiger",
+    "common": "Sword-bearing Conehead",
+    "url": "https://static.inaturalist.org/sounds/610869.mp3?1678262650",
+    "license": "cc-by-nc",
+    "observer": "Molly Jacobson",
+    "observation": "https://www.inaturalist.org/observations/150557122",
+    "file": "tettigoniidae/Neoconocephalus_ensiger_008.mp3",
+    "bytes": 601858
+  },
+  {
+    "species": "Neoconocephalus ensiger",
+    "common": "Sword-bearing Conehead",
+    "url": "https://static.inaturalist.org/sounds/496500.m4a?1657511417",
+    "license": "cc-by-nc",
+    "observer": "bertfoquet",
+    "observation": "https://www.inaturalist.org/observations/125733395",
+    "file": "tettigoniidae/Neoconocephalus_ensiger_009.m4a",
+    "bytes": 126309
+  },
+  {
+    "species": "Roeseliana roeselii",
+    "common": "Roesel's Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1137786.m4a?1721468527",
+    "license": "cc-by-nc",
+    "observer": "banjo2620",
+    "observation": "https://www.inaturalist.org/observations/230462650",
+    "file": "tettigoniidae/Roeseliana_roeselii_010.m4a",
+    "bytes": 142461
+  },
+  {
+    "species": "Roeseliana roeselii",
+    "common": "Roesel's Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1189807.m4a?1725107349",
+    "license": "cc-by-nc",
+    "observer": "fucked-up_ornithologist",
+    "observation": "https://www.inaturalist.org/observations/238946848",
+    "file": "tettigoniidae/Roeseliana_roeselii_011.m4a",
+    "bytes": 68301
+  },
+  {
+    "species": "Hexacentrus mundurra",
+    "common": "Fierce Predatory Katydid",
+    "url": "https://static.inaturalist.org/sounds/60953.m4a?1583841183",
+    "license": "cc-by-nc",
+    "observer": "simono",
+    "observation": "https://www.inaturalist.org/observations/39794250",
+    "file": "tettigoniidae/Hexacentrus_mundurra_012.m4a",
+    "bytes": 295865
+  },
+  {
+    "species": "Hexacentrus mundurra",
+    "common": "Fierce Predatory Katydid",
+    "url": "https://static.inaturalist.org/sounds/1328640.m4a?1741595392",
+    "license": "cc-by-nc",
+    "observer": "Colin Trainor",
+    "observation": "https://www.inaturalist.org/observations/264780525",
+    "file": "tettigoniidae/Hexacentrus_mundurra_013.m4a",
+    "bytes": 1440594
+  },
+  {
+    "species": "Montana montana",
+    "common": "Steppe Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/294141.m4a?1629428726",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/91365312",
+    "file": "tettigoniidae/Montana_montana_014.m4a",
+    "bytes": 500222
+  },
+  {
+    "species": "Montana montana",
+    "common": "Steppe Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/294142.m4a?1629428741",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/91365312",
+    "file": "tettigoniidae/Montana_montana_015.m4a",
+    "bytes": 654501
+  },
+  {
+    "species": "Paracyrtophyllus robustus",
+    "common": "Central Texas Leaf-Katydid",
+    "url": "https://static.inaturalist.org/sounds/256642.m4a?1624069548",
+    "license": "cc-by-nc",
+    "observer": "elisadonovan",
+    "observation": "https://www.inaturalist.org/observations/82624847",
+    "file": "tettigoniidae/Paracyrtophyllus_robustus_016.m4a",
+    "bytes": 73716
+  },
+  {
+    "species": "Paracyrtophyllus robustus",
+    "common": "Central Texas Leaf-Katydid",
+    "url": "https://static.inaturalist.org/sounds/1974884.m4a?1779615336",
+    "license": "cc-by",
+    "observer": "Dan Johnson",
+    "observation": "https://www.inaturalist.org/observations/364604138",
+    "file": "tettigoniidae/Paracyrtophyllus_robustus_017.m4a",
+    "bytes": 166841
+  },
+  {
+    "species": "Tettigonia viridissima",
+    "common": "Great Green Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/122822.mp3?1595282018",
+    "license": "cc-by-sa",
+    "observer": "Gilles San Martin",
+    "observation": "https://www.inaturalist.org/observations/53777269",
+    "file": "tettigoniidae/Tettigonia_viridissima_018.mp3",
+    "bytes": 358315
+  },
+  {
+    "species": "Tettigonia viridissima",
+    "common": "Great Green Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/132459.mp3?1598310167",
+    "license": "cc-by-nc",
+    "observer": "laauraaaant",
+    "observation": "https://www.inaturalist.org/observations/57491876",
+    "file": "tettigoniidae/Tettigonia_viridissima_019.mp3",
+    "bytes": 158479
+  },
+  {
+    "species": "Neoconocephalus nebrascensis",
+    "common": "Nebraska Conehead",
+    "url": "https://static.inaturalist.org/sounds/594978.mp3?1675952028",
+    "license": "cc-by-nc",
+    "observer": "Angus Mossman",
+    "observation": "https://www.inaturalist.org/observations/148296159",
+    "file": "tettigoniidae/Neoconocephalus_nebrascensis_021.mp3",
+    "bytes": 816814
+  },
+  {
+    "species": "Orchelimum nigripes",
+    "common": "Black-legged Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/303844.m4a?1631294244",
+    "license": "cc-by-nc",
+    "observer": "Joseph Langlois",
+    "observation": "https://www.inaturalist.org/observations/94343677",
+    "file": "tettigoniidae/Orchelimum_nigripes_022.m4a",
+    "bytes": 119189
+  },
+  {
+    "species": "Orchelimum nigripes",
+    "common": "Black-legged Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/535756.mp3?1663179615",
+    "license": "cc-by-nc",
+    "observer": "joe dziewa",
+    "observation": "https://www.inaturalist.org/observations/135017461",
+    "file": "tettigoniidae/Orchelimum_nigripes_023.mp3",
+    "bytes": 532213
+  },
+  {
+    "species": "Phymonotus glyphopyrenos",
+    "common": "Hot Springs Mountain Shieldback",
+    "url": "https://static.inaturalist.org/sounds/848485.mp3?1700541183",
+    "license": "cc-by-nc",
+    "observer": "Bridget Spencer",
+    "observation": "https://www.inaturalist.org/observations/191645308",
+    "file": "tettigoniidae/Phymonotus_glyphopyrenos_024.mp3",
+    "bytes": 188928
+  },
+  {
+    "species": "Cyrtaspis scutata",
+    "common": "Shielded Oak Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/556967.mp3?1667174434",
+    "license": "cc0",
+    "observer": "Marino Lini\u0107",
+    "observation": "https://www.inaturalist.org/observations/140592313",
+    "file": "tettigoniidae/Cyrtaspis_scutata_025.mp3",
+    "bytes": 169582
+  },
+  {
+    "species": "Neoconocephalus nebrascensis",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "tettigoniidae/Neoconocephalus_nebrascensis_018.m4a",
+    "bytes": 1114963
+  },
+  {
+    "species": "Pterophylla camellifolia",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "tettigoniidae/Pterophylla_camellifolia_007.m4a",
+    "bytes": 188405
+  },
+  {
+    "species": "Neoconocephalus nebrascensis",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "tettigoniidae/Neoconocephalus_nebrascensis_019.mp3",
+    "bytes": 816814
+  },
+  {
+    "species": "Tettigonia viridissima",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "tettigoniidae/Tettigonia_viridissima_020.mp3",
+    "bytes": 358315
+  },
+  {
+    "species": "Tettigonia viridissima",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "tettigoniidae/Tettigonia_viridissima_021.mp3",
+    "bytes": 158479
+  },
+  {
+    "species": "Gryllodes sigillatus",
+    "common": "Tropical House Cricket",
+    "url": "https://static.inaturalist.org/sounds/1945477.m4a?1778569457",
+    "license": "cc-by-nc",
+    "observer": "Joseph Knight",
+    "observation": "https://www.inaturalist.org/observations/360812681",
+    "file": "gryllidae/Gryllodes_sigillatus_000.m4a",
+    "bytes": 141687
+  },
+  {
+    "species": "Gryllodes sigillatus",
+    "common": "Tropical House Cricket",
+    "url": "https://static.inaturalist.org/sounds/392684.m4a?1649910350",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/111376907",
+    "file": "gryllidae/Gryllodes_sigillatus_001.m4a",
+    "bytes": 273470
+  },
+  {
+    "species": "Gryllus veletis",
+    "common": "Spring Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/257887.m4a?1624197967",
+    "license": "cc-by-nc",
+    "observer": "John Klymko",
+    "observation": "https://www.inaturalist.org/observations/83783290",
+    "file": "gryllidae/Gryllus_veletis_002.m4a",
+    "bytes": 115892
+  },
+  {
+    "species": "Gryllus veletis",
+    "common": "Spring Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/721495.m4a?1685626538",
+    "license": "cc-by-nc",
+    "observer": "averyavesave",
+    "observation": "https://www.inaturalist.org/observations/164972278",
+    "file": "gryllidae/Gryllus_veletis_003.m4a",
+    "bytes": 116064
+  },
+  {
+    "species": "Gryllus bimaculatus",
+    "common": "Southern Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/787922.m4a?1691445751",
+    "license": "cc-by-nc",
+    "observer": "lukapraprotnik",
+    "observation": "https://www.inaturalist.org/observations/177239755",
+    "file": "gryllidae/Gryllus_bimaculatus_004.m4a",
+    "bytes": 292129
+  },
+  {
+    "species": "Gryllus bimaculatus",
+    "common": "Southern Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/787923.m4a?1691445754",
+    "license": "cc-by-nc",
+    "observer": "lukapraprotnik",
+    "observation": "https://www.inaturalist.org/observations/177239755",
+    "file": "gryllidae/Gryllus_bimaculatus_005.m4a",
+    "bytes": 101081
+  },
+  {
+    "species": "Velarifictorus micado",
+    "common": "Japanese Burrowing Cricket",
+    "url": "https://static.inaturalist.org/sounds/536822.m4a?1663372030",
+    "license": "cc-by-nc",
+    "observer": "onidiras-iNaturalist",
+    "observation": "https://www.inaturalist.org/observations/135314542",
+    "file": "gryllidae/Velarifictorus_micado_006.m4a",
+    "bytes": 64783
+  },
+  {
+    "species": "Velarifictorus micado",
+    "common": "Japanese Burrowing Cricket",
+    "url": "https://static.inaturalist.org/sounds/530519.m4a?1662248412",
+    "license": "cc-by-nc",
+    "observer": "onidiras-iNaturalist",
+    "observation": "https://www.inaturalist.org/observations/133540347",
+    "file": "gryllidae/Velarifictorus_micado_007.m4a",
+    "bytes": 100022
+  },
+  {
+    "species": "Gryllus pennsylvanicus",
+    "common": "Fall Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/299421.m4a?1630360905",
+    "license": "cc-by-nc",
+    "observer": "Juli Mallett",
+    "observation": "https://www.inaturalist.org/observations/93087300",
+    "file": "gryllidae/Gryllus_pennsylvanicus_008.m4a",
+    "bytes": 35359
+  },
+  {
+    "species": "Gryllus pennsylvanicus",
+    "common": "Fall Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/323767.m4a?1635728500",
+    "license": "cc-by-nc",
+    "observer": "John D Reynolds",
+    "observation": "https://www.inaturalist.org/observations/99935945",
+    "file": "gryllidae/Gryllus_pennsylvanicus_009.m4a",
+    "bytes": 87656
+  },
+  {
+    "species": "Gryllus campestris",
+    "common": "European Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1068422.mp3?1717052707",
+    "license": "cc0",
+    "observer": "Marino Lini\u0107",
+    "observation": "https://www.inaturalist.org/observations/219272343",
+    "file": "gryllidae/Gryllus_campestris_010.mp3",
+    "bytes": 317567
+  },
+  {
+    "species": "Gryllus campestris",
+    "common": "European Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1595578.m4a?1754502910",
+    "license": "cc-by-nc",
+    "observer": "Frank Fritzlar",
+    "observation": "https://www.inaturalist.org/observations/304282015",
+    "file": "gryllidae/Gryllus_campestris_011.m4a",
+    "bytes": 869069
+  },
+  {
+    "species": "Svercus palmetorum",
+    "common": "Cicada Cricket",
+    "url": "https://static.inaturalist.org/sounds/957744.m4a?1712554017",
+    "license": "cc-by-nc",
+    "observer": "Axel Gosseries",
+    "observation": "https://www.inaturalist.org/observations/206021429",
+    "file": "gryllidae/Svercus_palmetorum_012.m4a",
+    "bytes": 313722
+  },
+  {
+    "species": "Svercus palmetorum",
+    "common": "Cicada Cricket",
+    "url": "https://static.inaturalist.org/sounds/957745.m4a?1712554081",
+    "license": "cc-by-nc",
+    "observer": "Axel Gosseries",
+    "observation": "https://www.inaturalist.org/observations/206021429",
+    "file": "gryllidae/Svercus_palmetorum_013.m4a",
+    "bytes": 212980
+  },
+  {
+    "species": "Xenogryllus marmoratus",
+    "common": "Japanese Pine Cricket",
+    "url": "https://static.inaturalist.org/sounds/838530.m4a?1698553817",
+    "license": "cc-by-nc",
+    "observer": "mutsu_semon",
+    "observation": "https://www.inaturalist.org/observations/189313004",
+    "file": "gryllidae/Xenogryllus_marmoratus_014.m4a",
+    "bytes": 67920
+  },
+  {
+    "species": "Xenogryllus marmoratus",
+    "common": "Japanese Pine Cricket",
+    "url": "https://static.inaturalist.org/sounds/1249299.m4a?1731360245",
+    "license": "cc-by",
+    "observer": "\u5cb8\u672c\u5e74\u90ce",
+    "observation": "https://www.inaturalist.org/observations/251360739",
+    "file": "gryllidae/Xenogryllus_marmoratus_015.m4a",
+    "bytes": 88971
+  },
+  {
+    "species": "Acheta domesticus",
+    "common": "House Cricket",
+    "url": "https://static.inaturalist.org/sounds/507909.m4a?1658865078",
+    "license": "cc-by-nc",
+    "observer": "Stephan Pflume",
+    "observation": "https://www.inaturalist.org/observations/128041848",
+    "file": "gryllidae/Acheta_domesticus_016.m4a",
+    "bytes": 203927
+  },
+  {
+    "species": "Acheta domesticus",
+    "common": "House Cricket",
+    "url": "https://static.inaturalist.org/sounds/507911.m4a?1658865277",
+    "license": "cc-by-nc",
+    "observer": "Stephan Pflume",
+    "observation": "https://www.inaturalist.org/observations/128041848",
+    "file": "gryllidae/Acheta_domesticus_017.m4a",
+    "bytes": 203927
+  },
+  {
+    "species": "Eumodicogryllus bordigalensis",
+    "common": "Verge Cricket",
+    "url": "https://static.inaturalist.org/sounds/2037424.m4a?1782160356",
+    "license": "cc-by-nc",
+    "observer": "Dalibor Hip\u00edk",
+    "observation": "https://www.inaturalist.org/observations/374406215",
+    "file": "gryllidae/Eumodicogryllus_bordigalensis_018.m4a",
+    "bytes": 87070
+  },
+  {
+    "species": "Eumodicogryllus bordigalensis",
+    "common": "Verge Cricket",
+    "url": "https://static.inaturalist.org/sounds/807457.mp3?1693986310",
+    "license": "cc-by-nc",
+    "observer": "eva_b_s",
+    "observation": "https://www.inaturalist.org/observations/182021106",
+    "file": "gryllidae/Eumodicogryllus_bordigalensis_019.mp3",
+    "bytes": 244514
+  },
+  {
+    "species": "Lepidogryllus parvulus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/392547.m4a?1649891766",
+    "license": "cc-by",
+    "observer": "Shaun Lee",
+    "observation": "https://www.inaturalist.org/observations/111362531",
+    "file": "gryllidae/Lepidogryllus_parvulus_020.m4a",
+    "bytes": 211771
+  },
+  {
+    "species": "Lepidogryllus parvulus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/392548.m4a?1649891769",
+    "license": "cc-by",
+    "observer": "Shaun Lee",
+    "observation": "https://www.inaturalist.org/observations/111362531",
+    "file": "gryllidae/Lepidogryllus_parvulus_021.m4a",
+    "bytes": 546714
+  },
+  {
+    "species": "Gryllita arizonae",
+    "common": "Arizona cricket",
+    "url": "https://static.inaturalist.org/sounds/534608.m4a?1663000421",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/134702748",
+    "file": "gryllidae/Gryllita_arizonae_022.m4a",
+    "bytes": 660637
+  },
+  {
+    "species": "Gryllita arizonae",
+    "common": "Arizona cricket",
+    "url": "https://static.inaturalist.org/sounds/534612.m4a?1663000457",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/134702748",
+    "file": "gryllidae/Gryllita_arizonae_023.m4a",
+    "bytes": 513418
+  },
+  {
+    "species": "Gryllus campestris",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "gryllidae/Gryllus_campestris_013.m4a",
+    "bytes": 869069
+  },
+  {
+    "species": "Svercus palmetorum",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "gryllidae/Svercus_palmetorum_010.m4a",
+    "bytes": 313722
+  },
+  {
+    "species": "Svercus palmetorum",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "gryllidae/Svercus_palmetorum_011.m4a",
+    "bytes": 212980
+  },
+  {
+    "species": "Gryllus campestris",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "gryllidae/Gryllus_campestris_012.mp3",
+    "bytes": 317567
+  },
+  {
+    "species": "Oecanthus fultoni",
+    "common": "Snowy Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/1618472.m4a?1756414151",
+    "license": "cc-by-nc",
+    "observer": "Dom",
+    "observation": "https://www.inaturalist.org/observations/308588489",
+    "file": "oecanthinae/Oecanthus_fultoni_000.m4a",
+    "bytes": 108871
+  },
+  {
+    "species": "Oecanthus fultoni",
+    "common": "Snowy Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/812355.mp3?1694712218",
+    "license": "cc-by-nc",
+    "observer": "Amcilraith",
+    "observation": "https://www.inaturalist.org/observations/182718632",
+    "file": "oecanthinae/Oecanthus_fultoni_001.mp3",
+    "bytes": 56016
+  },
+  {
+    "species": "Oecanthus castaneus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/922602.m4a?1709958725",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/201748008",
+    "file": "oecanthinae/Oecanthus_castaneus_002.m4a",
+    "bytes": 420394
+  },
+  {
+    "species": "Oecanthus castaneus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/922596.m4a?1709958471",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/201748008",
+    "file": "oecanthinae/Oecanthus_castaneus_003.m4a",
+    "bytes": 250351
+  },
+  {
+    "species": "Oecanthus beameri",
+    "common": "White Sands Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/334112.m4a?1638340811",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/102287655",
+    "file": "oecanthinae/Oecanthus_beameri_004.m4a",
+    "bytes": 621819
+  },
+  {
+    "species": "Oecanthus beameri",
+    "common": "White Sands Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/321033.m4a?1635146978",
+    "license": "cc-by",
+    "observer": "Jared Shorma",
+    "observation": "https://www.inaturalist.org/observations/98434363",
+    "file": "oecanthinae/Oecanthus_beameri_005.m4a",
+    "bytes": 693092
+  },
+  {
+    "species": "Oecanthus angustus",
+    "common": "Common Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/117876.m4a?1594120205",
+    "license": "cc-by-nc",
+    "observer": "simono",
+    "observation": "https://www.inaturalist.org/observations/52247911",
+    "file": "oecanthinae/Oecanthus_angustus_006.m4a",
+    "bytes": 232973
+  },
+  {
+    "species": "Oecanthus angustus",
+    "common": "Common Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/130171.m4a?1597487716",
+    "license": "cc-by-nc",
+    "observer": "simono",
+    "observation": "https://www.inaturalist.org/observations/56497666",
+    "file": "oecanthinae/Oecanthus_angustus_007.m4a",
+    "bytes": 328633
+  },
+  {
+    "species": "Neoxabea mexicana",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/142685.m4a?1602715831",
+    "license": "cc-by-nc",
+    "observer": "Carlos G Velazco-Macias",
+    "observation": "https://www.inaturalist.org/observations/62595661",
+    "file": "oecanthinae/Neoxabea_mexicana_008.m4a",
+    "bytes": 518795
+  },
+  {
+    "species": "Neoxabea mexicana",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/142686.m4a?1602715835",
+    "license": "cc-by-nc",
+    "observer": "Carlos G Velazco-Macias",
+    "observation": "https://www.inaturalist.org/observations/62595661",
+    "file": "oecanthinae/Neoxabea_mexicana_009.m4a",
+    "bytes": 559075
+  },
+  {
+    "species": "Eleutherodactylus coqui",
+    "common": "Common Coqui",
+    "url": "https://static.inaturalist.org/sounds/188818.m4a?1618602383",
+    "license": "cc-by-nc",
+    "observer": "Jennifer Possley",
+    "observation": "https://www.inaturalist.org/observations/74169025",
+    "file": "anura/Eleutherodactylus_coqui_000.m4a",
+    "bytes": 159243
+  },
+  {
+    "species": "Eleutherodactylus coqui",
+    "common": "Common Coqui",
+    "url": "https://static.inaturalist.org/sounds/793509.m4a?1692148861",
+    "license": "cc-by-nc",
+    "observer": "Gabriel Andrle",
+    "observation": "https://www.inaturalist.org/observations/178621836",
+    "file": "anura/Eleutherodactylus_coqui_001.m4a",
+    "bytes": 117517
+  },
+  {
+    "species": "Arthroleptella draconella",
+    "common": "Drakenstein Moss Frog",
+    "url": "https://static.inaturalist.org/sounds/110218.m4a?1592742244",
+    "license": "cc-by-nc",
+    "observer": "Alex Rebelo",
+    "observation": "https://www.inaturalist.org/observations/50399868",
+    "file": "anura/Arthroleptella_draconella_002.m4a",
+    "bytes": 211908
+  },
+  {
+    "species": "Arthroleptella draconella",
+    "common": "Drakenstein Moss Frog",
+    "url": "https://static.inaturalist.org/sounds/575902.mp3?1671888979",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/144983458",
+    "file": "anura/Arthroleptella_draconella_003.mp3",
+    "bytes": 320156
+  },
+  {
+    "species": "Arthroleptella subvoce",
+    "common": "Northern Moss Frog",
+    "url": "https://static.inaturalist.org/sounds/500354.mp3?1657957417",
+    "license": "cc-by-nc",
+    "observer": "Oliver Angus",
+    "observation": "https://www.inaturalist.org/observations/126446967",
+    "file": "anura/Arthroleptella_subvoce_004.mp3",
+    "bytes": 232416
+  },
+  {
+    "species": "Arthroleptella subvoce",
+    "common": "Northern Moss Frog",
+    "url": "https://static.inaturalist.org/sounds/500355.mp3?1657957419",
+    "license": "cc-by-nc",
+    "observer": "Oliver Angus",
+    "observation": "https://www.inaturalist.org/observations/126446967",
+    "file": "anura/Arthroleptella_subvoce_005.mp3",
+    "bytes": 186192
+  },
+  {
+    "species": "Cacosternum capense",
+    "common": "Cape Caco",
+    "url": "https://static.inaturalist.org/sounds/137055.m4a?1600503102",
+    "license": "cc0",
+    "observer": "Marius Burger",
+    "observation": "https://www.inaturalist.org/observations/60049372",
+    "file": "anura/Cacosternum_capense_006.m4a",
+    "bytes": 275690
+  },
+  {
+    "species": "Cacosternum capense",
+    "common": "Cape Caco",
+    "url": "https://static.inaturalist.org/sounds/137355.m4a?1600609719",
+    "license": "cc0",
+    "observer": "Marius Burger",
+    "observation": "https://www.inaturalist.org/observations/60049372",
+    "file": "anura/Cacosternum_capense_007.m4a",
+    "bytes": 417575
+  },
+  {
+    "species": "Rana arvalis",
+    "common": "Moor Frog",
+    "url": "https://static.inaturalist.org/sounds/182456.mp3?1617646559",
+    "license": "cc-by",
+    "observer": "Julia Moning",
+    "observation": "https://www.inaturalist.org/observations/73021791",
+    "file": "anura/Rana_arvalis_008.mp3",
+    "bytes": 270485
+  },
+  {
+    "species": "Rana arvalis",
+    "common": "Moor Frog",
+    "url": "https://static.inaturalist.org/sounds/182458.mp3?1617646682",
+    "license": "cc-by",
+    "observer": "Julia Moning",
+    "observation": "https://www.inaturalist.org/observations/73021791",
+    "file": "anura/Rana_arvalis_009.mp3",
+    "bytes": 297662
+  },
+  {
+    "species": "Tomopterna delalandii",
+    "common": "Cape sand frog",
+    "url": "https://static.inaturalist.org/sounds/349785.m4a?1643129618",
+    "license": "cc-by-nc",
+    "observer": "robertwelsh",
+    "observation": "https://www.inaturalist.org/observations/95983282",
+    "file": "anura/Tomopterna_delalandii_010.m4a",
+    "bytes": 143374
+  },
+  {
+    "species": "Tomopterna delalandii",
+    "common": "Cape sand frog",
+    "url": "https://static.inaturalist.org/sounds/349787.m4a?1643129648",
+    "license": "cc-by-nc",
+    "observer": "robertwelsh",
+    "observation": "https://www.inaturalist.org/observations/95983282",
+    "file": "anura/Tomopterna_delalandii_011.m4a",
+    "bytes": 143374
+  },
+  {
+    "species": "Cacosternum boettgeri",
+    "common": "Boettger's dainty frog",
+    "url": "https://static.inaturalist.org/sounds/835253.m4a?1698003704",
+    "license": "cc-by-nc",
+    "observer": "lizziegeorge",
+    "observation": "https://www.inaturalist.org/observations/188546280",
+    "file": "anura/Cacosternum_boettgeri_012.m4a",
+    "bytes": 104880
+  },
+  {
+    "species": "Cacosternum boettgeri",
+    "common": "Boettger's dainty frog",
+    "url": "https://static.inaturalist.org/sounds/835264.m4a?1698005615",
+    "license": "cc-by-nc",
+    "observer": "lizziegeorge",
+    "observation": "https://www.inaturalist.org/observations/188546280",
+    "file": "anura/Cacosternum_boettgeri_013.m4a",
+    "bytes": 104880
+  },
+  {
+    "species": "Breviceps gibbosus",
+    "common": "Giant Rain Frog",
+    "url": "https://static.inaturalist.org/sounds/113647.mp3?1593361255",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/51242632",
+    "file": "anura/Breviceps_gibbosus_014.mp3",
+    "bytes": 191843
+  },
+  {
+    "species": "Breviceps gibbosus",
+    "common": "Giant Rain Frog",
+    "url": "https://static.inaturalist.org/sounds/113648.mp3?1593361261",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/51242632",
+    "file": "anura/Breviceps_gibbosus_015.mp3",
+    "bytes": 431333
+  },
+  {
+    "species": "Afrixalus fulvovittatus",
+    "common": "Banded Banana Frog",
+    "url": "https://static.inaturalist.org/sounds/46681.mp3?1567808090",
+    "license": "cc-by-nc",
+    "observer": "phrogbecker",
+    "observation": "https://www.inaturalist.org/observations/32239452",
+    "file": "anura/Afrixalus_fulvovittatus_016.mp3",
+    "bytes": 1890775
+  },
+  {
+    "species": "Afrixalus fulvovittatus",
+    "common": "Banded Banana Frog",
+    "url": "https://static.inaturalist.org/sounds/46682.mp3?1567808092",
+    "license": "cc-by-nc",
+    "observer": "phrogbecker",
+    "observation": "https://www.inaturalist.org/observations/32239452",
+    "file": "anura/Afrixalus_fulvovittatus_017.mp3",
+    "bytes": 773779
+  },
+  {
+    "species": "Lithobates catesbeianus",
+    "common": "American Bullfrog",
+    "url": "https://static.inaturalist.org/sounds/314011.m4a?1633677150",
+    "license": "cc-by-nc",
+    "observer": "Ty Smith",
+    "observation": "https://www.inaturalist.org/observations/97524274",
+    "file": "anura/Lithobates_catesbeianus_018.m4a",
+    "bytes": 55555
+  },
+  {
+    "species": "Peltophryne lemur",
+    "common": "Puerto Rican Crested Toad",
+    "url": "https://static.inaturalist.org/sounds/17803.m4a?1648660367",
+    "license": "cc-by-nc",
+    "observer": "Wilfredo Falcon",
+    "observation": "https://www.inaturalist.org/observations/9882466",
+    "file": "anura/Peltophryne_lemur_019.m4a",
+    "bytes": 1159380
+  },
+  {
+    "species": "Breviceps verrucosus",
+    "common": "Plaintive Rain Frog",
+    "url": "https://static.inaturalist.org/sounds/348198.mp3?1642746937",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/105301676",
+    "file": "anura/Breviceps_verrucosus_020.mp3",
+    "bytes": 367804
+  },
+  {
+    "species": "Tomopterna adiastola",
+    "common": "Confused Sand frog",
+    "url": "https://static.inaturalist.org/sounds/335618.m4a?1638763001",
+    "license": "cc-by-nc",
+    "observer": "Jacob Dirsuwei",
+    "observation": "https://www.inaturalist.org/observations/102584519",
+    "file": "anura/Tomopterna_adiastola_021.m4a",
+    "bytes": 132040
+  },
+  {
+    "species": "Pseudacris kalmi",
+    "common": "New Jersey Chorus Frog",
+    "url": "https://static.inaturalist.org/sounds/177542.m4a?1616828721",
+    "license": "cc-by-nc",
+    "observer": "Ty Smith",
+    "observation": "https://www.inaturalist.org/observations/72147316",
+    "file": "anura/Pseudacris_kalmi_022.m4a",
+    "bytes": 74799
+  },
+  {
+    "species": "Lithobates catesbeianus",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "anura/Lithobates_catesbeianus_020.m4a",
+    "bytes": 55555
+  },
+  {
+    "species": "Peltophryne lemur",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "anura/Peltophryne_lemur_021.m4a",
+    "bytes": 1159380
+  },
+  {
+    "species": "Tomopterna adiastola",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "anura/Tomopterna_adiastola_023.m4a",
+    "bytes": 132040
+  },
+  {
+    "species": "Afrixalus fulvovittatus",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "anura/Afrixalus_fulvovittatus_018.mp3",
+    "bytes": 1890775
+  },
+  {
+    "species": "Afrixalus fulvovittatus",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "anura/Afrixalus_fulvovittatus_019.mp3",
+    "bytes": 773779
+  },
+  {
+    "species": "Breviceps verrucosus",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "anura/Breviceps_verrucosus_022.mp3",
+    "bytes": 367804
+  },
+  {
+    "species": "Dendropsophus microcephalus",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "anura/Dendropsophus_microcephalus_016.mp3",
+    "bytes": 276768
+  },
+  {
+    "species": "Dendropsophus microcephalus",
+    "common": "",
+    "url": "",
+    "license": "cc-by-nc (see iNaturalist)",
+    "observer": "see iNaturalist",
+    "observation": "",
+    "file": "anura/Dendropsophus_microcephalus_017.mp3",
+    "bytes": 496579
+  },
+  {
+    "species": "Hewlettia nigriviridis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/42658.m4a?1648757342",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/27962501",
+    "file": "cicadidae/Hewlettia_nigriviridis_000.m4a",
+    "bytes": 312374
+  },
+  {
+    "species": "Hewlettia nigriviridis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/42659.m4a?1648757347",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/27962501",
+    "file": "cicadidae/Hewlettia_nigriviridis_001.m4a",
+    "bytes": 541836
+  },
+  {
+    "species": "Cicada orni",
+    "common": "Ash Cicada",
+    "url": "https://static.inaturalist.org/sounds/342699.mp3?1641159748",
+    "license": "cc-by-nc",
+    "observer": "Sotirios Liakas",
+    "observation": "https://www.inaturalist.org/observations/95427844",
+    "file": "cicadidae/Cicada_orni_002.mp3",
+    "bytes": 2274490
+  },
+  {
+    "species": "Cicada orni",
+    "common": "Ash Cicada",
+    "url": "https://static.inaturalist.org/sounds/511858.m4a?1659337076",
+    "license": "cc-by-nc",
+    "observer": "Hanno Schaefer",
+    "observation": "https://www.inaturalist.org/observations/128942520",
+    "file": "cicadidae/Cicada_orni_003.m4a",
+    "bytes": 181688
+  },
+  {
+    "species": "Neotibicen linnei",
+    "common": "Linne's Cicada",
+    "url": "https://static.inaturalist.org/sounds/15135.m4a?1503444934",
+    "license": "cc-by-nc",
+    "observer": "Janet Wright",
+    "observation": "https://www.inaturalist.org/observations/7609899",
+    "file": "cicadidae/Neotibicen_linnei_004.m4a",
+    "bytes": 155263
+  },
+  {
+    "species": "Neotibicen linnei",
+    "common": "Linne's Cicada",
+    "url": "https://static.inaturalist.org/sounds/1558819.m4a?1751902295",
+    "license": "cc-by-nc",
+    "observer": "Daniel Sgro",
+    "observation": "https://www.inaturalist.org/observations/296028060",
+    "file": "cicadidae/Neotibicen_linnei_005.m4a",
+    "bytes": 197186
+  },
+  {
+    "species": "Tibicina quadrisignata",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1521557.mp3?1749818400",
+    "license": "cc-by-nc",
+    "observer": "Nelson Concei\u00e7\u00e3o",
+    "observation": "https://www.inaturalist.org/observations/289246106",
+    "file": "cicadidae/Tibicina_quadrisignata_006.mp3",
+    "bytes": 2842804
+  },
+  {
+    "species": "Carineta diardi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/550617.mp3?1665945102",
+    "license": "cc-by-nc",
+    "observer": "Observa\u00e7\u00f5es Naturalistas | Bruno Uehara",
+    "observation": "https://www.inaturalist.org/observations/139008401",
+    "file": "cicadidae/Carineta_diardi_008.mp3",
+    "bytes": 579874
+  },
+  {
+    "species": "Carineta diardi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/548053.m4a?1665482902",
+    "license": "cc-by-nc",
+    "observer": "Matheus M. Santos",
+    "observation": "https://www.inaturalist.org/observations/138368603",
+    "file": "cicadidae/Carineta_diardi_009.m4a",
+    "bytes": 98688
+  },
+  {
+    "species": "Tibicina haematodes",
+    "common": "Red Cicada",
+    "url": "https://static.inaturalist.org/sounds/1120048.m4a?1720074187",
+    "license": "cc-by",
+    "observer": "Stanislav Murashkin",
+    "observation": "https://www.inaturalist.org/observations/227045105",
+    "file": "cicadidae/Tibicina_haematodes_010.m4a",
+    "bytes": 72622
+  },
+  {
+    "species": "Tibicina haematodes",
+    "common": "Red Cicada",
+    "url": "https://static.inaturalist.org/sounds/759379.m4a?1688468438",
+    "license": "cc-by-nc",
+    "observer": "tamaszeke",
+    "observation": "https://www.inaturalist.org/observations/170997785",
+    "file": "cicadidae/Tibicina_haematodes_011.m4a",
+    "bytes": 553674
+  },
+  {
+    "species": "Okanagana fumipennis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/22470.mp3?1527817621",
+    "license": "cc0",
+    "observer": "Cecelia Alexander",
+    "observation": "https://www.inaturalist.org/observations/12999696",
+    "file": "cicadidae/Okanagana_fumipennis_012.mp3",
+    "bytes": 1749576
+  },
+  {
+    "species": "Okanagana fumipennis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/22472.mp3?1527817639",
+    "license": "cc0",
+    "observer": "Cecelia Alexander",
+    "observation": "https://www.inaturalist.org/observations/12999696",
+    "file": "cicadidae/Okanagana_fumipennis_013.mp3",
+    "bytes": 3446490
+  },
+  {
+    "species": "Tettigetta prasina",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/487802.mp3?1656700399",
+    "license": "cc-by-nc",
+    "observer": "Leonid",
+    "observation": "https://www.inaturalist.org/observations/124276172",
+    "file": "cicadidae/Tettigetta_prasina_014.mp3",
+    "bytes": 312983
+  },
+  {
+    "species": "Tettigetta prasina",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1141231.m4a?1721731760",
+    "license": "cc-by-nc",
+    "observer": "daisan",
+    "observation": "https://www.inaturalist.org/observations/231173577",
+    "file": "cicadidae/Tettigetta_prasina_015.m4a",
+    "bytes": 265866
+  },
+  {
+    "species": "Guyalna chlorogena",
+    "common": "Brazilian Rainforest Cicada",
+    "url": "https://static.inaturalist.org/sounds/1981958.m4a?1779843030",
+    "license": "cc-by-sa",
+    "observer": "Sidnei Dantas",
+    "observation": "https://www.inaturalist.org/observations/45439922",
+    "file": "cicadidae/Guyalna_chlorogena_016.m4a",
+    "bytes": 418491
+  },
+  {
+    "species": "Okanagana opacipennis",
+    "common": "manzanita cicada",
+    "url": "https://static.inaturalist.org/sounds/467194.m4a?1654882601",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/26717973",
+    "file": "cicadidae/Okanagana_opacipennis_017.m4a",
+    "bytes": 667024
+  },
+  {
+    "species": "Orchelimum pulchellum",
+    "common": "Handsome Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/823077.m4a?1696182080",
+    "license": "cc-by-nc",
+    "observer": "Owen Hurlbut Lesk",
+    "observation": "https://www.inaturalist.org/observations/185768524",
+    "file": "tettigoniidae/Orchelimum_pulchellum_000.m4a",
+    "bytes": 67650
+  },
+  {
+    "species": "Orchelimum pulchellum",
+    "common": "Handsome Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/1604190.m4a?1755185029",
+    "license": "cc-by-nc",
+    "observer": "bertfoquet",
+    "observation": "https://www.inaturalist.org/observations/306265536",
+    "file": "tettigoniidae/Orchelimum_pulchellum_001.m4a",
+    "bytes": 144369
+  },
+  {
+    "species": "Orchelimum pulchellum",
+    "common": "Handsome Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/530906.m4a?1662313009",
+    "license": "cc-by-nc",
+    "observer": "Josh Minker",
+    "observation": "https://www.inaturalist.org/observations/133641499",
+    "file": "tettigoniidae/Orchelimum_pulchellum_002.m4a",
+    "bytes": 105618
+  },
+  {
+    "species": "Hexacentrus hareyamai",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1122870.mp3?1720278407",
+    "license": "cc-by-nc",
+    "observer": "\u5b8b\u4e7e\u5b87",
+    "observation": "https://www.inaturalist.org/observations/227529838",
+    "file": "tettigoniidae/Hexacentrus_hareyamai_003.mp3",
+    "bytes": 348566
+  },
+  {
+    "species": "Hexacentrus hareyamai",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/518939.mp3?1660305916",
+    "license": "cc-by-nc",
+    "observer": "itots",
+    "observation": "https://www.inaturalist.org/observations/130486667",
+    "file": "tettigoniidae/Hexacentrus_hareyamai_004.mp3",
+    "bytes": 151284
+  },
+  {
+    "species": "Hexacentrus hareyamai",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/530599.m4a?1662262306",
+    "license": "cc-by",
+    "observer": "Yoshihiro Tokue",
+    "observation": "https://www.inaturalist.org/observations/133453600",
+    "file": "tettigoniidae/Hexacentrus_hareyamai_005.m4a",
+    "bytes": 311349
+  },
+  {
+    "species": "Aglaothorax ovatus",
+    "common": "Ovate Shieldback",
+    "url": "https://static.inaturalist.org/sounds/756831.m4a?1688223428",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/170455208",
+    "file": "tettigoniidae/Aglaothorax_ovatus_006.m4a",
+    "bytes": 194868
+  },
+  {
+    "species": "Aglaothorax ovatus",
+    "common": "Ovate Shieldback",
+    "url": "https://static.inaturalist.org/sounds/812685.m4a?1694754309",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/170455208",
+    "file": "tettigoniidae/Aglaothorax_ovatus_007.m4a",
+    "bytes": 759909
+  },
+  {
+    "species": "Aglaothorax ovatus",
+    "common": "Ovate Shieldback",
+    "url": "https://static.inaturalist.org/sounds/757158.m4a?1688255478",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/170455414",
+    "file": "tettigoniidae/Aglaothorax_ovatus_008.m4a",
+    "bytes": 397758
+  },
+  {
+    "species": "Amblycorypha rotundifolia",
+    "common": "Rattler Round-winged Katydid",
+    "url": "https://static.inaturalist.org/sounds/1567995.m4a?1752460467",
+    "license": "cc-by-nc",
+    "observer": "D.J. McNeil",
+    "observation": "https://www.inaturalist.org/observations/297773873",
+    "file": "tettigoniidae/Amblycorypha_rotundifolia_009.m4a",
+    "bytes": 84562
+  },
+  {
+    "species": "Amblycorypha rotundifolia",
+    "common": "Rattler Round-winged Katydid",
+    "url": "https://static.inaturalist.org/sounds/1575025.m4a?1752978269",
+    "license": "cc-by-nc",
+    "observer": "Kyle Aldinger",
+    "observation": "https://www.inaturalist.org/observations/299388790",
+    "file": "tettigoniidae/Amblycorypha_rotundifolia_010.m4a",
+    "bytes": 175300
+  },
+  {
+    "species": "Amblycorypha rotundifolia",
+    "common": "Rattler Round-winged Katydid",
+    "url": "https://static.inaturalist.org/sounds/1580742.m4a?1753405051",
+    "license": "cc-by-nc",
+    "observer": "Kyle Aldinger",
+    "observation": "https://www.inaturalist.org/observations/300817394",
+    "file": "tettigoniidae/Amblycorypha_rotundifolia_011.m4a",
+    "bytes": 113233
+  },
+  {
+    "species": "Pterophylla camellifolia",
+    "common": "Common True Katydid",
+    "url": "https://static.inaturalist.org/sounds/1604793.m4a?1755230451",
+    "license": "cc-by-nc",
+    "observer": "Kyle Aldinger",
+    "observation": "https://www.inaturalist.org/observations/306409669",
+    "file": "tettigoniidae/Pterophylla_camellifolia_012.m4a",
+    "bytes": 94902
+  },
+  {
+    "species": "Pterophylla camellifolia",
+    "common": "Common True Katydid",
+    "url": "https://static.inaturalist.org/sounds/495853.mp3?1657459324",
+    "license": "cc-by-nc-sa",
+    "observer": "Lee Elliott",
+    "observation": "https://www.inaturalist.org/observations/125603471",
+    "file": "tettigoniidae/Pterophylla_camellifolia_013.mp3",
+    "bytes": 874440
+  },
+  {
+    "species": "Pterophylla camellifolia",
+    "common": "Common True Katydid",
+    "url": "https://static.inaturalist.org/sounds/505374.m4a?1658546112",
+    "license": "cc-by-nc",
+    "observer": "watkinspt",
+    "observation": "https://www.inaturalist.org/observations/127452680",
+    "file": "tettigoniidae/Pterophylla_camellifolia_014.m4a",
+    "bytes": 188405
+  },
+  {
+    "species": "Neoconocephalus triops",
+    "common": "Broad-tipped Conehead",
+    "url": "https://static.inaturalist.org/sounds/1192962.m4a?1725437419",
+    "license": "cc-by",
+    "observer": "Dan Johnson",
+    "observation": "https://www.inaturalist.org/observations/239756818",
+    "file": "tettigoniidae/Neoconocephalus_triops_015.m4a",
+    "bytes": 87363
+  },
+  {
+    "species": "Neoconocephalus triops",
+    "common": "Broad-tipped Conehead",
+    "url": "https://static.inaturalist.org/sounds/2038248.m4a?1782193105",
+    "license": "cc-by",
+    "observer": "Reid Hardin",
+    "observation": "https://www.inaturalist.org/observations/374519018",
+    "file": "tettigoniidae/Neoconocephalus_triops_016.m4a",
+    "bytes": 510726
+  },
+  {
+    "species": "Neoconocephalus triops",
+    "common": "Broad-tipped Conehead",
+    "url": "https://static.inaturalist.org/sounds/527993.m4a?1661738869",
+    "license": "cc-by",
+    "observer": "River Ahlquist",
+    "observation": "https://www.inaturalist.org/observations/132736256",
+    "file": "tettigoniidae/Neoconocephalus_triops_017.m4a",
+    "bytes": 92428
+  },
+  {
+    "species": "Neoconocephalus ensiger",
+    "common": "Sword-bearing Conehead",
+    "url": "https://static.inaturalist.org/sounds/610869.mp3?1678262650",
+    "license": "cc-by-nc",
+    "observer": "Molly Jacobson",
+    "observation": "https://www.inaturalist.org/observations/150557122",
+    "file": "tettigoniidae/Neoconocephalus_ensiger_018.mp3",
+    "bytes": 601858
+  },
+  {
+    "species": "Neoconocephalus ensiger",
+    "common": "Sword-bearing Conehead",
+    "url": "https://static.inaturalist.org/sounds/496500.m4a?1657511417",
+    "license": "cc-by-nc",
+    "observer": "bertfoquet",
+    "observation": "https://www.inaturalist.org/observations/125733395",
+    "file": "tettigoniidae/Neoconocephalus_ensiger_019.m4a",
+    "bytes": 126309
+  },
+  {
+    "species": "Neoconocephalus ensiger",
+    "common": "Sword-bearing Conehead",
+    "url": "https://static.inaturalist.org/sounds/1604641.m4a?1755218017",
+    "license": "cc-by-nc",
+    "observer": "bassteeth",
+    "observation": "https://www.inaturalist.org/observations/306376671",
+    "file": "tettigoniidae/Neoconocephalus_ensiger_020.m4a",
+    "bytes": 73943
+  },
+  {
+    "species": "Roeseliana roeselii",
+    "common": "Roesel's Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1137786.m4a?1721468527",
+    "license": "cc-by-nc",
+    "observer": "banjo2620",
+    "observation": "https://www.inaturalist.org/observations/230462650",
+    "file": "tettigoniidae/Roeseliana_roeselii_021.m4a",
+    "bytes": 142461
+  },
+  {
+    "species": "Roeseliana roeselii",
+    "common": "Roesel's Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1189807.m4a?1725107349",
+    "license": "cc-by-nc",
+    "observer": "fucked-up_ornithologist",
+    "observation": "https://www.inaturalist.org/observations/238946848",
+    "file": "tettigoniidae/Roeseliana_roeselii_022.m4a",
+    "bytes": 68301
+  },
+  {
+    "species": "Roeseliana roeselii",
+    "common": "Roesel's Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/766956.m4a?1689168606",
+    "license": "cc0",
+    "observer": "ahabo",
+    "observation": "https://www.inaturalist.org/observations/172501413",
+    "file": "tettigoniidae/Roeseliana_roeselii_023.m4a",
+    "bytes": 96065
+  },
+  {
+    "species": "Hexacentrus mundurra",
+    "common": "Fierce Predatory Katydid",
+    "url": "https://static.inaturalist.org/sounds/60953.m4a?1583841183",
+    "license": "cc-by-nc",
+    "observer": "simono",
+    "observation": "https://www.inaturalist.org/observations/39794250",
+    "file": "tettigoniidae/Hexacentrus_mundurra_024.m4a",
+    "bytes": 295865
+  },
+  {
+    "species": "Hexacentrus mundurra",
+    "common": "Fierce Predatory Katydid",
+    "url": "https://static.inaturalist.org/sounds/1328640.m4a?1741595392",
+    "license": "cc-by-nc",
+    "observer": "Colin Trainor",
+    "observation": "https://www.inaturalist.org/observations/264780525",
+    "file": "tettigoniidae/Hexacentrus_mundurra_025.m4a",
+    "bytes": 1440594
+  },
+  {
+    "species": "Hexacentrus mundurra",
+    "common": "Fierce Predatory Katydid",
+    "url": "https://static.inaturalist.org/sounds/1021611.m4a?1714983776",
+    "license": "cc-by-nc",
+    "observer": "peter_yeeles",
+    "observation": "https://www.inaturalist.org/observations/213934888",
+    "file": "tettigoniidae/Hexacentrus_mundurra_026.m4a",
+    "bytes": 125494
+  },
+  {
+    "species": "Orchelimum silvaticum",
+    "common": "Long-spurred Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/1206478.mp3?1726873827",
+    "license": "cc-by-nc",
+    "observer": "geosesarma",
+    "observation": "https://www.inaturalist.org/observations/241537777",
+    "file": "tettigoniidae/Orchelimum_silvaticum_027.mp3",
+    "bytes": 342532
+  },
+  {
+    "species": "Orchelimum silvaticum",
+    "common": "Long-spurred Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/294128.mp3?1629424988",
+    "license": "cc-by",
+    "observer": "Cole Shoemaker",
+    "observation": "https://www.inaturalist.org/observations/91807197",
+    "file": "tettigoniidae/Orchelimum_silvaticum_028.mp3",
+    "bytes": 553678
+  },
+  {
+    "species": "Orchelimum silvaticum",
+    "common": "Long-spurred Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/294128.mp3?1629424988",
+    "license": "cc-by",
+    "observer": "Cole Shoemaker",
+    "observation": "https://www.inaturalist.org/observations/91807197",
+    "file": "tettigoniidae/Orchelimum_silvaticum_029.mp3",
+    "bytes": 553678
+  },
+  {
+    "species": "Paracyrtophyllus robustus",
+    "common": "Central Texas Leaf-Katydid",
+    "url": "https://static.inaturalist.org/sounds/256642.m4a?1624069548",
+    "license": "cc-by-nc",
+    "observer": "elisadonovan",
+    "observation": "https://www.inaturalist.org/observations/82624847",
+    "file": "tettigoniidae/Paracyrtophyllus_robustus_030.m4a",
+    "bytes": 73716
+  },
+  {
+    "species": "Paracyrtophyllus robustus",
+    "common": "Central Texas Leaf-Katydid",
+    "url": "https://static.inaturalist.org/sounds/1974884.m4a?1779615336",
+    "license": "cc-by",
+    "observer": "Dan Johnson",
+    "observation": "https://www.inaturalist.org/observations/364604138",
+    "file": "tettigoniidae/Paracyrtophyllus_robustus_031.m4a",
+    "bytes": 166841
+  },
+  {
+    "species": "Paracyrtophyllus robustus",
+    "common": "Central Texas Leaf-Katydid",
+    "url": "https://static.inaturalist.org/sounds/2013115.m4a?1781056639",
+    "license": "cc-by-nc",
+    "observer": "Mike Quinn, San Marcos",
+    "observation": "https://www.inaturalist.org/observations/370208386",
+    "file": "tettigoniidae/Paracyrtophyllus_robustus_032.m4a",
+    "bytes": 120446
+  },
+  {
+    "species": "Neoconocephalus nebrascensis",
+    "common": "Nebraska Conehead",
+    "url": "https://static.inaturalist.org/sounds/1587887.m4a?1753931850",
+    "license": "cc-by-nc",
+    "observer": "Anora Johnson",
+    "observation": "https://www.inaturalist.org/observations/302520773",
+    "file": "tettigoniidae/Neoconocephalus_nebrascensis_033.m4a",
+    "bytes": 1114963
+  },
+  {
+    "species": "Neoconocephalus nebrascensis",
+    "common": "Nebraska Conehead",
+    "url": "https://static.inaturalist.org/sounds/594978.mp3?1675952028",
+    "license": "cc-by-nc",
+    "observer": "Angus Mossman",
+    "observation": "https://www.inaturalist.org/observations/148296159",
+    "file": "tettigoniidae/Neoconocephalus_nebrascensis_034.mp3",
+    "bytes": 816814
+  },
+  {
+    "species": "Neoconocephalus nebrascensis",
+    "common": "Nebraska Conehead",
+    "url": "https://static.inaturalist.org/sounds/526296.mp3?1661393595",
+    "license": "cc-by-nc",
+    "observer": "Angus Mossman",
+    "observation": "https://www.inaturalist.org/observations/132225734",
+    "file": "tettigoniidae/Neoconocephalus_nebrascensis_035.mp3",
+    "bytes": 504046
+  },
+  {
+    "species": "Tettigonia viridissima",
+    "common": "Great Green Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/122822.mp3?1595282018",
+    "license": "cc-by-sa",
+    "observer": "Gilles San Martin",
+    "observation": "https://www.inaturalist.org/observations/53777269",
+    "file": "tettigoniidae/Tettigonia_viridissima_036.mp3",
+    "bytes": 358315
+  },
+  {
+    "species": "Tettigonia viridissima",
+    "common": "Great Green Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/132459.mp3?1598310167",
+    "license": "cc-by-nc",
+    "observer": "laauraaaant",
+    "observation": "https://www.inaturalist.org/observations/57491876",
+    "file": "tettigoniidae/Tettigonia_viridissima_037.mp3",
+    "bytes": 158479
+  },
+  {
+    "species": "Tettigonia viridissima",
+    "common": "Great Green Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/288001.m4a?1628195756",
+    "license": "cc-by-nc",
+    "observer": "Lennart Mak",
+    "observation": "https://www.inaturalist.org/observations/90071553",
+    "file": "tettigoniidae/Tettigonia_viridissima_038.m4a",
+    "bytes": 305968
+  },
+  {
+    "species": "Pholidoptera griseoaptera",
+    "common": "Dark Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/597463.mp3?1676363034",
+    "license": "cc-by-nc",
+    "observer": "mobbini",
+    "observation": "https://www.inaturalist.org/observations/148748353",
+    "file": "tettigoniidae/Pholidoptera_griseoaptera_039.mp3",
+    "bytes": 364902
+  },
+  {
+    "species": "Pholidoptera griseoaptera",
+    "common": "Dark Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/520012.m4a?1660428881",
+    "license": "cc-by-nc",
+    "observer": "Simon Bertschy",
+    "observation": "https://www.inaturalist.org/observations/130696018",
+    "file": "tettigoniidae/Pholidoptera_griseoaptera_040.m4a",
+    "bytes": 113823
+  },
+  {
+    "species": "Pholidoptera griseoaptera",
+    "common": "Dark Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/806626.m4a?1693856834",
+    "license": "cc0",
+    "observer": "Nico",
+    "observation": "https://www.inaturalist.org/observations/181792604",
+    "file": "tettigoniidae/Pholidoptera_griseoaptera_041.m4a",
+    "bytes": 147432
+  },
+  {
+    "species": "Decticus albifrons",
+    "common": "White-faced Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/44806.m4a?1564592948",
+    "license": "cc-by-nc",
+    "observer": "Juanvi",
+    "observation": "https://www.inaturalist.org/observations/29926132",
+    "file": "tettigoniidae/Decticus_albifrons_042.m4a",
+    "bytes": 429197
+  },
+  {
+    "species": "Decticus albifrons",
+    "common": "White-faced Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/25963.mp3?1537376659",
+    "license": "cc-by",
+    "observer": "Roman",
+    "observation": "https://www.inaturalist.org/observations/16690198",
+    "file": "tettigoniidae/Decticus_albifrons_043.mp3",
+    "bytes": 922018
+  },
+  {
+    "species": "Decticus albifrons",
+    "common": "White-faced Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/798482.m4a?1692819784",
+    "license": "cc-by-nc",
+    "observer": "flamelnico",
+    "observation": "https://www.inaturalist.org/observations/179872178",
+    "file": "tettigoniidae/Decticus_albifrons_044.m4a",
+    "bytes": 196733
+  },
+  {
+    "species": "Orchelimum nigripes",
+    "common": "Black-legged Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/303844.m4a?1631294244",
+    "license": "cc-by-nc",
+    "observer": "Joseph Langlois",
+    "observation": "https://www.inaturalist.org/observations/94343677",
+    "file": "tettigoniidae/Orchelimum_nigripes_045.m4a",
+    "bytes": 119189
+  },
+  {
+    "species": "Orchelimum nigripes",
+    "common": "Black-legged Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/535756.mp3?1663179615",
+    "license": "cc-by-nc",
+    "observer": "joe dziewa",
+    "observation": "https://www.inaturalist.org/observations/135017461",
+    "file": "tettigoniidae/Orchelimum_nigripes_046.mp3",
+    "bytes": 532213
+  },
+  {
+    "species": "Orchelimum nigripes",
+    "common": "Black-legged Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/536561.m4a?1663338319",
+    "license": "cc-by-nc",
+    "observer": "Davis Harder",
+    "observation": "https://www.inaturalist.org/observations/135245705",
+    "file": "tettigoniidae/Orchelimum_nigripes_047.m4a",
+    "bytes": 135682
+  },
+  {
+    "species": "Microcentrum rhombifolium",
+    "common": "Greater Anglewing",
+    "url": "https://static.inaturalist.org/sounds/24941.m4a?1648689877",
+    "license": "cc-by-nc",
+    "observer": "Ethan Kistler",
+    "observation": "https://www.inaturalist.org/observations/15316155",
+    "file": "tettigoniidae/Microcentrum_rhombifolium_048.m4a",
+    "bytes": 55589
+  },
+  {
+    "species": "Microcentrum rhombifolium",
+    "common": "Greater Anglewing",
+    "url": "https://static.inaturalist.org/sounds/1209985.m4a?1727147022",
+    "license": "cc-by-nc",
+    "observer": "countbayz",
+    "observation": "https://www.inaturalist.org/observations/243723847",
+    "file": "tettigoniidae/Microcentrum_rhombifolium_049.m4a",
+    "bytes": 142544
+  },
+  {
+    "species": "Microcentrum rhombifolium",
+    "common": "Greater Anglewing",
+    "url": "https://static.inaturalist.org/sounds/1630957.m4a?1757462710",
+    "license": "cc-by-nc",
+    "observer": "zenat8",
+    "observation": "https://www.inaturalist.org/observations/312800756",
+    "file": "tettigoniidae/Microcentrum_rhombifolium_050.m4a",
+    "bytes": 124641
+  },
+  {
+    "species": "Amblycorypha oblongifolia",
+    "common": "Oblong-winged Katydid",
+    "url": "https://static.inaturalist.org/sounds/1139669.m4a?1721595289",
+    "license": "cc-by-nc",
+    "observer": "Austin",
+    "observation": "https://www.inaturalist.org/observations/230844856",
+    "file": "tettigoniidae/Amblycorypha_oblongifolia_051.m4a",
+    "bytes": 119574
+  },
+  {
+    "species": "Amblycorypha oblongifolia",
+    "common": "Oblong-winged Katydid",
+    "url": "https://static.inaturalist.org/sounds/1139660.m4a?1721594418",
+    "license": "cc-by-nc",
+    "observer": "Austin",
+    "observation": "https://www.inaturalist.org/observations/230840988",
+    "file": "tettigoniidae/Amblycorypha_oblongifolia_052.m4a",
+    "bytes": 116895
+  },
+  {
+    "species": "Amblycorypha oblongifolia",
+    "common": "Oblong-winged Katydid",
+    "url": "https://static.inaturalist.org/sounds/1646510.m4a?1758687442",
+    "license": "cc-by-nc",
+    "observer": "Vicki McKay",
+    "observation": "https://www.inaturalist.org/observations/316211419",
+    "file": "tettigoniidae/Amblycorypha_oblongifolia_053.m4a",
+    "bytes": 289443
+  },
+  {
+    "species": "Microcentrum retinerve",
+    "common": "Lesser Anglewing",
+    "url": "https://static.inaturalist.org/sounds/25912.mp3?1537198585",
+    "license": "cc-by-nc",
+    "observer": "Dan Johnson",
+    "observation": "https://www.inaturalist.org/observations/16627500",
+    "file": "tettigoniidae/Microcentrum_retinerve_054.mp3",
+    "bytes": 220631
+  },
+  {
+    "species": "Microcentrum retinerve",
+    "common": "Lesser Anglewing",
+    "url": "https://static.inaturalist.org/sounds/1849766.m4a?1775781781",
+    "license": "cc-by-nc",
+    "observer": "Abigail Carlson",
+    "observation": "https://www.inaturalist.org/observations/348612741",
+    "file": "tettigoniidae/Microcentrum_retinerve_055.m4a",
+    "bytes": 232286
+  },
+  {
+    "species": "Microcentrum retinerve",
+    "common": "Lesser Anglewing",
+    "url": "https://static.inaturalist.org/sounds/1849766.m4a?1775781781",
+    "license": "cc-by-nc",
+    "observer": "Abigail Carlson",
+    "observation": "https://www.inaturalist.org/observations/348612741",
+    "file": "tettigoniidae/Microcentrum_retinerve_056.m4a",
+    "bytes": 232286
+  },
+  {
+    "species": "Tettigonia cantans",
+    "common": "Upland Green Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1566173.mp3?1752360198",
+    "license": "cc-by",
+    "observer": "\u0415\u0432\u0433\u0435\u043d\u0438\u0439 \u041c\u0430\u0440\u0438\u043d\u043a\u0438\u043d",
+    "observation": "https://www.inaturalist.org/observations/297423508",
+    "file": "tettigoniidae/Tettigonia_cantans_057.mp3",
+    "bytes": 351444
+  },
+  {
+    "species": "Tettigonia cantans",
+    "common": "Upland Green Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/273275.m4a?1626092983",
+    "license": "cc-by-nc",
+    "observer": "C.Huber",
+    "observation": "https://www.inaturalist.org/observations/86703498",
+    "file": "tettigoniidae/Tettigonia_cantans_058.m4a",
+    "bytes": 120483
+  },
+  {
+    "species": "Tettigonia cantans",
+    "common": "Upland Green Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/512071.mp3?1659367972",
+    "license": "cc-by",
+    "observer": "snaily_naily",
+    "observation": "https://www.inaturalist.org/observations/128987999",
+    "file": "tettigoniidae/Tettigonia_cantans_059.mp3",
+    "bytes": 331776
+  },
+  {
+    "species": "Orchelimum gladiator",
+    "common": "Gladiator Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/25200.m4a?1534731178",
+    "license": "cc-by-nc",
+    "observer": "Nick Belliveau",
+    "observation": "https://www.inaturalist.org/observations/15710858",
+    "file": "tettigoniidae/Orchelimum_gladiator_060.m4a",
+    "bytes": 190450
+  },
+  {
+    "species": "Orchelimum gladiator",
+    "common": "Gladiator Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/1139388.m4a?1721579216",
+    "license": "cc-by-nc",
+    "observer": "Jordan S",
+    "observation": "https://www.inaturalist.org/observations/230780502",
+    "file": "tettigoniidae/Orchelimum_gladiator_061.m4a",
+    "bytes": 105757
+  },
+  {
+    "species": "Orchelimum gladiator",
+    "common": "Gladiator Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/1143235.m4a?1721930860",
+    "license": "cc-by-nc",
+    "observer": "Jordan S",
+    "observation": "https://www.inaturalist.org/observations/230780502",
+    "file": "tettigoniidae/Orchelimum_gladiator_062.m4a",
+    "bytes": 148502
+  },
+  {
+    "species": "Decticus verrucivorus",
+    "common": "Wart-biter",
+    "url": "https://static.inaturalist.org/sounds/278835.mp3?1626774164",
+    "license": "cc-by",
+    "observer": "snaily_naily",
+    "observation": "https://www.inaturalist.org/observations/87831064",
+    "file": "tettigoniidae/Decticus_verrucivorus_063.mp3",
+    "bytes": 377856
+  },
+  {
+    "species": "Decticus verrucivorus",
+    "common": "Wart-biter",
+    "url": "https://static.inaturalist.org/sounds/1569274.m4a?1752573467",
+    "license": "cc-by-nc",
+    "observer": "Miriam \u00d6ttl",
+    "observation": "https://www.inaturalist.org/observations/298116596",
+    "file": "tettigoniidae/Decticus_verrucivorus_064.m4a",
+    "bytes": 62812
+  },
+  {
+    "species": "Decticus verrucivorus",
+    "common": "Wart-biter",
+    "url": "https://static.inaturalist.org/sounds/1569274.m4a?1752573467",
+    "license": "cc-by-nc",
+    "observer": "Miriam \u00d6ttl",
+    "observation": "https://www.inaturalist.org/observations/298116596",
+    "file": "tettigoniidae/Decticus_verrucivorus_065.m4a",
+    "bytes": 62812
+  },
+  {
+    "species": "Bucrates malivolans",
+    "common": "Cattail Conehead",
+    "url": "https://static.inaturalist.org/sounds/1112628.m4a?1719596908",
+    "license": "cc-by",
+    "observer": "Dan Johnson",
+    "observation": "https://www.inaturalist.org/observations/225757559",
+    "file": "tettigoniidae/Bucrates_malivolans_066.m4a",
+    "bytes": 166066
+  },
+  {
+    "species": "Bucrates malivolans",
+    "common": "Cattail Conehead",
+    "url": "https://static.inaturalist.org/sounds/1112628.m4a?1719596908",
+    "license": "cc-by",
+    "observer": "Dan Johnson",
+    "observation": "https://www.inaturalist.org/observations/225757559",
+    "file": "tettigoniidae/Bucrates_malivolans_067.m4a",
+    "bytes": 166066
+  },
+  {
+    "species": "Bucrates malivolans",
+    "common": "Cattail Conehead",
+    "url": "https://static.inaturalist.org/sounds/1112628.m4a?1719596908",
+    "license": "cc-by",
+    "observer": "Dan Johnson",
+    "observation": "https://www.inaturalist.org/observations/225757559",
+    "file": "tettigoniidae/Bucrates_malivolans_068.m4a",
+    "bytes": 166066
+  },
+  {
+    "species": "Lea floridensis",
+    "common": "Florida True Katydid",
+    "url": "https://static.inaturalist.org/sounds/1110678.m4a?1719453397",
+    "license": "cc-by-nc",
+    "observer": "DaveK",
+    "observation": "https://www.inaturalist.org/observations/225430154",
+    "file": "tettigoniidae/Lea_floridensis_069.m4a",
+    "bytes": 145398
+  },
+  {
+    "species": "Lea floridensis",
+    "common": "Florida True Katydid",
+    "url": "https://static.inaturalist.org/sounds/1110678.m4a?1719453397",
+    "license": "cc-by-nc",
+    "observer": "DaveK",
+    "observation": "https://www.inaturalist.org/observations/225430154",
+    "file": "tettigoniidae/Lea_floridensis_070.m4a",
+    "bytes": 145398
+  },
+  {
+    "species": "Lea floridensis",
+    "common": "Florida True Katydid",
+    "url": "https://static.inaturalist.org/sounds/1110678.m4a?1719453397",
+    "license": "cc-by-nc",
+    "observer": "DaveK",
+    "observation": "https://www.inaturalist.org/observations/225430154",
+    "file": "tettigoniidae/Lea_floridensis_071.m4a",
+    "bytes": 145398
+  },
+  {
+    "species": "Scudderia pistillata",
+    "common": "Broad-winged Bush Katydid",
+    "url": "https://static.inaturalist.org/sounds/1152022.m4a?1722737332",
+    "license": "cc-by-nc",
+    "observer": "Richard Hedley",
+    "observation": "https://www.inaturalist.org/observations/233624324",
+    "file": "tettigoniidae/Scudderia_pistillata_072.m4a",
+    "bytes": 344315
+  },
+  {
+    "species": "Scudderia pistillata",
+    "common": "Broad-winged Bush Katydid",
+    "url": "https://static.inaturalist.org/sounds/1152023.m4a?1722737334",
+    "license": "cc-by-nc",
+    "observer": "Richard Hedley",
+    "observation": "https://www.inaturalist.org/observations/233624324",
+    "file": "tettigoniidae/Scudderia_pistillata_073.m4a",
+    "bytes": 112028
+  },
+  {
+    "species": "Scudderia pistillata",
+    "common": "Broad-winged Bush Katydid",
+    "url": "https://static.inaturalist.org/sounds/1152022.m4a?1722737332",
+    "license": "cc-by-nc",
+    "observer": "Richard Hedley",
+    "observation": "https://www.inaturalist.org/observations/233624324",
+    "file": "tettigoniidae/Scudderia_pistillata_074.m4a",
+    "bytes": 344315
+  },
+  {
+    "species": "Metrioptera brachyptera",
+    "common": "Bog Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1198575.m4a?1726070928",
+    "license": "cc-by-nc",
+    "observer": "Africa Gomez",
+    "observation": "https://www.inaturalist.org/observations/241123230",
+    "file": "tettigoniidae/Metrioptera_brachyptera_075.m4a",
+    "bytes": 248607
+  },
+  {
+    "species": "Metrioptera brachyptera",
+    "common": "Bog Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1198579.m4a?1726070952",
+    "license": "cc-by-nc",
+    "observer": "Africa Gomez",
+    "observation": "https://www.inaturalist.org/observations/241123302",
+    "file": "tettigoniidae/Metrioptera_brachyptera_076.m4a",
+    "bytes": 195098
+  },
+  {
+    "species": "Metrioptera brachyptera",
+    "common": "Bog Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1198575.m4a?1726070928",
+    "license": "cc-by-nc",
+    "observer": "Africa Gomez",
+    "observation": "https://www.inaturalist.org/observations/241123230",
+    "file": "tettigoniidae/Metrioptera_brachyptera_077.m4a",
+    "bytes": 248607
+  },
+  {
+    "species": "Ruspolia nitidula",
+    "common": "Large Conehead",
+    "url": "https://static.inaturalist.org/sounds/769032.m4a?1689368210",
+    "license": "cc-by",
+    "observer": "Sylvain Eichhorn",
+    "observation": "https://www.inaturalist.org/observations/172906264",
+    "file": "tettigoniidae/Ruspolia_nitidula_078.m4a",
+    "bytes": 100998
+  },
+  {
+    "species": "Ruspolia nitidula",
+    "common": "Large Conehead",
+    "url": "https://static.inaturalist.org/sounds/1130975.mp3?1720889570",
+    "license": "cc-by-nc",
+    "observer": "Sylvain G",
+    "observation": "https://www.inaturalist.org/observations/229063614",
+    "file": "tettigoniidae/Ruspolia_nitidula_079.mp3",
+    "bytes": 1222294
+  },
+  {
+    "species": "Ruspolia nitidula",
+    "common": "Large Conehead",
+    "url": "https://static.inaturalist.org/sounds/1606724.mp3?1755373362",
+    "license": "cc-by-nc",
+    "observer": "Pawe\u0142 Radzikowski",
+    "observation": "https://www.inaturalist.org/observations/306815014",
+    "file": "tettigoniidae/Ruspolia_nitidula_080.mp3",
+    "bytes": 363455
+  },
+  {
+    "species": "Euconocephalus nasutus",
+    "common": "Irritating Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/612639.m4a?1678533157",
+    "license": "cc-by-nc",
+    "observer": "silentree",
+    "observation": "https://www.inaturalist.org/observations/150807938",
+    "file": "tettigoniidae/Euconocephalus_nasutus_081.m4a",
+    "bytes": 409754
+  },
+  {
+    "species": "Euconocephalus nasutus",
+    "common": "Irritating Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/612653.m4a?1678535663",
+    "license": "cc-by-nc",
+    "observer": "silentree",
+    "observation": "https://www.inaturalist.org/observations/150807938",
+    "file": "tettigoniidae/Euconocephalus_nasutus_082.m4a",
+    "bytes": 409754
+  },
+  {
+    "species": "Euconocephalus nasutus",
+    "common": "Irritating Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/612639.m4a?1678533157",
+    "license": "cc-by-nc",
+    "observer": "silentree",
+    "observation": "https://www.inaturalist.org/observations/150807938",
+    "file": "tettigoniidae/Euconocephalus_nasutus_083.m4a",
+    "bytes": 409754
+  },
+  {
+    "species": "Conocephalus melaenus",
+    "common": "Black-kneed Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/1122522.mp3?1720257275",
+    "license": "cc-by-nc",
+    "observer": "\u5b8b\u4e7e\u5b87",
+    "observation": "https://www.inaturalist.org/observations/227476298",
+    "file": "tettigoniidae/Conocephalus_melaenus_084.mp3",
+    "bytes": 1312630
+  },
+  {
+    "species": "Conocephalus melaenus",
+    "common": "Black-kneed Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/1122522.mp3?1720257275",
+    "license": "cc-by-nc",
+    "observer": "\u5b8b\u4e7e\u5b87",
+    "observation": "https://www.inaturalist.org/observations/227476298",
+    "file": "tettigoniidae/Conocephalus_melaenus_085.mp3",
+    "bytes": 1312630
+  },
+  {
+    "species": "Conocephalus melaenus",
+    "common": "Black-kneed Meadow Katydid",
+    "url": "https://static.inaturalist.org/sounds/1122522.mp3?1720257275",
+    "license": "cc-by-nc",
+    "observer": "\u5b8b\u4e7e\u5b87",
+    "observation": "https://www.inaturalist.org/observations/227476298",
+    "file": "tettigoniidae/Conocephalus_melaenus_086.mp3",
+    "bytes": 1312630
+  },
+  {
+    "species": "Poecilimon ornatus",
+    "common": "Ornate Bright Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1122013.m4a?1720204834",
+    "license": "cc-by-nc",
+    "observer": "Manuel Raab",
+    "observation": "https://www.inaturalist.org/observations/227352404",
+    "file": "tettigoniidae/Poecilimon_ornatus_087.m4a",
+    "bytes": 264992
+  },
+  {
+    "species": "Poecilimon ornatus",
+    "common": "Ornate Bright Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1122013.m4a?1720204834",
+    "license": "cc-by-nc",
+    "observer": "Manuel Raab",
+    "observation": "https://www.inaturalist.org/observations/227352404",
+    "file": "tettigoniidae/Poecilimon_ornatus_088.m4a",
+    "bytes": 264992
+  },
+  {
+    "species": "Poecilimon ornatus",
+    "common": "Ornate Bright Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/1122013.m4a?1720204834",
+    "license": "cc-by-nc",
+    "observer": "Manuel Raab",
+    "observation": "https://www.inaturalist.org/observations/227352404",
+    "file": "tettigoniidae/Poecilimon_ornatus_089.m4a",
+    "bytes": 264992
+  },
+  {
+    "species": "Metholce nigritarsis",
+    "common": "Black-footed Gondwanan Katydid",
+    "url": "https://static.inaturalist.org/sounds/1294362.m4a?1738042360",
+    "license": "cc-by",
+    "observer": "Sockrosma",
+    "observation": "https://www.inaturalist.org/observations/259833868",
+    "file": "tettigoniidae/Metholce_nigritarsis_090.m4a",
+    "bytes": 246767
+  },
+  {
+    "species": "Metholce nigritarsis",
+    "common": "Black-footed Gondwanan Katydid",
+    "url": "https://static.inaturalist.org/sounds/1294867.m4a?1738104559",
+    "license": "cc-by",
+    "observer": "Sockrosma",
+    "observation": "https://www.inaturalist.org/observations/259906459",
+    "file": "tettigoniidae/Metholce_nigritarsis_091.m4a",
+    "bytes": 163605
+  },
+  {
+    "species": "Belocephalus subapterus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/235605.mp3?1622134210",
+    "license": "cc-by",
+    "observer": "aispinsects",
+    "observation": "https://www.inaturalist.org/observations/80497083",
+    "file": "tettigoniidae/Belocephalus_subapterus_092.mp3",
+    "bytes": 835409
+  },
+  {
+    "species": "Belocephalus subapterus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1693740.mp3?1763131800",
+    "license": "cc-by-nc",
+    "observer": "Mikie Green",
+    "observation": "https://www.inaturalist.org/observations/326471843",
+    "file": "tettigoniidae/Belocephalus_subapterus_093.mp3",
+    "bytes": 280608
+  },
+  {
+    "species": "Onconotus servillei",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/41739.mp3?1561061474",
+    "license": "cc-by",
+    "observer": "Roman",
+    "observation": "https://www.inaturalist.org/observations/27343115",
+    "file": "tettigoniidae/Onconotus_servillei_094.mp3",
+    "bytes": 335203
+  },
+  {
+    "species": "Onconotus servillei",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/41738.mp3?1561060909",
+    "license": "cc-by",
+    "observer": "Roman",
+    "observation": "https://www.inaturalist.org/observations/27342663",
+    "file": "tettigoniidae/Onconotus_servillei_095.mp3",
+    "bytes": 302184
+  },
+  {
+    "species": "Montana montana",
+    "common": "Steppe Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/294141.m4a?1629428726",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/91365312",
+    "file": "tettigoniidae/Montana_montana_096.m4a",
+    "bytes": 500222
+  },
+  {
+    "species": "Montana montana",
+    "common": "Steppe Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/294142.m4a?1629428741",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/91365312",
+    "file": "tettigoniidae/Montana_montana_097.m4a",
+    "bytes": 654501
+  },
+  {
+    "species": "Gryllodes sigillatus",
+    "common": "Tropical House Cricket",
+    "url": "https://static.inaturalist.org/sounds/381367.mp3?1648591218",
+    "license": "cc-by-nc",
+    "observer": "david26781",
+    "observation": "https://www.inaturalist.org/observations/109872267",
+    "file": "gryllidae/Gryllodes_sigillatus_002.mp3",
+    "bytes": 253283
+  },
+  {
+    "species": "Gryllus veletis",
+    "common": "Spring Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/721495.m4a?1685626538",
+    "license": "cc-by-nc",
+    "observer": "averyavesave",
+    "observation": "https://www.inaturalist.org/observations/164972278",
+    "file": "gryllidae/Gryllus_veletis_004.m4a",
+    "bytes": 116064
+  },
+  {
+    "species": "Gryllus veletis",
+    "common": "Spring Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/733228.m4a?1686429096",
+    "license": "cc-by-nc",
+    "observer": "trentberry",
+    "observation": "https://www.inaturalist.org/observations/166661508",
+    "file": "gryllidae/Gryllus_veletis_005.m4a",
+    "bytes": 65709
+  },
+  {
+    "species": "Gryllus bimaculatus",
+    "common": "Southern Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/787922.m4a?1691445751",
+    "license": "cc-by-nc",
+    "observer": "lukapraprotnik",
+    "observation": "https://www.inaturalist.org/observations/177239755",
+    "file": "gryllidae/Gryllus_bimaculatus_006.m4a",
+    "bytes": 292129
+  },
+  {
+    "species": "Gryllus bimaculatus",
+    "common": "Southern Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/787923.m4a?1691445754",
+    "license": "cc-by-nc",
+    "observer": "lukapraprotnik",
+    "observation": "https://www.inaturalist.org/observations/177239755",
+    "file": "gryllidae/Gryllus_bimaculatus_007.m4a",
+    "bytes": 101081
+  },
+  {
+    "species": "Gryllus bimaculatus",
+    "common": "Southern Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/787924.m4a?1691445759",
+    "license": "cc-by-nc",
+    "observer": "lukapraprotnik",
+    "observation": "https://www.inaturalist.org/observations/177239755",
+    "file": "gryllidae/Gryllus_bimaculatus_008.m4a",
+    "bytes": 101633
+  },
+  {
+    "species": "Velarifictorus micado",
+    "common": "Japanese Burrowing Cricket",
+    "url": "https://static.inaturalist.org/sounds/536822.m4a?1663372030",
+    "license": "cc-by-nc",
+    "observer": "onidiras-iNaturalist",
+    "observation": "https://www.inaturalist.org/observations/135314542",
+    "file": "gryllidae/Velarifictorus_micado_009.m4a",
+    "bytes": 64783
+  },
+  {
+    "species": "Velarifictorus micado",
+    "common": "Japanese Burrowing Cricket",
+    "url": "https://static.inaturalist.org/sounds/530519.m4a?1662248412",
+    "license": "cc-by-nc",
+    "observer": "onidiras-iNaturalist",
+    "observation": "https://www.inaturalist.org/observations/133540347",
+    "file": "gryllidae/Velarifictorus_micado_010.m4a",
+    "bytes": 100022
+  },
+  {
+    "species": "Velarifictorus micado",
+    "common": "Japanese Burrowing Cricket",
+    "url": "https://static.inaturalist.org/sounds/1116884.m4a?1719857032",
+    "license": "cc-by",
+    "observer": "L.J. Lamera",
+    "observation": "https://www.inaturalist.org/observations/226493575",
+    "file": "gryllidae/Velarifictorus_micado_011.m4a",
+    "bytes": 55603
+  },
+  {
+    "species": "Teleogryllus commodus",
+    "common": "Australian Black Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/601987.m4a?1677011094",
+    "license": "cc-by-nc-sa",
+    "observer": "Simon Grove (TMAG)",
+    "observation": "https://www.inaturalist.org/observations/149348554",
+    "file": "gryllidae/Teleogryllus_commodus_012.m4a",
+    "bytes": 259049
+  },
+  {
+    "species": "Teleogryllus commodus",
+    "common": "Australian Black Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1343940.m4a?1742624138",
+    "license": "cc-by-nc",
+    "observer": "Brendan Doogan",
+    "observation": "https://www.inaturalist.org/observations/266334130",
+    "file": "gryllidae/Teleogryllus_commodus_013.m4a",
+    "bytes": 96281
+  },
+  {
+    "species": "Teleogryllus commodus",
+    "common": "Australian Black Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1922588.m4a?1777789339",
+    "license": "cc-by-nc",
+    "observer": "Ella Davies",
+    "observation": "https://www.inaturalist.org/observations/357806523",
+    "file": "gryllidae/Teleogryllus_commodus_014.m4a",
+    "bytes": 116213
+  },
+  {
+    "species": "Gryllus pennsylvanicus",
+    "common": "Fall Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/299421.m4a?1630360905",
+    "license": "cc-by-nc",
+    "observer": "Juli Mallett",
+    "observation": "https://www.inaturalist.org/observations/93087300",
+    "file": "gryllidae/Gryllus_pennsylvanicus_015.m4a",
+    "bytes": 35359
+  },
+  {
+    "species": "Gryllus pennsylvanicus",
+    "common": "Fall Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/323767.m4a?1635728500",
+    "license": "cc-by-nc",
+    "observer": "John D Reynolds",
+    "observation": "https://www.inaturalist.org/observations/99935945",
+    "file": "gryllidae/Gryllus_pennsylvanicus_016.m4a",
+    "bytes": 87656
+  },
+  {
+    "species": "Gryllus pennsylvanicus",
+    "common": "Fall Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1185629.m4a?1724631905",
+    "license": "cc-by-nc",
+    "observer": "Kyle Aldinger",
+    "observation": "https://www.inaturalist.org/observations/237978212",
+    "file": "gryllidae/Gryllus_pennsylvanicus_017.m4a",
+    "bytes": 90195
+  },
+  {
+    "species": "Gryllus campestris",
+    "common": "European Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1068422.mp3?1717052707",
+    "license": "cc0",
+    "observer": "Marino Lini\u0107",
+    "observation": "https://www.inaturalist.org/observations/219272343",
+    "file": "gryllidae/Gryllus_campestris_018.mp3",
+    "bytes": 317567
+  },
+  {
+    "species": "Gryllus campestris",
+    "common": "European Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1595578.m4a?1754502910",
+    "license": "cc-by-nc",
+    "observer": "Frank Fritzlar",
+    "observation": "https://www.inaturalist.org/observations/304282015",
+    "file": "gryllidae/Gryllus_campestris_019.m4a",
+    "bytes": 869069
+  },
+  {
+    "species": "Gryllus campestris",
+    "common": "European Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1914500.m4a?1777545163",
+    "license": "cc-by-nc",
+    "observer": "Karsten Mody",
+    "observation": "https://www.inaturalist.org/observations/356803373",
+    "file": "gryllidae/Gryllus_campestris_020.m4a",
+    "bytes": 111296
+  },
+  {
+    "species": "Svercus palmetorum",
+    "common": "Cicada Cricket",
+    "url": "https://static.inaturalist.org/sounds/957744.m4a?1712554017",
+    "license": "cc-by-nc",
+    "observer": "Axel Gosseries",
+    "observation": "https://www.inaturalist.org/observations/206021429",
+    "file": "gryllidae/Svercus_palmetorum_021.m4a",
+    "bytes": 313722
+  },
+  {
+    "species": "Svercus palmetorum",
+    "common": "Cicada Cricket",
+    "url": "https://static.inaturalist.org/sounds/957745.m4a?1712554081",
+    "license": "cc-by-nc",
+    "observer": "Axel Gosseries",
+    "observation": "https://www.inaturalist.org/observations/206021429",
+    "file": "gryllidae/Svercus_palmetorum_022.m4a",
+    "bytes": 212980
+  },
+  {
+    "species": "Svercus palmetorum",
+    "common": "Cicada Cricket",
+    "url": "https://static.inaturalist.org/sounds/758464.mp3?1688381354",
+    "license": "cc-by-nc",
+    "observer": "Lo\u00efs Rancilhac",
+    "observation": "https://www.inaturalist.org/observations/170814473",
+    "file": "gryllidae/Svercus_palmetorum_023.mp3",
+    "bytes": 309501
+  },
+  {
+    "species": "Xenogryllus marmoratus",
+    "common": "Japanese Pine Cricket",
+    "url": "https://static.inaturalist.org/sounds/838530.m4a?1698553817",
+    "license": "cc-by-nc",
+    "observer": "mutsu_semon",
+    "observation": "https://www.inaturalist.org/observations/189313004",
+    "file": "gryllidae/Xenogryllus_marmoratus_024.m4a",
+    "bytes": 67920
+  },
+  {
+    "species": "Xenogryllus marmoratus",
+    "common": "Japanese Pine Cricket",
+    "url": "https://static.inaturalist.org/sounds/1249299.m4a?1731360245",
+    "license": "cc-by",
+    "observer": "\u5cb8\u672c\u5e74\u90ce",
+    "observation": "https://www.inaturalist.org/observations/251360739",
+    "file": "gryllidae/Xenogryllus_marmoratus_025.m4a",
+    "bytes": 88971
+  },
+  {
+    "species": "Xenogryllus marmoratus",
+    "common": "Japanese Pine Cricket",
+    "url": "https://static.inaturalist.org/sounds/316643.mp3?1634309830",
+    "license": "cc-by-nc",
+    "observer": "Observa\u00e7\u00f5es Naturalistas | Bruno Uehara",
+    "observation": "https://www.inaturalist.org/observations/98279736",
+    "file": "gryllidae/Xenogryllus_marmoratus_026.mp3",
+    "bytes": 319903
+  },
+  {
+    "species": "Acheta domesticus",
+    "common": "House Cricket",
+    "url": "https://static.inaturalist.org/sounds/507909.m4a?1658865078",
+    "license": "cc-by-nc",
+    "observer": "Stephan Pflume",
+    "observation": "https://www.inaturalist.org/observations/128041848",
+    "file": "gryllidae/Acheta_domesticus_027.m4a",
+    "bytes": 203927
+  },
+  {
+    "species": "Acheta domesticus",
+    "common": "House Cricket",
+    "url": "https://static.inaturalist.org/sounds/507911.m4a?1658865277",
+    "license": "cc-by-nc",
+    "observer": "Stephan Pflume",
+    "observation": "https://www.inaturalist.org/observations/128041848",
+    "file": "gryllidae/Acheta_domesticus_028.m4a",
+    "bytes": 203927
+  },
+  {
+    "species": "Acheta domesticus",
+    "common": "House Cricket",
+    "url": "https://static.inaturalist.org/sounds/507968.m4a?1658870480",
+    "license": "cc-by-nc",
+    "observer": "Stephan Pflume",
+    "observation": "https://www.inaturalist.org/observations/128041848",
+    "file": "gryllidae/Acheta_domesticus_029.m4a",
+    "bytes": 862240
+  },
+  {
+    "species": "Eumodicogryllus bordigalensis",
+    "common": "Verge Cricket",
+    "url": "https://static.inaturalist.org/sounds/2037424.m4a?1782160356",
+    "license": "cc-by-nc",
+    "observer": "Dalibor Hip\u00edk",
+    "observation": "https://www.inaturalist.org/observations/374406215",
+    "file": "gryllidae/Eumodicogryllus_bordigalensis_030.m4a",
+    "bytes": 87070
+  },
+  {
+    "species": "Eumodicogryllus bordigalensis",
+    "common": "Verge Cricket",
+    "url": "https://static.inaturalist.org/sounds/807457.mp3?1693986310",
+    "license": "cc-by-nc",
+    "observer": "eva_b_s",
+    "observation": "https://www.inaturalist.org/observations/182021106",
+    "file": "gryllidae/Eumodicogryllus_bordigalensis_031.mp3",
+    "bytes": 244514
+  },
+  {
+    "species": "Eumodicogryllus bordigalensis",
+    "common": "Verge Cricket",
+    "url": "https://static.inaturalist.org/sounds/1941656.m4a?1778436560",
+    "license": "cc-by-nc",
+    "observer": "julenn",
+    "observation": "https://www.inaturalist.org/observations/360311915",
+    "file": "gryllidae/Eumodicogryllus_bordigalensis_032.m4a",
+    "bytes": 249082
+  },
+  {
+    "species": "Lepidogryllus parvulus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/392547.m4a?1649891766",
+    "license": "cc-by",
+    "observer": "Shaun Lee",
+    "observation": "https://www.inaturalist.org/observations/111362531",
+    "file": "gryllidae/Lepidogryllus_parvulus_033.m4a",
+    "bytes": 211771
+  },
+  {
+    "species": "Lepidogryllus parvulus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/392548.m4a?1649891769",
+    "license": "cc-by",
+    "observer": "Shaun Lee",
+    "observation": "https://www.inaturalist.org/observations/111362531",
+    "file": "gryllidae/Lepidogryllus_parvulus_034.m4a",
+    "bytes": 546714
+  },
+  {
+    "species": "Lepidogryllus parvulus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/392549.m4a?1649891772",
+    "license": "cc-by",
+    "observer": "Shaun Lee",
+    "observation": "https://www.inaturalist.org/observations/111362531",
+    "file": "gryllidae/Lepidogryllus_parvulus_035.m4a",
+    "bytes": 569479
+  },
+  {
+    "species": "Gryllus assimilis",
+    "common": "Jamaican Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/431441.m4a?1652087652",
+    "license": "cc-by-nc",
+    "observer": "Ant\u00f4nio",
+    "observation": "https://www.inaturalist.org/observations/116252739",
+    "file": "gryllidae/Gryllus_assimilis_036.m4a",
+    "bytes": 89109
+  },
+  {
+    "species": "Gryllus assimilis",
+    "common": "Jamaican Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1556684.m4a?1751765504",
+    "license": "cc-by-nc",
+    "observer": "Theodor Igor Ottinger",
+    "observation": "https://www.inaturalist.org/observations/295562642",
+    "file": "gryllidae/Gryllus_assimilis_037.m4a",
+    "bytes": 66881
+  },
+  {
+    "species": "Gryllus assimilis",
+    "common": "Jamaican Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/141988.mp3?1602392022",
+    "license": "cc-by-nc",
+    "observer": "Cin-Ty Lee",
+    "observation": "https://www.inaturalist.org/observations/62271051",
+    "file": "gryllidae/Gryllus_assimilis_038.mp3",
+    "bytes": 144439
+  },
+  {
+    "species": "Teleogryllus emma",
+    "common": "Emma Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/311309.mp3?1632995841",
+    "license": "cc-by-nc",
+    "observer": "Observa\u00e7\u00f5es Naturalistas | Bruno Uehara",
+    "observation": "https://www.inaturalist.org/observations/96668998",
+    "file": "gryllidae/Teleogryllus_emma_039.mp3",
+    "bytes": 1289569
+  },
+  {
+    "species": "Teleogryllus emma",
+    "common": "Emma Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1207588.m4a?1726962295",
+    "license": "cc-by",
+    "observer": "IMORI MIHO",
+    "observation": "https://www.inaturalist.org/observations/243213355",
+    "file": "gryllidae/Teleogryllus_emma_040.m4a",
+    "bytes": 286114
+  },
+  {
+    "species": "Teleogryllus emma",
+    "common": "Emma Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1216124.m4a?1727574497",
+    "license": "cc-by",
+    "observer": "WATANABE Hitoshi \u6e21\u8fba\u4ec1",
+    "observation": "https://www.inaturalist.org/observations/244614321",
+    "file": "gryllidae/Teleogryllus_emma_041.m4a",
+    "bytes": 106607
+  },
+  {
+    "species": "Velarifictorus ornatus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1472261.m4a?1747665328",
+    "license": "cc-by-nc",
+    "observer": "\u7ef4\u751f\u7d20",
+    "observation": "https://www.inaturalist.org/observations/282377455",
+    "file": "gryllidae/Velarifictorus_ornatus_042.m4a",
+    "bytes": 149299
+  },
+  {
+    "species": "Velarifictorus ornatus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1545156.mp3?1751113714",
+    "license": "cc-by-nc",
+    "observer": "wresy",
+    "observation": "https://www.inaturalist.org/observations/293366233",
+    "file": "gryllidae/Velarifictorus_ornatus_043.mp3",
+    "bytes": 576657
+  },
+  {
+    "species": "Velarifictorus ornatus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1552744.m4a?1751543324",
+    "license": "cc-by-nc",
+    "observer": "\u7ef4\u751f\u7d20",
+    "observation": "https://www.inaturalist.org/observations/294820568",
+    "file": "gryllidae/Velarifictorus_ornatus_044.m4a",
+    "bytes": 284639
+  },
+  {
+    "species": "Gryllus texensis",
+    "common": "Texas Trilling Cricket",
+    "url": "https://static.inaturalist.org/sounds/1373534.m4a?1744564056",
+    "license": "cc-by-nc",
+    "observer": "Caleb Helsel",
+    "observation": "https://www.inaturalist.org/observations/270230854",
+    "file": "gryllidae/Gryllus_texensis_045.m4a",
+    "bytes": 225113
+  },
+  {
+    "species": "Gryllus texensis",
+    "common": "Texas Trilling Cricket",
+    "url": "https://static.inaturalist.org/sounds/1375291.mp3?1744653004",
+    "license": "cc-by-nc",
+    "observer": "Krush6",
+    "observation": "https://www.inaturalist.org/observations/270467160",
+    "file": "gryllidae/Gryllus_texensis_046.mp3",
+    "bytes": 342974
+  },
+  {
+    "species": "Gryllus texensis",
+    "common": "Texas Trilling Cricket",
+    "url": "https://static.inaturalist.org/sounds/1228122.m4a?1728779754",
+    "license": "cc-by-nc",
+    "observer": "Caleb Helsel",
+    "observation": "https://www.inaturalist.org/observations/247030680",
+    "file": "gryllidae/Gryllus_texensis_047.m4a",
+    "bytes": 424865
+  },
+  {
+    "species": "Gryllus rubens",
+    "common": "Southeastern Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1379575.m4a?1744921297",
+    "license": "cc-by-nc",
+    "observer": "jessicatate91",
+    "observation": "https://www.inaturalist.org/observations/271078837",
+    "file": "gryllidae/Gryllus_rubens_048.m4a",
+    "bytes": 170015
+  },
+  {
+    "species": "Gryllus rubens",
+    "common": "Southeastern Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1433814.m4a?1746161370",
+    "license": "cc-by-nc",
+    "observer": "Lila S.",
+    "observation": "https://www.inaturalist.org/observations/277613242",
+    "file": "gryllidae/Gryllus_rubens_049.m4a",
+    "bytes": 61017
+  },
+  {
+    "species": "Gryllus rubens",
+    "common": "Southeastern Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1433815.m4a?1746161371",
+    "license": "cc-by-nc",
+    "observer": "Lila S.",
+    "observation": "https://www.inaturalist.org/observations/277613242",
+    "file": "gryllidae/Gryllus_rubens_050.m4a",
+    "bytes": 232353
+  },
+  {
+    "species": "Loxoblemmus doenitzi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1599685.m4a?1754828178",
+    "license": "cc-by-nc",
+    "observer": "snipecube3d",
+    "observation": "https://www.inaturalist.org/observations/305213383",
+    "file": "gryllidae/Loxoblemmus_doenitzi_051.m4a",
+    "bytes": 149296
+  },
+  {
+    "species": "Loxoblemmus doenitzi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/321193.mp3?1635167370",
+    "license": "cc-by-nc",
+    "observer": "Observa\u00e7\u00f5es Naturalistas | Bruno Uehara",
+    "observation": "https://www.inaturalist.org/observations/99341655",
+    "file": "gryllidae/Loxoblemmus_doenitzi_052.mp3",
+    "bytes": 351668
+  },
+  {
+    "species": "Loxoblemmus doenitzi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1603029.m4a?1755087604",
+    "license": "cc-by-nc",
+    "observer": "orientalstork",
+    "observation": "https://www.inaturalist.org/observations/305993858",
+    "file": "gryllidae/Loxoblemmus_doenitzi_053.m4a",
+    "bytes": 706184
+  },
+  {
+    "species": "Gryllus longicercus",
+    "common": "Long-cercus Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1228453.m4a?1728816813",
+    "license": "cc-by-nc",
+    "observer": "Shelia Hargis",
+    "observation": "https://www.inaturalist.org/observations/247093987",
+    "file": "gryllidae/Gryllus_longicercus_054.m4a",
+    "bytes": 310512
+  },
+  {
+    "species": "Gryllus longicercus",
+    "common": "Long-cercus Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/703812.m4a?1684515027",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/128562854",
+    "file": "gryllidae/Gryllus_longicercus_055.m4a",
+    "bytes": 408361
+  },
+  {
+    "species": "Gryllus longicercus",
+    "common": "Long-cercus Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1216634.m4a?1727620407",
+    "license": "cc-by-nc",
+    "observer": "William Abney",
+    "observation": "https://www.inaturalist.org/observations/244701100",
+    "file": "gryllidae/Gryllus_longicercus_056.m4a",
+    "bytes": 132286
+  },
+  {
+    "species": "Miogryllus verticalis",
+    "common": "Eastern Striped Cricket",
+    "url": "https://static.inaturalist.org/sounds/468768.m4a?1655008104",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/121361098",
+    "file": "gryllidae/Miogryllus_verticalis_057.m4a",
+    "bytes": 243281
+  },
+  {
+    "species": "Miogryllus verticalis",
+    "common": "Eastern Striped Cricket",
+    "url": "https://static.inaturalist.org/sounds/1641803.m4a?1758308530",
+    "license": "cc-by-nc",
+    "observer": "Kyle Aldinger",
+    "observation": "https://www.inaturalist.org/observations/315072339",
+    "file": "gryllidae/Miogryllus_verticalis_058.m4a",
+    "bytes": 209062
+  },
+  {
+    "species": "Miogryllus verticalis",
+    "common": "Eastern Striped Cricket",
+    "url": "https://static.inaturalist.org/sounds/1081259.m4a?1717723565",
+    "license": "cc-by-nc",
+    "observer": "Kyle Aldinger",
+    "observation": "https://www.inaturalist.org/observations/221011503",
+    "file": "gryllidae/Miogryllus_verticalis_059.m4a",
+    "bytes": 117928
+  },
+  {
+    "species": "Acanthogryllus acus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1755710.mp3?1769971510",
+    "license": "cc-by-nc",
+    "observer": "Werner Reitmeier",
+    "observation": "https://www.inaturalist.org/observations/336986046",
+    "file": "gryllidae/Acanthogryllus_acus_060.mp3",
+    "bytes": 442024
+  },
+  {
+    "species": "Acanthogryllus acus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1754768.mp3?1769884751",
+    "license": "cc-by-nc",
+    "observer": "Werner Reitmeier",
+    "observation": "https://www.inaturalist.org/observations/336845521",
+    "file": "gryllidae/Acanthogryllus_acus_061.mp3",
+    "bytes": 761240
+  },
+  {
+    "species": "Acanthogryllus acus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1754766.mp3?1769884736",
+    "license": "cc-by-nc",
+    "observer": "Werner Reitmeier",
+    "observation": "https://www.inaturalist.org/observations/336845521",
+    "file": "gryllidae/Acanthogryllus_acus_062.mp3",
+    "bytes": 175575
+  },
+  {
+    "species": "Gryllus firmus",
+    "common": "Sand Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1227643.m4a?1728737023",
+    "license": "cc-by-nc",
+    "observer": "Caleb Helsel",
+    "observation": "https://www.inaturalist.org/observations/246916899",
+    "file": "gryllidae/Gryllus_firmus_063.m4a",
+    "bytes": 97150
+  },
+  {
+    "species": "Gryllus firmus",
+    "common": "Sand Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1227643.m4a?1728737023",
+    "license": "cc-by-nc",
+    "observer": "Caleb Helsel",
+    "observation": "https://www.inaturalist.org/observations/246916899",
+    "file": "gryllidae/Gryllus_firmus_064.m4a",
+    "bytes": 97150
+  },
+  {
+    "species": "Gryllus firmus",
+    "common": "Sand Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/1232205.m4a?1729264496",
+    "license": "cc-by-nc",
+    "observer": "mkinaturalist",
+    "observation": "https://www.inaturalist.org/observations/247918506",
+    "file": "gryllidae/Gryllus_firmus_065.m4a",
+    "bytes": 147818
+  },
+  {
+    "species": "Velarifictorus aspersus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/245940.m4a?1622941726",
+    "license": "cc-by-nc",
+    "observer": "\u9189\u7fc1",
+    "observation": "https://www.inaturalist.org/observations/81796492",
+    "file": "gryllidae/Velarifictorus_aspersus_066.m4a",
+    "bytes": 266989
+  },
+  {
+    "species": "Velarifictorus aspersus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1950991.m4a?1778802866",
+    "license": "cc-by",
+    "observer": "smathichong",
+    "observation": "https://www.inaturalist.org/observations/361565159",
+    "file": "gryllidae/Velarifictorus_aspersus_067.m4a",
+    "bytes": 251807
+  },
+  {
+    "species": "Eugryllodes pipiens",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1235784.mp3?1729621694",
+    "license": "cc-by-nc",
+    "observer": "Werner Reitmeier",
+    "observation": "https://www.inaturalist.org/observations/248633781",
+    "file": "gryllidae/Eugryllodes_pipiens_068.mp3",
+    "bytes": 260702
+  },
+  {
+    "species": "Eugryllodes pipiens",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1151841.m4a?1722722157",
+    "license": "cc-by-nc",
+    "observer": "anaispaturle",
+    "observation": "https://www.inaturalist.org/observations/233582770",
+    "file": "gryllidae/Eugryllodes_pipiens_069.m4a",
+    "bytes": 221400
+  },
+  {
+    "species": "Gryllus multipulsator",
+    "common": "Long-chirp Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/720295.m4a?1685542714",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/164807354",
+    "file": "gryllidae/Gryllus_multipulsator_070.m4a",
+    "bytes": 204340
+  },
+  {
+    "species": "Gryllus multipulsator",
+    "common": "Long-chirp Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/808463.mp3?1694149441",
+    "license": "cc-by-nc",
+    "observer": "Steven Kurniawidjaja",
+    "observation": "https://www.inaturalist.org/observations/182283590",
+    "file": "gryllidae/Gryllus_multipulsator_071.mp3",
+    "bytes": 192679
+  },
+  {
+    "species": "Anurogryllus celerinictus",
+    "common": "Indies Short-tailed Cricket",
+    "url": "https://static.inaturalist.org/sounds/613083.m4a?1678575326",
+    "license": "cc-by",
+    "observer": "David Garza",
+    "observation": "https://www.inaturalist.org/observations/150865338",
+    "file": "gryllidae/Anurogryllus_celerinictus_072.m4a",
+    "bytes": 133064
+  },
+  {
+    "species": "Anurogryllus celerinictus",
+    "common": "Indies Short-tailed Cricket",
+    "url": "https://static.inaturalist.org/sounds/312735.m4a?1633330960",
+    "license": "cc-by-nc",
+    "observer": "Chalon Boesel",
+    "observation": "https://www.inaturalist.org/observations/97121532",
+    "file": "gryllidae/Anurogryllus_celerinictus_073.m4a",
+    "bytes": 88018
+  },
+  {
+    "species": "Melanogryllus desertus",
+    "common": "Desert Cricket",
+    "url": "https://static.inaturalist.org/sounds/366153.m4a?1646535327",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/107998785",
+    "file": "gryllidae/Melanogryllus_desertus_074.m4a",
+    "bytes": 999726
+  },
+  {
+    "species": "Melanogryllus desertus",
+    "common": "Desert Cricket",
+    "url": "https://static.inaturalist.org/sounds/980115.mp3?1713898731",
+    "license": "cc-by-nc",
+    "observer": "Sylvain G",
+    "observation": "https://www.inaturalist.org/observations/208946342",
+    "file": "gryllidae/Melanogryllus_desertus_075.mp3",
+    "bytes": 685767
+  },
+  {
+    "species": "Loxoblemmus arietulus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/321217.mp3?1635170415",
+    "license": "cc-by-nc",
+    "observer": "Observa\u00e7\u00f5es Naturalistas | Bruno Uehara",
+    "observation": "https://www.inaturalist.org/observations/99345793",
+    "file": "gryllidae/Loxoblemmus_arietulus_076.mp3",
+    "bytes": 439022
+  },
+  {
+    "species": "Loxoblemmus arietulus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/309795.mp3?1632683060",
+    "license": "cc-by-nc",
+    "observer": "Observa\u00e7\u00f5es Naturalistas | Bruno Uehara",
+    "observation": "https://www.inaturalist.org/observations/96266504",
+    "file": "gryllidae/Loxoblemmus_arietulus_077.mp3",
+    "bytes": 562320
+  },
+  {
+    "species": "Gryllita arizonae",
+    "common": "Arizona cricket",
+    "url": "https://static.inaturalist.org/sounds/534608.m4a?1663000421",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/134702748",
+    "file": "gryllidae/Gryllita_arizonae_078.m4a",
+    "bytes": 660637
+  },
+  {
+    "species": "Gryllita arizonae",
+    "common": "Arizona cricket",
+    "url": "https://static.inaturalist.org/sounds/534612.m4a?1663000457",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/134702748",
+    "file": "gryllidae/Gryllita_arizonae_079.m4a",
+    "bytes": 513418
+  },
+  {
+    "species": "Acheta meridionalis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/333760.mp3?1638293941",
+    "license": "cc-by-nc",
+    "observer": "Werner Reitmeier",
+    "observation": "https://www.inaturalist.org/observations/102247516",
+    "file": "gryllidae/Acheta_meridionalis_080.mp3",
+    "bytes": 920065
+  },
+  {
+    "species": "Acheta meridionalis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1824148.mp3?1774539552",
+    "license": "cc-by-nc",
+    "observer": "Werner Reitmeier",
+    "observation": "https://www.inaturalist.org/observations/345296107",
+    "file": "gryllidae/Acheta_meridionalis_081.mp3",
+    "bytes": 490936
+  },
+  {
+    "species": "Oecanthus fultoni",
+    "common": "Snowy Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/1601596.m4a?1754969905",
+    "license": "cc-by-nc",
+    "observer": "Froggy Elizabeth Tinker",
+    "observation": "https://www.inaturalist.org/observations/304647720",
+    "file": "oecanthinae/Oecanthus_fultoni_002.m4a",
+    "bytes": 166813
+  },
+  {
+    "species": "Oecanthus castaneus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/922596.m4a?1709958471",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/201748008",
+    "file": "oecanthinae/Oecanthus_castaneus_004.m4a",
+    "bytes": 250351
+  },
+  {
+    "species": "Oecanthus castaneus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/896260.m4a?1707829468",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/199188429",
+    "file": "oecanthinae/Oecanthus_castaneus_005.m4a",
+    "bytes": 279332
+  },
+  {
+    "species": "Oecanthus angustus",
+    "common": "Common Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/130162.m4a?1597484614",
+    "license": "cc-by-nc",
+    "observer": "simono",
+    "observation": "https://www.inaturalist.org/observations/56497176",
+    "file": "oecanthinae/Oecanthus_angustus_008.m4a",
+    "bytes": 59706
+  },
+  {
+    "species": "Neoxabea mexicana",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/142686.m4a?1602715835",
+    "license": "cc-by-nc",
+    "observer": "Carlos G Velazco-Macias",
+    "observation": "https://www.inaturalist.org/observations/62595661",
+    "file": "oecanthinae/Neoxabea_mexicana_010.m4a",
+    "bytes": 559075
+  },
+  {
+    "species": "Neoxabea mexicana",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/142687.m4a?1602715839",
+    "license": "cc-by-nc",
+    "observer": "Carlos G Velazco-Macias",
+    "observation": "https://www.inaturalist.org/observations/62595661",
+    "file": "oecanthinae/Neoxabea_mexicana_011.m4a",
+    "bytes": 1056004
+  },
+  {
+    "species": "Oecanthus dulcisonans",
+    "common": "Large Tree-cricket",
+    "url": "https://static.inaturalist.org/sounds/551508.m4a?1666112467",
+    "license": "cc-by-nc",
+    "observer": "lvdr",
+    "observation": "https://www.inaturalist.org/observations/139242796",
+    "file": "oecanthinae/Oecanthus_dulcisonans_012.m4a",
+    "bytes": 280116
+  },
+  {
+    "species": "Oecanthus dulcisonans",
+    "common": "Large Tree-cricket",
+    "url": "https://static.inaturalist.org/sounds/1242333.m4a?1730480065",
+    "license": "cc-by-nc",
+    "observer": "robsouter",
+    "observation": "https://www.inaturalist.org/observations/250023148",
+    "file": "oecanthinae/Oecanthus_dulcisonans_013.m4a",
+    "bytes": 149968
+  },
+  {
+    "species": "Oecanthus dulcisonans",
+    "common": "Large Tree-cricket",
+    "url": "https://static.inaturalist.org/sounds/497017.m4a?1657575004",
+    "license": "cc-by-nc",
+    "observer": "Pedro Beja",
+    "observation": "https://www.inaturalist.org/observations/125841461",
+    "file": "oecanthinae/Oecanthus_dulcisonans_014.m4a",
+    "bytes": 144393
+  },
+  {
+    "species": "Oecanthus niveus",
+    "common": "Narrow-winged Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/1167323.m4a?1724030052",
+    "license": "cc-by-nc",
+    "observer": "Kyle Aldinger",
+    "observation": "https://www.inaturalist.org/observations/236638243",
+    "file": "oecanthinae/Oecanthus_niveus_015.m4a",
+    "bytes": 156895
+  },
+  {
+    "species": "Oecanthus niveus",
+    "common": "Narrow-winged Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/1071384.m4a?1717226637",
+    "license": "cc-by",
+    "observer": "Dan Johnson",
+    "observation": "https://www.inaturalist.org/observations/219688419",
+    "file": "oecanthinae/Oecanthus_niveus_016.m4a",
+    "bytes": 107497
+  },
+  {
+    "species": "Oecanthus niveus",
+    "common": "Narrow-winged Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/2040492.m4a?1782300376",
+    "license": "cc-by-nc",
+    "observer": "bertfoquet",
+    "observation": "https://www.inaturalist.org/observations/375116408",
+    "file": "oecanthinae/Oecanthus_niveus_017.m4a",
+    "bytes": 88336
+  },
+  {
+    "species": "Oecanthus pellucens",
+    "common": "Italian Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/808548.m4a?1694168531",
+    "license": "cc-by-nc",
+    "observer": "Hanno Schaefer",
+    "observation": "https://www.inaturalist.org/observations/182300958",
+    "file": "oecanthinae/Oecanthus_pellucens_018.m4a",
+    "bytes": 250028
+  },
+  {
+    "species": "Oecanthus pellucens",
+    "common": "Italian Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/48709.mp3?1571497948",
+    "license": "cc-by-nc",
+    "observer": "mobbini",
+    "observation": "https://www.inaturalist.org/observations/34583313",
+    "file": "oecanthinae/Oecanthus_pellucens_019.mp3",
+    "bytes": 786345
+  },
+  {
+    "species": "Oecanthus pellucens",
+    "common": "Italian Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/1190175.m4a?1725130701",
+    "license": "cc-by-nc",
+    "observer": "Luca Mehlhorn",
+    "observation": "https://www.inaturalist.org/observations/239023154",
+    "file": "oecanthinae/Oecanthus_pellucens_020.m4a",
+    "bytes": 44692
+  },
+  {
+    "species": "Oecanthus euryelytra",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1611476.m4a?1755812653",
+    "license": "cc-by-nc",
+    "observer": "\u8001\u5c71\u656c\u5fb7",
+    "observation": "https://www.inaturalist.org/observations/307985926",
+    "file": "oecanthinae/Oecanthus_euryelytra_021.m4a",
+    "bytes": 172498
+  },
+  {
+    "species": "Oecanthus euryelytra",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1683587.m4a?1761997424",
+    "license": "cc-by-nc",
+    "observer": "Haruka Riku",
+    "observation": "https://www.inaturalist.org/observations/324307977",
+    "file": "oecanthinae/Oecanthus_euryelytra_022.m4a",
+    "bytes": 117580
+  },
+  {
+    "species": "Oecanthus euryelytra",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1671073.m4a?1760797020",
+    "license": "cc-by",
+    "observer": "Yoshihiro Tokue",
+    "observation": "https://www.inaturalist.org/observations/321611106",
+    "file": "oecanthinae/Oecanthus_euryelytra_023.m4a",
+    "bytes": 374435
+  },
+  {
+    "species": "Neoxabea bipunctata",
+    "common": "Two-spotted Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/1167322.m4a?1724030018",
+    "license": "cc-by-nc",
+    "observer": "Kyle Aldinger",
+    "observation": "https://www.inaturalist.org/observations/236638147",
+    "file": "oecanthinae/Neoxabea_bipunctata_024.m4a",
+    "bytes": 122022
+  },
+  {
+    "species": "Neoxabea bipunctata",
+    "common": "Two-spotted Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/132746.m4a?1598402095",
+    "license": "cc-by-nc",
+    "observer": "David H Small",
+    "observation": "https://www.inaturalist.org/observations/57599334",
+    "file": "oecanthinae/Neoxabea_bipunctata_025.m4a",
+    "bytes": 224903
+  },
+  {
+    "species": "Neoxabea bipunctata",
+    "common": "Two-spotted Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/1142507.m4a?1721846609",
+    "license": "cc-by-nc",
+    "observer": "Chelsea Clifford",
+    "observation": "https://www.inaturalist.org/observations/231318417",
+    "file": "oecanthinae/Neoxabea_bipunctata_026.m4a",
+    "bytes": 89681
+  },
+  {
+    "species": "Oecanthus celerinictus",
+    "common": "Fast-calling tree cricket",
+    "url": "https://static.inaturalist.org/sounds/352647.m4a?1643756426",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/105859272",
+    "file": "oecanthinae/Oecanthus_celerinictus_027.m4a",
+    "bytes": 404372
+  },
+  {
+    "species": "Oecanthus celerinictus",
+    "common": "Fast-calling tree cricket",
+    "url": "https://static.inaturalist.org/sounds/2039898.m4a?1782264076",
+    "license": "cc-by-nc",
+    "observer": "bertfoquet",
+    "observation": "https://www.inaturalist.org/observations/374780448",
+    "file": "oecanthinae/Oecanthus_celerinictus_028.m4a",
+    "bytes": 387768
+  },
+  {
+    "species": "Oecanthus celerinictus",
+    "common": "Fast-calling tree cricket",
+    "url": "https://static.inaturalist.org/sounds/2039897.m4a?1782264076",
+    "license": "cc-by-nc",
+    "observer": "bertfoquet",
+    "observation": "https://www.inaturalist.org/observations/374780448",
+    "file": "oecanthinae/Oecanthus_celerinictus_029.m4a",
+    "bytes": 341981
+  },
+  {
+    "species": "Hewlettia nigriviridis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/475793.m4a?1655580957",
+    "license": "cc-by-nc",
+    "observer": "Elliott Smeds",
+    "observation": "https://www.inaturalist.org/observations/122363597",
+    "file": "cicadidae/Hewlettia_nigriviridis_002.m4a",
+    "bytes": 511791
+  },
+  {
+    "species": "Cicada orni",
+    "common": "Ash Cicada",
+    "url": "https://static.inaturalist.org/sounds/342699.mp3?1641159748",
+    "license": "cc-by-nc",
+    "observer": "Sotirios Liakas",
+    "observation": "https://www.inaturalist.org/observations/95427844",
+    "file": "cicadidae/Cicada_orni_003.mp3",
+    "bytes": 2274490
+  },
+  {
+    "species": "Cicada orni",
+    "common": "Ash Cicada",
+    "url": "https://static.inaturalist.org/sounds/511858.m4a?1659337076",
+    "license": "cc-by-nc",
+    "observer": "Hanno Schaefer",
+    "observation": "https://www.inaturalist.org/observations/128942520",
+    "file": "cicadidae/Cicada_orni_004.m4a",
+    "bytes": 181688
+  },
+  {
+    "species": "Cicada orni",
+    "common": "Ash Cicada",
+    "url": "https://static.inaturalist.org/sounds/128951.mp3?1597009603",
+    "license": "cc-by-nc",
+    "observer": "Gerben ter Haar",
+    "observation": "https://www.inaturalist.org/observations/55965979",
+    "file": "cicadidae/Cicada_orni_005.mp3",
+    "bytes": 1217350
+  },
+  {
+    "species": "Neotibicen linnei",
+    "common": "Linne's Cicada",
+    "url": "https://static.inaturalist.org/sounds/15135.m4a?1503444934",
+    "license": "cc-by-nc",
+    "observer": "Janet Wright",
+    "observation": "https://www.inaturalist.org/observations/7609899",
+    "file": "cicadidae/Neotibicen_linnei_006.m4a",
+    "bytes": 155263
+  },
+  {
+    "species": "Neotibicen linnei",
+    "common": "Linne's Cicada",
+    "url": "https://static.inaturalist.org/sounds/1558819.m4a?1751902295",
+    "license": "cc-by-nc",
+    "observer": "Daniel Sgro",
+    "observation": "https://www.inaturalist.org/observations/296028060",
+    "file": "cicadidae/Neotibicen_linnei_007.m4a",
+    "bytes": 197186
+  },
+  {
+    "species": "Neotibicen linnei",
+    "common": "Linne's Cicada",
+    "url": "https://static.inaturalist.org/sounds/15135.m4a?1503444934",
+    "license": "cc-by-nc",
+    "observer": "Janet Wright",
+    "observation": "https://www.inaturalist.org/observations/54908919",
+    "file": "cicadidae/Neotibicen_linnei_008.m4a",
+    "bytes": 155263
+  },
+  {
+    "species": "Tibicina quadrisignata",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1521557.mp3?1749818400",
+    "license": "cc-by-nc",
+    "observer": "Nelson Concei\u00e7\u00e3o",
+    "observation": "https://www.inaturalist.org/observations/289246106",
+    "file": "cicadidae/Tibicina_quadrisignata_009.mp3",
+    "bytes": 2842804
+  },
+  {
+    "species": "Carineta diardi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/550617.mp3?1665945102",
+    "license": "cc-by-nc",
+    "observer": "Observa\u00e7\u00f5es Naturalistas | Bruno Uehara",
+    "observation": "https://www.inaturalist.org/observations/139008401",
+    "file": "cicadidae/Carineta_diardi_012.mp3",
+    "bytes": 579874
+  },
+  {
+    "species": "Carineta diardi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/548053.m4a?1665482902",
+    "license": "cc-by-nc",
+    "observer": "Matheus M. Santos",
+    "observation": "https://www.inaturalist.org/observations/138368603",
+    "file": "cicadidae/Carineta_diardi_013.m4a",
+    "bytes": 98688
+  },
+  {
+    "species": "Carineta diardi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1254317.mp3?1732122934",
+    "license": "cc-by-nc",
+    "observer": "vinicius_s_domingues",
+    "observation": "https://www.inaturalist.org/observations/251102829",
+    "file": "cicadidae/Carineta_diardi_014.mp3",
+    "bytes": 499908
+  },
+  {
+    "species": "Okanagana fumipennis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/22470.mp3?1527817621",
+    "license": "cc0",
+    "observer": "Cecelia Alexander",
+    "observation": "https://www.inaturalist.org/observations/12999696",
+    "file": "cicadidae/Okanagana_fumipennis_015.mp3",
+    "bytes": 1749576
+  },
+  {
+    "species": "Okanagana fumipennis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/22472.mp3?1527817639",
+    "license": "cc0",
+    "observer": "Cecelia Alexander",
+    "observation": "https://www.inaturalist.org/observations/12999696",
+    "file": "cicadidae/Okanagana_fumipennis_016.mp3",
+    "bytes": 3446490
+  },
+  {
+    "species": "Okanagana fumipennis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/22474.mp3?1527817661",
+    "license": "cc0",
+    "observer": "Cecelia Alexander",
+    "observation": "https://www.inaturalist.org/observations/12999696",
+    "file": "cicadidae/Okanagana_fumipennis_017.mp3",
+    "bytes": 1203803
+  },
+  {
+    "species": "Cicadetta montana",
+    "common": "New Forest Cicada",
+    "url": "https://static.inaturalist.org/sounds/507643.m4a?1658837858",
+    "license": "cc-by-nc",
+    "observer": "Edita Jakubauskait\u0117",
+    "observation": "https://www.inaturalist.org/observations/127982142",
+    "file": "cicadidae/Cicadetta_montana_018.m4a",
+    "bytes": 66114
+  },
+  {
+    "species": "Cicadetta montana",
+    "common": "New Forest Cicada",
+    "url": "https://static.inaturalist.org/sounds/109735.mp3?1592662380",
+    "license": "cc-by-nc",
+    "observer": "Werner Reitmeier",
+    "observation": "https://www.inaturalist.org/observations/50267809",
+    "file": "cicadidae/Cicadetta_montana_019.mp3",
+    "bytes": 103462
+  },
+  {
+    "species": "Cicadetta montana",
+    "common": "New Forest Cicada",
+    "url": "https://static.inaturalist.org/sounds/262694.mp3?1624736550",
+    "license": "cc-by-nc",
+    "observer": "\u0414\u043c\u0438\u0442\u0440\u0438\u0439",
+    "observation": "https://www.inaturalist.org/observations/84594529",
+    "file": "cicadidae/Cicadetta_montana_020.mp3",
+    "bytes": 68014
+  },
+  {
+    "species": "Lyristes plebejus",
+    "common": "Common Cicada",
+    "url": "https://static.inaturalist.org/sounds/880521.mp3?1705851625",
+    "license": "cc-by-nc",
+    "observer": "Olga Eremenko",
+    "observation": "https://www.inaturalist.org/observations/197233117",
+    "file": "cicadidae/Lyristes_plebejus_021.mp3",
+    "bytes": 467113
+  },
+  {
+    "species": "Lyristes plebejus",
+    "common": "Common Cicada",
+    "url": "https://static.inaturalist.org/sounds/1163073.m4a?1723721191",
+    "license": "cc-by-nc-sa",
+    "observer": "Maria Em\u00edlia Martins",
+    "observation": "https://www.inaturalist.org/observations/235885705",
+    "file": "cicadidae/Lyristes_plebejus_022.m4a",
+    "bytes": 339565
+  },
+  {
+    "species": "Lyristes plebejus",
+    "common": "Common Cicada",
+    "url": "https://static.inaturalist.org/sounds/1163074.m4a?1723721203",
+    "license": "cc-by-nc-sa",
+    "observer": "Maria Em\u00edlia Martins",
+    "observation": "https://www.inaturalist.org/observations/235885705",
+    "file": "cicadidae/Lyristes_plebejus_023.m4a",
+    "bytes": 407932
+  },
+  {
+    "species": "Cicadetta brevipennis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/769584.mp3?1689427503",
+    "license": "cc-by-nc",
+    "observer": "\u041f\u0435\u0442\u0440 \u0416\u0435\u043b\u0442\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/168968614",
+    "file": "cicadidae/Cicadetta_brevipennis_024.mp3",
+    "bytes": 399613
+  },
+  {
+    "species": "Cicadetta brevipennis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/769585.mp3?1689427503",
+    "license": "cc-by-nc",
+    "observer": "\u041f\u0435\u0442\u0440 \u0416\u0435\u043b\u0442\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/168968614",
+    "file": "cicadidae/Cicadetta_brevipennis_025.mp3",
+    "bytes": 377461
+  },
+  {
+    "species": "Cicadetta brevipennis",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/2042096.m4a?1782385825",
+    "license": "cc-by-nc",
+    "observer": "Anotheroutsider",
+    "observation": "https://www.inaturalist.org/observations/375187898",
+    "file": "cicadidae/Cicadetta_brevipennis_026.m4a",
+    "bytes": 387608
+  },
+  {
+    "species": "Monomatapa insignis",
+    "common": "Large Widehead Cicada",
+    "url": "https://static.inaturalist.org/sounds/50950.m4a?1574529709",
+    "license": "cc-by-nc",
+    "observer": "Dewald du Plessis",
+    "observation": "https://www.inaturalist.org/observations/35983086",
+    "file": "cicadidae/Monomatapa_insignis_027.m4a",
+    "bytes": 110107
+  },
+  {
+    "species": "Monomatapa insignis",
+    "common": "Large Widehead Cicada",
+    "url": "https://static.inaturalist.org/sounds/50956.mp3?1574541631",
+    "license": "cc-by-nc",
+    "observer": "Dewald du Plessis",
+    "observation": "https://www.inaturalist.org/observations/35983086",
+    "file": "cicadidae/Monomatapa_insignis_028.mp3",
+    "bytes": 624201
+  },
+  {
+    "species": "Monomatapa insignis",
+    "common": "Large Widehead Cicada",
+    "url": "https://static.inaturalist.org/sounds/50744.mp3?1574268098",
+    "license": "cc-by-nc",
+    "observer": "Dewald du Plessis",
+    "observation": "https://www.inaturalist.org/observations/35857882",
+    "file": "cicadidae/Monomatapa_insignis_029.mp3",
+    "bytes": 344816
+  },
+  {
+    "species": "Cicada barbara lusitanica",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/324731.mp3?1635959161",
+    "license": "cc-by-nc",
+    "observer": "Nelson Concei\u00e7\u00e3o",
+    "observation": "https://www.inaturalist.org/observations/100160885",
+    "file": "cicadidae/Cicada_barbara_lusitanica_030.mp3",
+    "bytes": 1831995
+  },
+  {
+    "species": "Cicada barbara lusitanica",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/324732.mp3?1635959164",
+    "license": "cc-by-nc",
+    "observer": "Nelson Concei\u00e7\u00e3o",
+    "observation": "https://www.inaturalist.org/observations/100160885",
+    "file": "cicadidae/Cicada_barbara_lusitanica_031.mp3",
+    "bytes": 1176311
+  },
+  {
+    "species": "Cicada barbara lusitanica",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/324733.mp3?1635959166",
+    "license": "cc-by-nc",
+    "observer": "Nelson Concei\u00e7\u00e3o",
+    "observation": "https://www.inaturalist.org/observations/100160885",
+    "file": "cicadidae/Cicada_barbara_lusitanica_032.mp3",
+    "bytes": 2966715
+  },
+  {
+    "species": "Okanagana opacipennis",
+    "common": "manzanita cicada",
+    "url": "https://static.inaturalist.org/sounds/467194.m4a?1654882601",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/26717973",
+    "file": "cicadidae/Okanagana_opacipennis_033.m4a",
+    "bytes": 667024
+  },
+  {
+    "species": "Okanagana opacipennis",
+    "common": "manzanita cicada",
+    "url": "https://static.inaturalist.org/sounds/475796.m4a?1655580963",
+    "license": "cc-by-nc",
+    "observer": "Elliott Smeds",
+    "observation": "https://www.inaturalist.org/observations/122363615",
+    "file": "cicadidae/Okanagana_opacipennis_034.m4a",
+    "bytes": 449360
+  },
+  {
+    "species": "Hilaphura varipes",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/57421.mp3?1581349776",
+    "license": "cc-by-nc",
+    "observer": "cigarras_de_portugal",
+    "observation": "https://www.inaturalist.org/observations/38506777",
+    "file": "cicadidae/Hilaphura_varipes_035.mp3",
+    "bytes": 274986
+  },
+  {
+    "species": "Hilaphura varipes",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/2002962.mp3?1780656285",
+    "license": "cc-by",
+    "observer": "Pedro E\u00e7a",
+    "observation": "https://www.inaturalist.org/observations/368593661",
+    "file": "cicadidae/Hilaphura_varipes_036.mp3",
+    "bytes": 485089
+  },
+  {
+    "species": "Tibicina haematodes",
+    "common": "Red Cicada",
+    "url": "https://static.inaturalist.org/sounds/1120048.m4a?1720074187",
+    "license": "cc-by",
+    "observer": "Stanislav Murashkin",
+    "observation": "https://www.inaturalist.org/observations/227045105",
+    "file": "cicadidae/Tibicina_haematodes_037.m4a",
+    "bytes": 72622
+  },
+  {
+    "species": "Tibicina haematodes",
+    "common": "Red Cicada",
+    "url": "https://static.inaturalist.org/sounds/759379.m4a?1688468438",
+    "license": "cc-by-nc",
+    "observer": "tamaszeke",
+    "observation": "https://www.inaturalist.org/observations/170997785",
+    "file": "cicadidae/Tibicina_haematodes_038.m4a",
+    "bytes": 553674
+  },
+  {
+    "species": "Megapomponia merula",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/304167.m4a?1631366164",
+    "license": "cc-by-nc",
+    "observer": "ChanSK",
+    "observation": "https://www.inaturalist.org/observations/94432338",
+    "file": "cicadidae/Megapomponia_merula_039.m4a",
+    "bytes": 136778
+  },
+  {
+    "species": "Megapomponia merula",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/713414.m4a?1685138765",
+    "license": "cc-by",
+    "observer": "Gijs Romijn",
+    "observation": "https://www.inaturalist.org/observations/163887448",
+    "file": "cicadidae/Megapomponia_merula_040.m4a",
+    "bytes": 298244
+  },
+  {
+    "species": "Tettigetta prasina",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/487802.mp3?1656700399",
+    "license": "cc-by-nc",
+    "observer": "Leonid",
+    "observation": "https://www.inaturalist.org/observations/124276172",
+    "file": "cicadidae/Tettigetta_prasina_041.mp3",
+    "bytes": 312983
+  },
+  {
+    "species": "Tettigetta prasina",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1141231.m4a?1721731760",
+    "license": "cc-by-nc",
+    "observer": "daisan",
+    "observation": "https://www.inaturalist.org/observations/231173577",
+    "file": "cicadidae/Tettigetta_prasina_042.m4a",
+    "bytes": 265866
+  },
+  {
+    "species": "Hadoa chisosensis",
+    "common": "Southern Pi\u00f1on Sun-Singer",
+    "url": "https://static.inaturalist.org/sounds/1462821.m4a?1747277389",
+    "license": "cc-by",
+    "observer": "Alejandra Pe\u00f1a Estrada",
+    "observation": "https://www.inaturalist.org/observations/281168823",
+    "file": "cicadidae/Hadoa_chisosensis_043.m4a",
+    "bytes": 459932
+  },
+  {
+    "species": "Hadoa chisosensis",
+    "common": "Southern Pi\u00f1on Sun-Singer",
+    "url": "https://static.inaturalist.org/sounds/1035031.mp3?1715550694",
+    "license": "cc-by-nc",
+    "observer": "Jorge Anzures G\u00f3mez",
+    "observation": "https://www.inaturalist.org/observations/215362860",
+    "file": "cicadidae/Hadoa_chisosensis_044.mp3",
+    "bytes": 201024
+  },
+  {
+    "species": "Cryptotympana holsti",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1208559.m4a?1727025702",
+    "license": "cc-by-nc",
+    "observer": "MP Zhou",
+    "observation": "https://www.inaturalist.org/observations/243396393",
+    "file": "cicadidae/Cryptotympana_holsti_045.m4a",
+    "bytes": 115509
+  },
+  {
+    "species": "Cryptotympana holsti",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1208560.m4a?1727025715",
+    "license": "cc-by-nc",
+    "observer": "MP Zhou",
+    "observation": "https://www.inaturalist.org/observations/243396397",
+    "file": "cicadidae/Cryptotympana_holsti_046.m4a",
+    "bytes": 32980
+  },
+  {
+    "species": "Quesada gigas",
+    "common": "Giant Cicada",
+    "url": "https://static.inaturalist.org/sounds/398237.mp3?1650329315",
+    "license": "cc-by",
+    "observer": "Helio Lourencini",
+    "observation": "https://www.inaturalist.org/observations/111993301",
+    "file": "cicadidae/Quesada_gigas_047.mp3",
+    "bytes": 1742290
+  },
+  {
+    "species": "Quesada gigas",
+    "common": "Giant Cicada",
+    "url": "https://static.inaturalist.org/sounds/280088.m4a?1626917830",
+    "license": "cc-by-nc",
+    "observer": "Rachel G",
+    "observation": "https://www.inaturalist.org/observations/88071479",
+    "file": "cicadidae/Quesada_gigas_048.m4a",
+    "bytes": 372470
+  },
+  {
+    "species": "Cicadatra atra",
+    "common": "Black Sorrow Cicada",
+    "url": "https://static.inaturalist.org/sounds/807328.mp3?1693957798",
+    "license": "cc-by-nc",
+    "observer": "Sebastian \u0106ato",
+    "observation": "https://www.inaturalist.org/observations/181984177",
+    "file": "cicadidae/Cicadatra_atra_049.mp3",
+    "bytes": 80977
+  },
+  {
+    "species": "Cicadatra atra",
+    "common": "Black Sorrow Cicada",
+    "url": "https://static.inaturalist.org/sounds/807325.mp3?1693957670",
+    "license": "cc-by-nc",
+    "observer": "Sebastian \u0106ato",
+    "observation": "https://www.inaturalist.org/observations/181984177",
+    "file": "cicadidae/Cicadatra_atra_050.mp3",
+    "bytes": 145105
+  },
+  {
+    "species": "Platypleura techowi",
+    "common": "Thorntree Orangewing Cicada",
+    "url": "https://static.inaturalist.org/sounds/45721.mp3?1566292612",
+    "license": "cc-by-nc",
+    "observer": "Dewald du Plessis",
+    "observation": "https://www.inaturalist.org/observations/30881137",
+    "file": "cicadidae/Platypleura_techowi_051.mp3",
+    "bytes": 1293593
+  },
+  {
+    "species": "Platypleura techowi",
+    "common": "Thorntree Orangewing Cicada",
+    "url": "https://static.inaturalist.org/sounds/45722.mp3?1566292612",
+    "license": "cc-by-nc",
+    "observer": "Dewald du Plessis",
+    "observation": "https://www.inaturalist.org/observations/30881137",
+    "file": "cicadidae/Platypleura_techowi_052.mp3",
+    "bytes": 1063815
+  },
+  {
+    "species": "Magicicada tredecula",
+    "common": "Little 13-Year Cicada",
+    "url": "https://static.inaturalist.org/sounds/1081006.m4a?1717708653",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/220972276",
+    "file": "cicadidae/Magicicada_tredecula_053.m4a",
+    "bytes": 224085
+  },
+  {
+    "species": "Magicicada tredecula",
+    "common": "Little 13-Year Cicada",
+    "url": "https://static.inaturalist.org/sounds/1095398.m4a?1718482043",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/220972276",
+    "file": "cicadidae/Magicicada_tredecula_054.m4a",
+    "bytes": 438694
+  },
+  {
+    "species": "Macrotristria angularis",
+    "common": "Cherrynose",
+    "url": "https://static.inaturalist.org/sounds/162699.mp3?1612671193",
+    "license": "cc-by-nc",
+    "observer": "Ben McBurney",
+    "observation": "https://www.inaturalist.org/observations/69183549",
+    "file": "cicadidae/Macrotristria_angularis_055.mp3",
+    "bytes": 206991
+  },
+  {
+    "species": "Macrotristria angularis",
+    "common": "Cherrynose",
+    "url": "https://static.inaturalist.org/sounds/905387.m4a?1708642932",
+    "license": "cc-by-nc",
+    "observer": "Colin Trainor",
+    "observation": "https://www.inaturalist.org/observations/200129780",
+    "file": "cicadidae/Macrotristria_angularis_056.m4a",
+    "bytes": 326157
+  },
+  {
+    "species": "Magicicada cassinii",
+    "common": "Cassin's 17-year Cicada",
+    "url": "https://static.inaturalist.org/sounds/1541771.m4a?1750892023",
+    "license": "cc-by-nc",
+    "observer": "spinosaurus347",
+    "observation": "https://www.inaturalist.org/observations/292737137",
+    "file": "cicadidae/Magicicada_cassinii_057.m4a",
+    "bytes": 77836
+  },
+  {
+    "species": "Magicicada cassinii",
+    "common": "Cassin's 17-year Cicada",
+    "url": "https://static.inaturalist.org/sounds/1093960.m4a?1718399839",
+    "license": "cc-by-nc",
+    "observer": "shewholistens",
+    "observation": "https://www.inaturalist.org/observations/222723988",
+    "file": "cicadidae/Magicicada_cassinii_058.m4a",
+    "bytes": 85545
+  },
+  {
+    "species": "Hadoa chiricahua",
+    "common": "Chiricahua Sun-Singer",
+    "url": "https://static.inaturalist.org/sounds/452705.m4a?1653674885",
+    "license": "cc-by-nc",
+    "observer": "Joshua C'deBaca",
+    "observation": "https://www.inaturalist.org/observations/118949024",
+    "file": "cicadidae/Hadoa_chiricahua_059.m4a",
+    "bytes": 255527
+  },
+  {
+    "species": "Hadoa chiricahua",
+    "common": "Chiricahua Sun-Singer",
+    "url": "https://static.inaturalist.org/sounds/452910.mp3?1653688005",
+    "license": "cc-by-nc",
+    "observer": "Joshua C'deBaca",
+    "observation": "https://www.inaturalist.org/observations/118949024",
+    "file": "cicadidae/Hadoa_chiricahua_060.mp3",
+    "bytes": 1145972
+  },
+  {
+    "species": "Yezoterpnosia nigricosta",
+    "common": "Ezo Spring Cicada",
+    "url": "https://static.inaturalist.org/sounds/17399.mp3?1517019246",
+    "license": "cc-by-nc",
+    "observer": "Steven Kurniawidjaja",
+    "observation": "https://www.inaturalist.org/observations/9626955",
+    "file": "cicadidae/Yezoterpnosia_nigricosta_061.mp3",
+    "bytes": 131705
+  },
+  {
+    "species": "Yezoterpnosia nigricosta",
+    "common": "Ezo Spring Cicada",
+    "url": "https://static.inaturalist.org/sounds/164320.mp3?1613385444",
+    "license": "cc-by-nc",
+    "observer": "Alexander Yakovlev",
+    "observation": "https://www.inaturalist.org/observations/69463414",
+    "file": "cicadidae/Yezoterpnosia_nigricosta_062.mp3",
+    "bytes": 1138659
+  },
+  {
+    "species": "Eleutherodactylus coqui",
+    "common": "Common Coqui",
+    "url": "https://static.inaturalist.org/sounds/1352744.m4a?1743232882",
+    "license": "cc-by-nc",
+    "observer": "kaitai",
+    "observation": "https://www.inaturalist.org/observations/267468845",
+    "file": "anura/Eleutherodactylus_coqui_002.m4a",
+    "bytes": 68225
+  },
+  {
+    "species": "Arthroleptella subvoce",
+    "common": "Northern Moss Frog",
+    "url": "https://static.inaturalist.org/sounds/500354.mp3?1657957417",
+    "license": "cc-by-nc",
+    "observer": "Oliver Angus",
+    "observation": "https://www.inaturalist.org/observations/126446967",
+    "file": "anura/Arthroleptella_subvoce_003.mp3",
+    "bytes": 232416
+  },
+  {
+    "species": "Cacosternum capense",
+    "common": "Cape Caco",
+    "url": "https://static.inaturalist.org/sounds/1159826.m4a?1723488438",
+    "license": "cc-by-nc",
+    "observer": "z_mcgrath",
+    "observation": "https://www.inaturalist.org/observations/235387484",
+    "file": "anura/Cacosternum_capense_008.m4a",
+    "bytes": 144098
+  },
+  {
+    "species": "Rana arvalis",
+    "common": "Moor Frog",
+    "url": "https://static.inaturalist.org/sounds/182458.mp3?1617646682",
+    "license": "cc-by",
+    "observer": "Julia Moning",
+    "observation": "https://www.inaturalist.org/observations/73021791",
+    "file": "anura/Rana_arvalis_010.mp3",
+    "bytes": 297662
+  },
+  {
+    "species": "Rana arvalis",
+    "common": "Moor Frog",
+    "url": "https://static.inaturalist.org/sounds/1343215.mp3?1742566589",
+    "license": "cc-by-nc",
+    "observer": "knarfoh",
+    "observation": "https://www.inaturalist.org/observations/266234244",
+    "file": "anura/Rana_arvalis_011.mp3",
+    "bytes": 622529
+  },
+  {
+    "species": "Tomopterna delalandii",
+    "common": "Cape sand frog",
+    "url": "https://static.inaturalist.org/sounds/349785.m4a?1643129618",
+    "license": "cc-by-nc",
+    "observer": "robertwelsh",
+    "observation": "https://www.inaturalist.org/observations/95983282",
+    "file": "anura/Tomopterna_delalandii_012.m4a",
+    "bytes": 143374
+  },
+  {
+    "species": "Tomopterna delalandii",
+    "common": "Cape sand frog",
+    "url": "https://static.inaturalist.org/sounds/349787.m4a?1643129648",
+    "license": "cc-by-nc",
+    "observer": "robertwelsh",
+    "observation": "https://www.inaturalist.org/observations/95983282",
+    "file": "anura/Tomopterna_delalandii_013.m4a",
+    "bytes": 143374
+  },
+  {
+    "species": "Tomopterna delalandii",
+    "common": "Cape sand frog",
+    "url": "https://static.inaturalist.org/sounds/356811.mp3?1644742255",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/106665105",
+    "file": "anura/Tomopterna_delalandii_014.mp3",
+    "bytes": 304274
+  },
+  {
+    "species": "Heleophryne depressa",
+    "common": "Cederberg Ghost Frog",
+    "url": "https://static.inaturalist.org/sounds/16632.mp3?1513146687",
+    "license": "cc-by-nc",
+    "observer": "Alex Rebelo",
+    "observation": "https://www.inaturalist.org/observations/9142273",
+    "file": "anura/Heleophryne_depressa_015.mp3",
+    "bytes": 151296
+  },
+  {
+    "species": "Heleophryne depressa",
+    "common": "Cederberg Ghost Frog",
+    "url": "https://static.inaturalist.org/sounds/145677.mp3?1603951634",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/63748397",
+    "file": "anura/Heleophryne_depressa_016.mp3",
+    "bytes": 144195
+  },
+  {
+    "species": "Heleophryne depressa",
+    "common": "Cederberg Ghost Frog",
+    "url": "https://static.inaturalist.org/sounds/145678.mp3?1603951638",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/63748397",
+    "file": "anura/Heleophryne_depressa_017.mp3",
+    "bytes": 159242
+  },
+  {
+    "species": "Dryophytes gratiosus",
+    "common": "Barking Tree Frog",
+    "url": "https://static.inaturalist.org/sounds/1038221.m4a?1715703415",
+    "license": "cc-by-nc",
+    "observer": "Cole Tiemann",
+    "observation": "https://www.inaturalist.org/observations/215729716",
+    "file": "anura/Dryophytes_gratiosus_018.m4a",
+    "bytes": 121893
+  },
+  {
+    "species": "Dryophytes gratiosus",
+    "common": "Barking Tree Frog",
+    "url": "https://static.inaturalist.org/sounds/1072990.m4a?1717288709",
+    "license": "cc-by-nc",
+    "observer": "suzieleslie",
+    "observation": "https://www.inaturalist.org/observations/219882831",
+    "file": "anura/Dryophytes_gratiosus_019.m4a",
+    "bytes": 284628
+  },
+  {
+    "species": "Dryophytes gratiosus",
+    "common": "Barking Tree Frog",
+    "url": "https://static.inaturalist.org/sounds/1072991.m4a?1717288711",
+    "license": "cc-by-nc",
+    "observer": "suzieleslie",
+    "observation": "https://www.inaturalist.org/observations/219882831",
+    "file": "anura/Dryophytes_gratiosus_020.m4a",
+    "bytes": 248073
+  },
+  {
+    "species": "Cacosternum boettgeri",
+    "common": "Boettger's dainty frog",
+    "url": "https://static.inaturalist.org/sounds/835253.m4a?1698003704",
+    "license": "cc-by-nc",
+    "observer": "lizziegeorge",
+    "observation": "https://www.inaturalist.org/observations/188546280",
+    "file": "anura/Cacosternum_boettgeri_021.m4a",
+    "bytes": 104880
+  },
+  {
+    "species": "Cacosternum boettgeri",
+    "common": "Boettger's dainty frog",
+    "url": "https://static.inaturalist.org/sounds/835264.m4a?1698005615",
+    "license": "cc-by-nc",
+    "observer": "lizziegeorge",
+    "observation": "https://www.inaturalist.org/observations/188546280",
+    "file": "anura/Cacosternum_boettgeri_022.m4a",
+    "bytes": 104880
+  },
+  {
+    "species": "Cacosternum boettgeri",
+    "common": "Boettger's dainty frog",
+    "url": "https://static.inaturalist.org/sounds/827818.mp3?1696861030",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/186850613",
+    "file": "anura/Cacosternum_boettgeri_023.mp3",
+    "bytes": 133329
+  },
+  {
+    "species": "Dendropsophus microcephalus",
+    "common": "Yellow Treefrog",
+    "url": "https://static.inaturalist.org/sounds/297886.mp3?1630087002",
+    "license": "cc-by-nc",
+    "observer": "Marley T. G\u00f3mez-Rinc\u00f3n",
+    "observation": "https://www.inaturalist.org/observations/92692972",
+    "file": "anura/Dendropsophus_microcephalus_024.mp3",
+    "bytes": 276768
+  },
+  {
+    "species": "Dendropsophus microcephalus",
+    "common": "Yellow Treefrog",
+    "url": "https://static.inaturalist.org/sounds/341638.mp3?1640882575",
+    "license": "cc-by-nc",
+    "observer": "Luis Trinchan",
+    "observation": "https://www.inaturalist.org/observations/96730205",
+    "file": "anura/Dendropsophus_microcephalus_025.mp3",
+    "bytes": 496579
+  },
+  {
+    "species": "Dendropsophus microcephalus",
+    "common": "Yellow Treefrog",
+    "url": "https://static.inaturalist.org/sounds/341638.mp3?1640882575",
+    "license": "cc-by-nc",
+    "observer": "Luis Trinchan",
+    "observation": "https://www.inaturalist.org/observations/96730205",
+    "file": "anura/Dendropsophus_microcephalus_026.mp3",
+    "bytes": 496579
+  },
+  {
+    "species": "Breviceps gibbosus",
+    "common": "Giant Rain Frog",
+    "url": "https://static.inaturalist.org/sounds/113647.mp3?1593361255",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/51242632",
+    "file": "anura/Breviceps_gibbosus_027.mp3",
+    "bytes": 191843
+  },
+  {
+    "species": "Breviceps gibbosus",
+    "common": "Giant Rain Frog",
+    "url": "https://static.inaturalist.org/sounds/113648.mp3?1593361261",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/51242632",
+    "file": "anura/Breviceps_gibbosus_028.mp3",
+    "bytes": 431333
+  },
+  {
+    "species": "Breviceps gibbosus",
+    "common": "Giant Rain Frog",
+    "url": "https://static.inaturalist.org/sounds/113649.mp3?1593361276",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/51242632",
+    "file": "anura/Breviceps_gibbosus_029.mp3",
+    "bytes": 224026
+  },
+  {
+    "species": "Hypopachus variolosus",
+    "common": "Sheep Frog",
+    "url": "https://static.inaturalist.org/sounds/298975.mp3?1630262179",
+    "license": "cc-by-nc",
+    "observer": "Oliver Komar",
+    "observation": "https://www.inaturalist.org/observations/92856061",
+    "file": "anura/Hypopachus_variolosus_030.mp3",
+    "bytes": 811720
+  },
+  {
+    "species": "Hypopachus variolosus",
+    "common": "Sheep Frog",
+    "url": "https://static.inaturalist.org/sounds/14835.mp3?1502480237",
+    "license": "cc-by-nc",
+    "observer": "Chris Harrison",
+    "observation": "https://www.inaturalist.org/observations/6832617",
+    "file": "anura/Hypopachus_variolosus_031.mp3",
+    "bytes": 217920
+  },
+  {
+    "species": "Hypopachus variolosus",
+    "common": "Sheep Frog",
+    "url": "https://static.inaturalist.org/sounds/7524.mp3?1502905724",
+    "license": "cc-by-nc",
+    "observer": "Chris Harrison",
+    "observation": "https://www.inaturalist.org/observations/3910238",
+    "file": "anura/Hypopachus_variolosus_032.mp3",
+    "bytes": 113019
+  },
+  {
+    "species": "Pseudacris brachyphona",
+    "common": "Mountain Chorus Frog",
+    "url": "https://static.inaturalist.org/sounds/969658.m4a?1713232751",
+    "license": "cc-by-nc",
+    "observer": "Sara Spaid",
+    "observation": "https://www.inaturalist.org/observations/207509153",
+    "file": "anura/Pseudacris_brachyphona_033.m4a",
+    "bytes": 191856
+  },
+  {
+    "species": "Pseudacris brachyphona",
+    "common": "Mountain Chorus Frog",
+    "url": "https://static.inaturalist.org/sounds/417713.m4a?1651435934",
+    "license": "cc-by-nc",
+    "observer": "Sara Spaid",
+    "observation": "https://www.inaturalist.org/observations/114374405",
+    "file": "anura/Pseudacris_brachyphona_034.m4a",
+    "bytes": 106556
+  },
+  {
+    "species": "Pseudacris brachyphona",
+    "common": "Mountain Chorus Frog",
+    "url": "https://static.inaturalist.org/sounds/1359228.m4a?1743642449",
+    "license": "cc-by-nc",
+    "observer": "michael_hodge",
+    "observation": "https://www.inaturalist.org/observations/268310558",
+    "file": "anura/Pseudacris_brachyphona_035.m4a",
+    "bytes": 510340
+  },
+  {
+    "species": "Lithobates catesbeianus",
+    "common": "American Bullfrog",
+    "url": "https://static.inaturalist.org/sounds/314011.m4a?1633677150",
+    "license": "cc-by-nc",
+    "observer": "Ty Smith",
+    "observation": "https://www.inaturalist.org/observations/97524274",
+    "file": "anura/Lithobates_catesbeianus_036.m4a",
+    "bytes": 55555
+  },
+  {
+    "species": "Lithobates catesbeianus",
+    "common": "American Bullfrog",
+    "url": "https://static.inaturalist.org/sounds/1955670.m4a?1778972581",
+    "license": "cc-by-nc",
+    "observer": "hmung013",
+    "observation": "https://www.inaturalist.org/observations/362174668",
+    "file": "anura/Lithobates_catesbeianus_037.m4a",
+    "bytes": 69205
+  },
+  {
+    "species": "Arthroleptella draconella",
+    "common": "Drakenstein Moss Frog",
+    "url": "https://static.inaturalist.org/sounds/110218.m4a?1592742244",
+    "license": "cc-by-nc",
+    "observer": "Alex Rebelo",
+    "observation": "https://www.inaturalist.org/observations/50399868",
+    "file": "anura/Arthroleptella_draconella_038.m4a",
+    "bytes": 211908
+  },
+  {
+    "species": "Arthroleptella draconella",
+    "common": "Drakenstein Moss Frog",
+    "url": "https://static.inaturalist.org/sounds/575902.mp3?1671888979",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/144983458",
+    "file": "anura/Arthroleptella_draconella_039.mp3",
+    "bytes": 320156
+  },
+  {
+    "species": "Breviceps verrucosus",
+    "common": "Plaintive Rain Frog",
+    "url": "https://static.inaturalist.org/sounds/348198.mp3?1642746937",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/105301676",
+    "file": "anura/Breviceps_verrucosus_040.mp3",
+    "bytes": 367804
+  },
+  {
+    "species": "Breviceps verrucosus",
+    "common": "Plaintive Rain Frog",
+    "url": "https://static.inaturalist.org/sounds/925128.mp3?1710154150",
+    "license": "cc-by-nc",
+    "observer": "Nick Helme",
+    "observation": "https://www.inaturalist.org/observations/202037126",
+    "file": "anura/Breviceps_verrucosus_041.mp3",
+    "bytes": 191425
+  },
+  {
+    "species": "Afrixalus knysnae",
+    "common": "Knysna Spiny Reed Frog",
+    "url": "https://static.inaturalist.org/sounds/595121.mp3?1675971644",
+    "license": "cc-by-nc",
+    "observer": "probreviceps",
+    "observation": "https://www.inaturalist.org/observations/148399635",
+    "file": "anura/Afrixalus_knysnae_042.mp3",
+    "bytes": 202983
+  },
+  {
+    "species": "Afrixalus knysnae",
+    "common": "Knysna Spiny Reed Frog",
+    "url": "https://static.inaturalist.org/sounds/595122.mp3?1675971645",
+    "license": "cc-by-nc",
+    "observer": "probreviceps",
+    "observation": "https://www.inaturalist.org/observations/148399637",
+    "file": "anura/Afrixalus_knysnae_043.mp3",
+    "bytes": 216776
+  },
+  {
+    "species": "Lithobates kauffeldi",
+    "common": "Atlantic Coast Leopard Frog",
+    "url": "https://static.inaturalist.org/sounds/170854.m4a?1615392154",
+    "license": "cc-by-nc",
+    "observer": "Ty Smith",
+    "observation": "https://www.inaturalist.org/observations/70929826",
+    "file": "anura/Lithobates_kauffeldi_044.m4a",
+    "bytes": 41575
+  },
+  {
+    "species": "Lithobates kauffeldi",
+    "common": "Atlantic Coast Leopard Frog",
+    "url": "https://static.inaturalist.org/sounds/630003.mp3?1680445626",
+    "license": "cc0",
+    "observer": "Eric Bartkowski",
+    "observation": "https://www.inaturalist.org/observations/153179156",
+    "file": "anura/Lithobates_kauffeldi_045.mp3",
+    "bytes": 577328
+  },
+  {
+    "species": "Arthroleptella kogelbergensis",
+    "common": "Kogelberg Moss Frog",
+    "url": "https://static.inaturalist.org/sounds/495220.mp3?1657393749",
+    "license": "cc-by-nc",
+    "observer": "Oliver Angus",
+    "observation": "https://www.inaturalist.org/observations/125492831",
+    "file": "anura/Arthroleptella_kogelbergensis_046.mp3",
+    "bytes": 202896
+  },
+  {
+    "species": "Arthroleptella kogelbergensis",
+    "common": "Kogelberg Moss Frog",
+    "url": "https://static.inaturalist.org/sounds/287952.m4a?1628188999",
+    "license": "cc-by-nc",
+    "observer": "Justin Hawthorne",
+    "observation": "https://www.inaturalist.org/observations/90058861",
+    "file": "anura/Arthroleptella_kogelbergensis_047.m4a",
+    "bytes": 284238
+  },
+  {
+    "species": "Pseudacris maculata",
+    "common": "Boreal Chorus Frog",
+    "url": "https://static.inaturalist.org/sounds/1333143.m4a?1741886488",
+    "license": "cc-by-nc",
+    "observer": "Ryan Philbrick",
+    "observation": "https://www.inaturalist.org/observations/265184408",
+    "file": "anura/Pseudacris_maculata_048.m4a",
+    "bytes": 125879
+  },
+  {
+    "species": "Pseudacris maculata",
+    "common": "Boreal Chorus Frog",
+    "url": "https://static.inaturalist.org/sounds/1042080.m4a?1715899054",
+    "license": "cc-by-nc",
+    "observer": "geoffreyelliott",
+    "observation": "https://www.inaturalist.org/observations/216201129",
+    "file": "anura/Pseudacris_maculata_049.m4a",
+    "bytes": 555432
+  },
+  {
+    "species": "Dryophytes chrysoscelis",
+    "common": "Cope's Gray Tree Frog",
+    "url": "https://static.inaturalist.org/sounds/241026.m4a?1622500655",
+    "license": "cc-by-nc",
+    "observer": "sglanville",
+    "observation": "https://www.inaturalist.org/observations/81103830",
+    "file": "anura/Dryophytes_chrysoscelis_050.m4a",
+    "bytes": 83744
+  },
+  {
+    "species": "Dryophytes chrysoscelis",
+    "common": "Cope's Gray Tree Frog",
+    "url": "https://static.inaturalist.org/sounds/1769748.m4a?1771311591",
+    "license": "cc-by-nc",
+    "observer": "JoshExistsToo",
+    "observation": "https://www.inaturalist.org/observations/338998854",
+    "file": "anura/Dryophytes_chrysoscelis_051.m4a",
+    "bytes": 89253
+  },
+  {
+    "species": "Afrixalus fulvovittatus",
+    "common": "Banded Banana Frog",
+    "url": "https://static.inaturalist.org/sounds/46681.mp3?1567808090",
+    "license": "cc-by-nc",
+    "observer": "phrogbecker",
+    "observation": "https://www.inaturalist.org/observations/32239452",
+    "file": "anura/Afrixalus_fulvovittatus_052.mp3",
+    "bytes": 1890775
+  },
+  {
+    "species": "Afrixalus fulvovittatus",
+    "common": "Banded Banana Frog",
+    "url": "https://static.inaturalist.org/sounds/46682.mp3?1567808092",
+    "license": "cc-by-nc",
+    "observer": "phrogbecker",
+    "observation": "https://www.inaturalist.org/observations/32239452",
+    "file": "anura/Afrixalus_fulvovittatus_053.mp3",
+    "bytes": 773779
+  },
+  {
+    "species": "Breviceps montanus",
+    "common": "Mountain Rain Frog",
+    "url": "https://static.inaturalist.org/sounds/251287.m4a?1623493233",
+    "license": "cc-by-nc",
+    "observer": "Kurt van Wyk",
+    "observation": "https://www.inaturalist.org/observations/82656802",
+    "file": "anura/Breviceps_montanus_054.m4a",
+    "bytes": 73427
+  },
+  {
+    "species": "Breviceps montanus",
+    "common": "Mountain Rain Frog",
+    "url": "https://static.inaturalist.org/sounds/251287.m4a?1623493233",
+    "license": "cc-by-nc",
+    "observer": "Kurt van Wyk",
+    "observation": "https://www.inaturalist.org/observations/82656802",
+    "file": "anura/Breviceps_montanus_055.m4a",
+    "bytes": 73427
+  },
+  {
+    "species": "Hyla arborea",
+    "common": "European Tree Frog",
+    "url": "https://static.inaturalist.org/sounds/1264264.mp3?1733672848",
+    "license": "cc-by-nc",
+    "observer": "Stamatis Kalogiannis",
+    "observation": "https://www.inaturalist.org/observations/254517550",
+    "file": "anura/Hyla_arborea_056.mp3",
+    "bytes": 326794
+  },
+  {
+    "species": "Hyla arborea",
+    "common": "European Tree Frog",
+    "url": "https://static.inaturalist.org/sounds/743568.mp3?1687114877",
+    "license": "cc-by",
+    "observer": "Igor Balashov",
+    "observation": "https://www.inaturalist.org/observations/168146835",
+    "file": "anura/Hyla_arborea_057.mp3",
+    "bytes": 1341504
+  },
+  {
+    "species": "Smilisca baudinii",
+    "common": "Mexican Treefrog",
+    "url": "https://static.inaturalist.org/sounds/225729.mp3?1621378123",
+    "license": "cc-by-nc",
+    "observer": "Chris Harrison",
+    "observation": "https://www.inaturalist.org/observations/79330576",
+    "file": "anura/Smilisca_baudinii_058.mp3",
+    "bytes": 124009
+  },
+  {
+    "species": "Smilisca baudinii",
+    "common": "Mexican Treefrog",
+    "url": "https://static.inaturalist.org/sounds/313688.m4a?1633577327",
+    "license": "cc-by-nc",
+    "observer": "Guillermo D.Christy",
+    "observation": "https://www.inaturalist.org/observations/97417174",
+    "file": "anura/Smilisca_baudinii_059.m4a",
+    "bytes": 119425
+  },
+  {
+    "species": "Cacosternum parvum",
+    "common": "Mountain caco",
+    "url": "https://static.inaturalist.org/sounds/1764194.m4a?1770826479",
+    "license": "cc-by-nc",
+    "observer": "Tim Brammer",
+    "observation": "https://www.inaturalist.org/observations/338211611",
+    "file": "anura/Cacosternum_parvum_060.m4a",
+    "bytes": 227466
+  },
+  {
+    "species": "Cacosternum parvum",
+    "common": "Mountain caco",
+    "url": "https://static.inaturalist.org/sounds/847634.m4a?1700403362",
+    "license": "cc-by-nc",
+    "observer": "Adriaan Jordaan",
+    "observation": "https://www.inaturalist.org/observations/191458230",
+    "file": "anura/Cacosternum_parvum_061.m4a",
+    "bytes": 297977
+  },
+  {
+    "species": "Centrolene venezuelense",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1318388.m4a?1740690711",
+    "license": "cc-by-nc",
+    "observer": "Fundacion ProAves",
+    "observation": "https://www.inaturalist.org/observations/263309874",
+    "file": "anura/Centrolene_venezuelense_062.m4a",
+    "bytes": 75633
+  },
+  {
+    "species": "Centrolene venezuelense",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/1318387.m4a?1740690711",
+    "license": "cc-by-nc",
+    "observer": "Fundacion ProAves",
+    "observation": "https://www.inaturalist.org/observations/263309874",
+    "file": "anura/Centrolene_venezuelense_063.m4a",
+    "bytes": 56025
+  },
+  {
+    "species": "Pelophylax perezi",
+    "common": "Iberian Green Frog",
+    "url": "https://static.inaturalist.org/sounds/682234.m4a?1683302307",
+    "license": "cc-by-nc",
+    "observer": "Daniel Gaona Carrilero",
+    "observation": "https://www.inaturalist.org/observations/159880015",
+    "file": "anura/Pelophylax_perezi_064.m4a",
+    "bytes": 80831
+  },
+  {
+    "species": "Pelophylax perezi",
+    "common": "Iberian Green Frog",
+    "url": "https://static.inaturalist.org/sounds/682235.m4a?1683302310",
+    "license": "cc-by-nc",
+    "observer": "Daniel Gaona Carrilero",
+    "observation": "https://www.inaturalist.org/observations/159880015",
+    "file": "anura/Pelophylax_perezi_065.m4a",
+    "bytes": 89516
+  },
+  {
+    "species": "Epidalea calamita",
+    "common": "Natterjack Toad",
+    "url": "https://static.inaturalist.org/sounds/582682.m4a?1673206090",
+    "license": "cc-by-nc",
+    "observer": "Axel Gosseries",
+    "observation": "https://www.inaturalist.org/observations/146143308",
+    "file": "anura/Epidalea_calamita_066.m4a",
+    "bytes": 204109
+  },
+  {
+    "species": "Epidalea calamita",
+    "common": "Natterjack Toad",
+    "url": "https://static.inaturalist.org/sounds/582683.m4a?1673206093",
+    "license": "cc-by-nc",
+    "observer": "Axel Gosseries",
+    "observation": "https://www.inaturalist.org/observations/146143308",
+    "file": "anura/Epidalea_calamita_067.m4a",
+    "bytes": 191906
+  },
+  {
+    "species": "Peltophryne lemur",
+    "common": "Puerto Rican Crested Toad",
+    "url": "https://static.inaturalist.org/sounds/17803.m4a?1648660367",
+    "license": "cc-by-nc",
+    "observer": "Wilfredo Falcon",
+    "observation": "https://www.inaturalist.org/observations/9882466",
+    "file": "anura/Peltophryne_lemur_068.m4a",
+    "bytes": 1159380
+  },
+  {
+    "species": "Tomopterna adiastola",
+    "common": "Confused Sand frog",
+    "url": "https://static.inaturalist.org/sounds/335618.m4a?1638763001",
+    "license": "cc-by-nc",
+    "observer": "Jacob Dirsuwei",
+    "observation": "https://www.inaturalist.org/observations/102584519",
+    "file": "anura/Tomopterna_adiastola_069.m4a",
+    "bytes": 132040
+  },
+  {
+    "species": "Sclerophrys pardalis",
+    "common": "Eastern Leopard Toad",
+    "url": "https://static.inaturalist.org/sounds/792693.m4a?1692040545",
+    "license": "cc-by-nc",
+    "observer": "Adam Welz",
+    "observation": "https://www.inaturalist.org/observations/178415600",
+    "file": "anura/Sclerophrys_pardalis_071.m4a",
+    "bytes": 138774
+  },
+  {
+    "species": "Rhinella horribilis",
+    "common": "Giant Toad",
+    "url": "https://static.inaturalist.org/sounds/19348.mp3?1523355259",
+    "license": "cc-by-nc",
+    "observer": "Chris Harrison",
+    "observation": "https://www.inaturalist.org/observations/6832635",
+    "file": "anura/Rhinella_horribilis_072.mp3",
+    "bytes": 397200
+  },
+  {
+    "species": "Cacosternum platys",
+    "common": "Flat Dainty frog",
+    "url": "https://static.inaturalist.org/sounds/134118.m4a?1599072896",
+    "license": "cc0",
+    "observer": "Marius Burger",
+    "observation": "https://www.inaturalist.org/observations/58352375",
+    "file": "anura/Cacosternum_platys_073.m4a",
+    "bytes": 315508
+  },
+  {
+    "species": "Oecanthus castaneus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/922602.m4a?1709958725",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/201748008",
+    "file": "acrididae/Oecanthus_castaneus_000.m4a",
+    "bytes": 420394
+  },
+  {
+    "species": "Oecanthus castaneus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/922596.m4a?1709958471",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/201748008",
+    "file": "acrididae/Oecanthus_castaneus_001.m4a",
+    "bytes": 250351
+  },
+  {
+    "species": "Oecanthus beameri",
+    "common": "White Sands Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/321033.m4a?1635146978",
+    "license": "cc-by",
+    "observer": "Jared Shorma",
+    "observation": "https://www.inaturalist.org/observations/98434363",
+    "file": "acrididae/Oecanthus_beameri_003.m4a",
+    "bytes": 693092
+  },
+  {
+    "species": "Neoxabea mexicana",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/142685.m4a?1602715831",
+    "license": "cc-by-nc",
+    "observer": "Carlos G Velazco-Macias",
+    "observation": "https://www.inaturalist.org/observations/62595661",
+    "file": "acrididae/Neoxabea_mexicana_004.m4a",
+    "bytes": 518795
+  },
+  {
+    "species": "Neoxabea mexicana",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/142686.m4a?1602715835",
+    "license": "cc-by-nc",
+    "observer": "Carlos G Velazco-Macias",
+    "observation": "https://www.inaturalist.org/observations/62595661",
+    "file": "acrididae/Neoxabea_mexicana_005.m4a",
+    "bytes": 559075
+  },
+  {
+    "species": "Hoplosphyrum boreale",
+    "common": "Western Brush Cricket",
+    "url": "https://static.inaturalist.org/sounds/314115.m4a?1633708607",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/97493053",
+    "file": "acrididae/Hoplosphyrum_boreale_006.m4a",
+    "bytes": 390182
+  },
+  {
+    "species": "Hoplosphyrum boreale",
+    "common": "Western Brush Cricket",
+    "url": "https://static.inaturalist.org/sounds/314116.m4a?1633708614",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/97493053",
+    "file": "acrididae/Hoplosphyrum_boreale_007.m4a",
+    "bytes": 762085
+  },
+  {
+    "species": "Aglaothorax ovatus",
+    "common": "Ovate Shieldback",
+    "url": "https://static.inaturalist.org/sounds/756831.m4a?1688223428",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/170455208",
+    "file": "acrididae/Aglaothorax_ovatus_008.m4a",
+    "bytes": 194868
+  },
+  {
+    "species": "Aglaothorax ovatus",
+    "common": "Ovate Shieldback",
+    "url": "https://static.inaturalist.org/sounds/812685.m4a?1694754309",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/170455208",
+    "file": "acrididae/Aglaothorax_ovatus_009.m4a",
+    "bytes": 759909
+  },
+  {
+    "species": "Gryllodes sigillatus",
+    "common": "Tropical House Cricket",
+    "url": "https://static.inaturalist.org/sounds/1945477.m4a?1778569457",
+    "license": "cc-by-nc",
+    "observer": "Joseph Knight",
+    "observation": "https://www.inaturalist.org/observations/360812681",
+    "file": "acrididae/Gryllodes_sigillatus_010.m4a",
+    "bytes": 141687
+  },
+  {
+    "species": "Gryllodes sigillatus",
+    "common": "Tropical House Cricket",
+    "url": "https://static.inaturalist.org/sounds/392684.m4a?1649910350",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/111376907",
+    "file": "acrididae/Gryllodes_sigillatus_011.m4a",
+    "bytes": 273470
+  },
+  {
+    "species": "Gryllus veletis",
+    "common": "Spring Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/257887.m4a?1624197967",
+    "license": "cc-by-nc",
+    "observer": "John Klymko",
+    "observation": "https://www.inaturalist.org/observations/83783290",
+    "file": "acrididae/Gryllus_veletis_012.m4a",
+    "bytes": 115892
+  },
+  {
+    "species": "Gryllus veletis",
+    "common": "Spring Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/721495.m4a?1685626538",
+    "license": "cc-by-nc",
+    "observer": "averyavesave",
+    "observation": "https://www.inaturalist.org/observations/164972278",
+    "file": "acrididae/Gryllus_veletis_013.m4a",
+    "bytes": 116064
+  },
+  {
+    "species": "Pterophylla camellifolia",
+    "common": "Common True Katydid",
+    "url": "https://static.inaturalist.org/sounds/495853.mp3?1657459324",
+    "license": "cc-by-nc-sa",
+    "observer": "Lee Elliott",
+    "observation": "https://www.inaturalist.org/observations/125603471",
+    "file": "acrididae/Pterophylla_camellifolia_015.mp3",
+    "bytes": 874440
+  },
+  {
+    "species": "Stenobothrus lineatus",
+    "common": "Stripe-winged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/762066.m4a?1688721127",
+    "license": "cc-by",
+    "observer": "Emanuel Kern",
+    "observation": "https://www.inaturalist.org/observations/171526611",
+    "file": "acrididae/Stenobothrus_lineatus_016.m4a",
+    "bytes": 65642
+  },
+  {
+    "species": "Stenobothrus lineatus",
+    "common": "Stripe-winged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/762074.m4a?1688721354",
+    "license": "cc-by",
+    "observer": "Emanuel Kern",
+    "observation": "https://www.inaturalist.org/observations/171526611",
+    "file": "acrididae/Stenobothrus_lineatus_017.m4a",
+    "bytes": 48782
+  },
+  {
+    "species": "Gryllus bimaculatus",
+    "common": "Southern Field Cricket",
+    "url": "https://static.inaturalist.org/sounds/787922.m4a?1691445751",
+    "license": "cc-by-nc",
+    "observer": "lukapraprotnik",
+    "observation": "https://www.inaturalist.org/observations/177239755",
+    "file": "acrididae/Gryllus_bimaculatus_018.m4a",
+    "bytes": 292129
+  },
+  {
+    "species": "Meloimorpha japonica",
+    "common": "Asian Bell Cricket",
+    "url": "https://static.inaturalist.org/sounds/807066.m4a?1693926026",
+    "license": "cc-by-nc",
+    "observer": "rdrl",
+    "observation": "https://www.inaturalist.org/observations/181913180",
+    "file": "acrididae/Meloimorpha_japonica_020.m4a",
+    "bytes": 90143
+  },
+  {
+    "species": "Meloimorpha japonica",
+    "common": "Asian Bell Cricket",
+    "url": "https://static.inaturalist.org/sounds/807058.m4a?1693925732",
+    "license": "cc-by-nc",
+    "observer": "rdrl",
+    "observation": "https://www.inaturalist.org/observations/181913180",
+    "file": "acrididae/Meloimorpha_japonica_021.m4a",
+    "bytes": 90143
+  },
+  {
+    "species": "Velarifictorus micado",
+    "common": "Japanese Burrowing Cricket",
+    "url": "https://static.inaturalist.org/sounds/536822.m4a?1663372030",
+    "license": "cc-by-nc",
+    "observer": "onidiras-iNaturalist",
+    "observation": "https://www.inaturalist.org/observations/135314542",
+    "file": "acrididae/Velarifictorus_micado_022.m4a",
+    "bytes": 64783
+  },
+  {
+    "species": "Velarifictorus micado",
+    "common": "Japanese Burrowing Cricket",
+    "url": "https://static.inaturalist.org/sounds/530519.m4a?1662248412",
+    "license": "cc-by-nc",
+    "observer": "onidiras-iNaturalist",
+    "observation": "https://www.inaturalist.org/observations/133540347",
+    "file": "acrididae/Velarifictorus_micado_023.m4a",
+    "bytes": 100022
+  },
+  {
+    "species": "Megaulacobothrus aethalinus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/291482.m4a?1628945295",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/91078940",
+    "file": "acrididae/Megaulacobothrus_aethalinus_024.m4a",
+    "bytes": 289414
+  },
+  {
+    "species": "Megaulacobothrus aethalinus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/292214.m4a?1629076402",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/91078940",
+    "file": "acrididae/Megaulacobothrus_aethalinus_025.m4a",
+    "bytes": 389358
+  },
+  {
+    "species": "Nemobius sylvestris",
+    "common": "Wood Cricket",
+    "url": "https://static.inaturalist.org/sounds/1641698.m4a?1758302033",
+    "license": "cc-by-nc",
+    "observer": "Maciej Kawecki-Wenger",
+    "observation": "https://www.inaturalist.org/observations/315049201",
+    "file": "acrididae/Nemobius_sylvestris_026.m4a",
+    "bytes": 78948
+  },
+  {
+    "species": "Nemobius sylvestris",
+    "common": "Wood Cricket",
+    "url": "https://static.inaturalist.org/sounds/839959.m4a?1698851317",
+    "license": "cc-by-nc",
+    "observer": "Tom\u00e1\u0161 Dvo\u0159\u00e1k",
+    "observation": "https://www.inaturalist.org/observations/189669434",
+    "file": "acrididae/Nemobius_sylvestris_027.m4a",
+    "bytes": 53201
+  },
+  {
+    "species": "Phymonotus glyphopyrenos",
+    "common": "Hot Springs Mountain Shieldback",
+    "url": "https://static.inaturalist.org/sounds/848485.mp3?1700541183",
+    "license": "cc-by-nc",
+    "observer": "Bridget Spencer",
+    "observation": "https://www.inaturalist.org/observations/191645308",
+    "file": "acrididae/Phymonotus_glyphopyrenos_028.mp3",
+    "bytes": 188928
+  },
+  {
+    "species": "Cyrtaspis scutata",
+    "common": "Shielded Oak Bush-cricket",
+    "url": "https://static.inaturalist.org/sounds/556967.mp3?1667174434",
+    "license": "cc0",
+    "observer": "Marino Lini\u0107",
+    "observation": "https://www.inaturalist.org/observations/140592313",
+    "file": "acrididae/Cyrtaspis_scutata_029.mp3",
+    "bytes": 169582
+  },
+  {
+    "species": "Oecanthus fultoni",
+    "common": "Snowy Tree Cricket",
+    "url": "https://static.inaturalist.org/sounds/1618472.m4a?1756414151",
+    "license": "cc-by-nc",
+    "observer": "Dom",
+    "observation": "https://www.inaturalist.org/observations/308588489",
+    "file": "acrididae/Oecanthus_fultoni_030.m4a",
+    "bytes": 108871
+  },
+  {
+    "species": "Metholce nigritarsis",
+    "common": "Black-footed Gondwanan Katydid",
+    "url": "https://static.inaturalist.org/sounds/1294362.m4a?1738042360",
+    "license": "cc-by",
+    "observer": "Sockrosma",
+    "observation": "https://www.inaturalist.org/observations/259833868",
+    "file": "acrididae/Metholce_nigritarsis_031.m4a",
+    "bytes": 246767
+  },
+  {
+    "species": "Hemideina crassidens",
+    "common": "Wellington Tree W\u0113t\u0101",
+    "url": "https://static.inaturalist.org/sounds/1299686.m4a?1738640744",
+    "license": "cc-by",
+    "observer": "Richard Littauer",
+    "observation": "https://www.inaturalist.org/observations/260566754",
+    "file": "acrididae/Hemideina_crassidens_032.m4a",
+    "bytes": 106994
+  },
+  {
+    "species": "Aglaothorax amathitis",
+    "common": "Bluffs Shieldback",
+    "url": "https://static.inaturalist.org/sounds/270483.m4a?1625730729",
+    "license": "cc-by-nc",
+    "observer": "James Bailey",
+    "observation": "https://www.inaturalist.org/observations/86134427",
+    "file": "acrididae/Aglaothorax_amathitis_033.m4a",
+    "bytes": 467163
+  }
+]
