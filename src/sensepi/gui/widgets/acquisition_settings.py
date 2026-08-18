@@ -5,9 +5,9 @@ from dataclasses import dataclass, field
 from PySide6.QtCore import Signal, QSignalBlocker
 from PySide6.QtWidgets import (
     QComboBox,
-    QDoubleSpinBox,
     QFormLayout,
     QHBoxLayout,
+    QLabel,
     QSpinBox,
     QWidget,
 )
@@ -21,7 +21,7 @@ from sensepi.config.sampling import (
 from ..config.acquisition_state import GuiAcquisitionConfig, SensorSelectionConfig
 
 
-DEFAULT_DEVICE_RATE_HZ = 200.0
+DEFAULT_DEVICE_RATE_HZ = 50.0
 DEFAULT_SIGNALS_REFRESH_MS = 50
 DEFAULT_FFT_REFRESH_MS = 750
 DEFAULT_MODE_KEY = "high_fidelity"
@@ -109,13 +109,9 @@ class AcquisitionSettingsWidget(QWidget):
         form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
         # Device sampling controls
-        self.device_rate_spin = QDoubleSpinBox(self)
-        self.device_rate_spin.setRange(1.0, 4000.0)
-        self.device_rate_spin.setDecimals(1)
-        self.device_rate_spin.setSingleStep(1.0)
-        self.device_rate_spin.setValue(float(self._sampling_config.device_rate_hz))
+        self.device_rate_label = QLabel(f"{DEFAULT_DEVICE_RATE_HZ:.0f} Hz", self)
         if show_device_rate:
-            form.addRow("Sampling rate [Hz]:", self.device_rate_spin)
+            form.addRow("Sampling rate:", self.device_rate_label)
 
         self.mode_combo = QComboBox(self)
         for key, mode in RECORDING_MODES.items():
@@ -152,7 +148,6 @@ class AcquisitionSettingsWidget(QWidget):
         )
 
         # Wiring
-        self.device_rate_spin.valueChanged.connect(self._on_sampling_control_changed)
         self.mode_combo.currentIndexChanged.connect(self._on_sampling_control_changed)
         self._on_sampling_control_changed()
 
@@ -168,8 +163,7 @@ class AcquisitionSettingsWidget(QWidget):
             device_rate_hz=float(self._sampling_config.device_rate_hz),
             mode_key=str(self._sampling_config.mode_key),
         )
-        if self.device_rate_spin.isVisible():
-            sampling.device_rate_hz = float(self.device_rate_spin.value())
+        sampling.device_rate_hz = DEFAULT_DEVICE_RATE_HZ
         if self.mode_combo.isVisible():
             sampling.mode_key = str(self.mode_combo.currentData())
         self._sampling_config = sampling
@@ -201,9 +195,7 @@ class AcquisitionSettingsWidget(QWidget):
             mode_key=str(sampling.mode_key),
         )
         self._sampling_config = sampling
-        if self.device_rate_spin.isVisible():
-            with QSignalBlocker(self.device_rate_spin):
-                self.device_rate_spin.setValue(float(sampling.device_rate_hz))
+        self.device_rate_label.setText(f"{DEFAULT_DEVICE_RATE_HZ:.0f} Hz")
         idx = self.mode_combo.findData(sampling.mode_key)
         if idx < 0:
             idx = self.mode_combo.findData(DEFAULT_MODE_KEY)
@@ -215,15 +207,13 @@ class AcquisitionSettingsWidget(QWidget):
 
     def _build_sampling_config(self) -> SamplingConfig:
         try:
-            rate = float(self.device_rate_spin.value())
+            rate = DEFAULT_DEVICE_RATE_HZ
         except (TypeError, ValueError):
             rate = DEFAULT_DEVICE_RATE_HZ
         idx = self.mode_combo.currentIndex()
         mode_key = str(self.mode_combo.itemData(idx) or DEFAULT_MODE_KEY)
         if mode_key not in RECORDING_MODES:
             mode_key = DEFAULT_MODE_KEY
-        if not self.device_rate_spin.isVisible():
-            rate = float(self._sampling_config.device_rate_hz)
         if not self.mode_combo.isVisible():
             mode_key = str(self._sampling_config.mode_key)
         return SamplingConfig(device_rate_hz=rate, mode_key=mode_key)

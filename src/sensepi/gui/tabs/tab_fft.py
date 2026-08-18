@@ -55,7 +55,7 @@ DEFAULT_FFT_UPDATE_MS = 500  # fallback if config missing
 MIN_FFT_UPDATE_MS = 50
 MAX_FFT_UPDATE_MS = 2000
 
-DEFAULT_MAX_FREQUENCY_HZ = 200.0  # cap plotted frequency if useful
+DEFAULT_MAX_FREQUENCY_HZ = 20.0
 
 # The spectrum shows only the structural horizontal axes (T11.1).
 SPECTRUM_CHANNELS: tuple[str, ...] = ("ax", "ay")
@@ -299,7 +299,7 @@ class FftTab(QWidget):
         self._last_damping_error: str = ""
 
         # Sensor→floor placement (only meaningful for mode shapes). Fixed rig set.
-        self._shape_sensor_ids = (1, 2, 3)
+        self._shape_sensor_ids = (1, 2, 3, 4)
         # Rolling/overlapping cadence for Window 2 (recompute every EIGEN_UPDATE_S
         # using the last EIGEN_BATCH_S of data from the 120 s modal buffer).
         self._eig_timer = QTimer(self)
@@ -431,7 +431,7 @@ class FftTab(QWidget):
         self._right_view_combo.currentTextChanged.connect(self._on_view_changed)
         self._damping_sensor_label = QLabel("Damping sensor:")
         self._damping_sensor_combo = QComboBox()
-        for sid in (1, 2, 3):
+        for sid in (1, 2, 3, 4):
             self._damping_sensor_combo.addItem(f"S{sid}", sid)
         self._damping_sensor_combo.setCurrentIndex(2)  # default top-story sensor S3
         self._damping_sensor_combo.currentIndexChanged.connect(self._on_damping_sensor_changed)

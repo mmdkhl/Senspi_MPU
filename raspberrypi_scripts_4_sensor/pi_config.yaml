@@ -1,0 +1,12 @@
+mpu6050:
+  output_dir: /home/verwalter/logs/mpu
+  sample_rate_hz: 50
+  stream_every: 1
+  channels: default
+  dlpf: 3
+  include_temperature: false
+  sensors:
+  - 1
+  - 2
+  - 3
+  - 4

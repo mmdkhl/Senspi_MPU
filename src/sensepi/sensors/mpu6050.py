@@ -3,7 +3,7 @@ The Raspberry Pi logger streams JSON lines with (at least):
 
   - timestamp_ns : int   monotonic time in nanoseconds
   - t_s          : float seconds since the run started
-  - sensor_id    : int   logical sensor index (1, 2, or 3)
+  - sensor_id    : int   logical sensor index (1, 2, 3, or 4)
   - ax, ay, az   : float linear acceleration in m/s²
   - gx, gy, gz   : float angular rate in deg/s
 

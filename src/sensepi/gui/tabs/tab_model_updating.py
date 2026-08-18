@@ -2187,12 +2187,12 @@ class ModelUpdatingTab(QWidget):
         self._rebuild_exp_data_widgets()
         self._on_exp_source_changed()
 
-    # Sensor IDs available from the hardware (fixed at 3 MPU6050 units). This is a
-    # HARDWARE fact, not a story-count assumption (NS-5): when nStory > 3 the rig
+    # Sensor IDs available from the hardware (fixed at 4 MPU6050 units). This is a
+    # HARDWARE fact, not a story-count assumption (NS-5): when nStory > 4 the rig
     # cannot fully instrument every floor, so calibration falls back to PARTIAL
     # coverage (measured floors only) or frequency-only — handled by B1 + the
     # 3-state coverage message. nStory itself is unconstrained (Stories spinbox 1–20).
-    _SENSOR_IDS = (1, 2, 3)
+    _SENSOR_IDS = (1, 2, 3, 4)
 
     def _build_sensors_panel(self) -> QWidget:
         """Sensor Configuration panel shown when data source is 'From Sensors'."""
@@ -2209,6 +2209,7 @@ class ModelUpdatingTab(QWidget):
             "1 bottom + 2 top",
             "Fully instrumented (1 per floor)",
             "Bottom + top only",
+            "2 bottom + 2 top",
             "Custom",
         ])
         map_form.addRow("Preset:", self._sensor_preset)
@@ -2318,13 +2319,27 @@ class ModelUpdatingTab(QWidget):
             return
         if preset == "Fully instrumented (1 per floor)":
             mapping = {sid: min(i + 1, n_story) for i, sid in enumerate(self._SENSOR_IDS)}
-            guide = "Place one sensor on each of stories 1, 2, 3 (full mode shapes)."
+            guide = "Place one sensor on each of stories 1, 2, 3, 4 (full mode shapes)."
         elif preset == "Bottom + top only":
             mapping = {1: 1, 2: n_story, 3: n_story}
-            guide = f"Sensor 1 on story 1; sensors 2 & 3 on the top story ({n_story})."
+            guide = (
+                f"Sensor 1 on story 1; sensors 2 & 3 on the top story ({n_story}). "
+                "Sensor 4 not set by this preset — place manually or use "
+                "\"2 bottom + 2 top\"."
+            )
+        elif preset == "2 bottom + 2 top":
+            mapping = {1: 1, 2: 1, 3: n_story, 4: n_story}
+            guide = (
+                f"Sensors 1 & 2 on story 1 (bottom); sensors 3 & 4 on the top "
+                f"story ({n_story})."
+            )
         else:  # "1 bottom + 2 top"
             mapping = {1: 1, 2: n_story, 3: n_story}
-            guide = f"Sensor 1 on story 1 (bottom); sensors 2 & 3 on the top story ({n_story}) corners."
+            guide = (
+                f"Sensor 1 on story 1 (bottom); sensors 2 & 3 on the top story "
+                f"({n_story}) corners. Sensor 4 not set by this preset — place "
+                "manually or use \"2 bottom + 2 top\"."
+            )
         for sid, story in mapping.items():
             combo = self._sensor_story_combos.get(sid)
             if combo is not None:
