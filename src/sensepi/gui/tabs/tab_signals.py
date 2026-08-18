@@ -58,15 +58,15 @@ if TYPE_CHECKING:
     from ..recorder_controller import RecorderController
 
 DEFAULT_REFRESH_MODE = "fixed"
-DEFAULT_REFRESH_INTERVAL_MS = 50  # 20 Hz default for live traces
+DEFAULT_REFRESH_INTERVAL_MS = 33  # ~30 Hz default for live traces
 # Hard lower bound on the GUI timer interval. Updating more often than ~50 Hz
 # brings little perceptual benefit but can chew CPU when many traces are shown.
 MIN_REFRESH_INTERVAL_MS = 20
 REFRESH_PROFILE_CUSTOM_LABEL = "Custom"
 REFRESH_PRESETS: list[tuple[str, int]] = [
-    ("Low CPU", 250),
-    ("Balanced", DEFAULT_REFRESH_INTERVAL_MS),
-    ("High fidelity", 20),
+    ("10 Hz", 100),
+    ("30 Hz", 33),
+    ("50 Hz", 20),
 ]
 REFRESH_FOLLOW_DEVICE = "__device_rate__"  # QComboBox itemData sentinel
 STREAM_STALL_THRESHOLD_S = 2.0
@@ -130,9 +130,9 @@ class SignalPlotWidgetBase(QWidget):
         self._max_lines_per_subplot: int | None = None
 
     def _create_buffer_store(self) -> Dict[SampleKey, TimeSeriesBuffer]:
-        # Only physical sensors 1, 2, 3 exist. Using 0 here created a phantom S0 row.
+        # Physical sensors are 1-4. Using 0 here created a phantom S0 row.
         return initialize_buffers_for_channels(
-            sensor_ids=(1, 2, 3),
+            sensor_ids=(1, 2, 3, 4),
             channels=("ax", "ay", "az", "gx", "gy", "gz"),
             window_seconds=self._max_seconds,
             max_rate_hz=self._max_rate_hz,
@@ -1144,16 +1144,8 @@ class SignalsTab(QWidget):
         self.refresh_profile_combo.setToolTip(
             "Preset GUI refresh intervals for the time-domain plots."
         )
-        for name, interval in REFRESH_PRESETS:
-            hz = int(round(1000.0 / interval)) if interval > 0 else 0
-            label = f"{name} ({hz} Hz / {int(interval)} ms)"
+        for label, interval in REFRESH_PRESETS:
             self.refresh_profile_combo.addItem(label, int(interval))
-        self.refresh_profile_combo.addItem("Device sampling rate", REFRESH_FOLLOW_DEVICE)
-        self._refresh_profile_custom_index = self.refresh_profile_combo.count()
-        self.refresh_profile_combo.addItem(
-            self._format_custom_refresh_profile_label(self.refresh_interval_ms),
-            None,
-        )
         self.refresh_profile_combo.currentIndexChanged.connect(
             self._on_refresh_profile_changed
         )

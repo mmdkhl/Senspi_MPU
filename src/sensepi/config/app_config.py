@@ -216,7 +216,7 @@ class AppConfig:
         default_factory=PlotPerformanceConfig
     )
     sampling_config: SamplingConfig = field(
-        default_factory=lambda: SamplingConfig(device_rate_hz=200.0)
+        default_factory=lambda: SamplingConfig(device_rate_hz=50.0)
     )
 
 
@@ -536,7 +536,7 @@ def build_pi_config_for_host(host_cfg: HostConfig, app_cfg: AppConfig) -> PiLogg
 
     sensor_defaults = sensors.get("sensors") or {}
     mpu_defaults = dict(sensor_defaults.get("mpu6050", {}) or {})
-    sensors_list = mpu_defaults.get("sensors", [1, 2, 3])
+    sensors_list = mpu_defaults.get("sensors", [1, 2, 3, 4])
     if isinstance(sensors_list, str):
         sensors_list = [s.strip() for s in sensors_list.split(",") if s.strip()]
 

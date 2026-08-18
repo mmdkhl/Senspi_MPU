@@ -91,8 +91,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--bench-sensors",
         type=int,
-        default=3,
-        help="Synthetic sensor count (default: 3)",
+        default=4,
+        help="Synthetic sensor count (default: 4)",
     )
     parser.add_argument(
         "--bench-csv",
