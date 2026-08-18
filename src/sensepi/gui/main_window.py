@@ -18,6 +18,7 @@ from .config.acquisition_state import (
 )
 from .recorder_controller import RecorderController
 from .tabs.tab_fft import FftTab
+from .tabs.tab_digital_twin import DigitalTwinExperimentTab
 from .tabs.tab_model_updating import ModelUpdatingTab
 from .tabs.tab_settings import SettingsTab
 from .tabs.tab_signals import SignalsTab
@@ -71,6 +72,14 @@ class MainWindow(QMainWindow):
             self._on_sampling_changed(self._app_config.sampling_config)
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        # Stop the Digital Twin worker before shutting down the stream/OpenSees state.
+        try:
+            self.digital_twin_tab.shutdown()
+        except Exception as exc:  # pragma: no cover - best-effort shutdown
+            self.recorder_tab.report_error(
+                f"Failed to stop Digital Twin experiment on close: {exc!r}"
+            )
+
         # Stop the sonification workers FIRST. stop_live_stream(wait=True) blocks
         # the GUI thread, so the queued stream_stopped that would otherwise stop
         # a tab can never be delivered during shutdown — leaving a running
@@ -114,11 +123,18 @@ class MainWindow(QMainWindow):
         self.sonification_tab = SonificationTab(
             recorder_controller=self.recorder_tab, parent=self
         )
+        self.digital_twin_tab = DigitalTwinExperimentTab(
+            recorder_controller=self.recorder_tab,
+            model_updating_tab=self.model_updating_tab,
+            sonification_tab=self.sonification_tab,
+            parent=self,
+        )
 
         self._tabs.addTab(self.signals_tab, self.tr("Live Signals"))
         self._tabs.addTab(self.fft_tab, self.tr("Spectrum"))
         self._tabs.addTab(self.model_updating_tab, self.tr("Model Updating"))
         self._tabs.addTab(self.sonification_tab, self.tr("Sonification"))
+        self._tabs.addTab(self.digital_twin_tab, self.tr("Digital Twin Experiment"))
         self._tabs.addTab(self.settings_tab, self.tr("Settings"))
 
         container = QWidget()
@@ -144,6 +160,8 @@ class MainWindow(QMainWindow):
         self.recorder_tab.stream_stopped.connect(self.fft_tab.on_stream_stopped)
         self.recorder_tab.stream_started.connect(self.sonification_tab.on_stream_started)
         self.recorder_tab.stream_stopped.connect(self.sonification_tab.on_stream_stopped)
+        self.recorder_tab.stream_started.connect(self.digital_twin_tab.on_stream_started)
+        self.recorder_tab.stream_stopped.connect(self.digital_twin_tab.on_stream_stopped)
         self.recorder_tab.stream_stopped.connect(self._cancel_auto_stop_timer)
         self.recorder_tab.recording_stopped.connect(self._cancel_auto_stop_timer)
         self._auto_stop_timer.timeout.connect(self._on_auto_stop_timeout)

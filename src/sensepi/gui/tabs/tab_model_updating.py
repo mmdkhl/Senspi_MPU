@@ -1640,6 +1640,9 @@ class _ContinuousUpdateWorker(QObject):
                     fdd, self._params["sensor_f_min"], self._params["sensor_f_max"]),
                 "fig2_track_png": _render_freq_tracking_png(self._history),
                 "cycle": cycle,
+                "success": bool(success),
+                "calibrated_params": copy.deepcopy(calib),
+                "signature": _make_calibration_signature(initial_params),
             })
 
             if max_cycles and cycle >= max_cycles:
@@ -1726,6 +1729,9 @@ class ModelUpdatingTab(QWidget):
         self._recorder_controller = None
         self._continuous_thread: QThread | None = None
         self._continuous_worker: _ContinuousUpdateWorker | None = None
+        self._latest_continuous_calibration: dict[str, Any] | None = None
+        self._latest_continuous_signature: str | None = None
+        self._continuous_handoff_selected = False
         # Remaining follow-up actions after a sensor identification (e.g.
         # ["calibrate", "run"] for the Identify & Analyze button). Each step is
         # launched from _clear_worker once the previous thread has finished.
@@ -1788,12 +1794,19 @@ class ModelUpdatingTab(QWidget):
             "Shows the Run Analysis output computed from sensor results."
         )
         self._continuous_btn = QPushButton("Start Continuous Update", self)
+        self._continuous_dt_btn = QPushButton("Use Latest Calibration for Digital Twin", self)
+        self._continuous_dt_btn.setToolTip(
+            "Freeze the latest completed Continuous Update calibration and make it "
+            "available to the Digital Twin. Model Definition fields are not changed."
+        )
         self._identify_btn.setEnabled(False)
         self._identify_analyze_btn.setEnabled(False)
         self._continuous_btn.setEnabled(False)
+        self._continuous_dt_btn.setEnabled(False)
         actions.addWidget(self._identify_btn)
         actions.addWidget(self._identify_analyze_btn)
         actions.addWidget(self._continuous_btn)
+        actions.addWidget(self._continuous_dt_btn)
 
         self._reset_btn = QPushButton("Reset", self)
         self._reset_btn.setToolTip("Clear results/log and return to a ready state for a new analysis.")
@@ -1811,6 +1824,7 @@ class ModelUpdatingTab(QWidget):
             lambda: self._start_identify(chain=["calibrate", "run"])
         )
         self._continuous_btn.clicked.connect(self._toggle_continuous)
+        self._continuous_dt_btn.clicked.connect(self._use_latest_continuous_for_digital_twin)
         self._reset_btn.clicked.connect(self._reset_tab)
 
     def _build_model_tab(self) -> None:
@@ -2349,6 +2363,9 @@ class ModelUpdatingTab(QWidget):
             self._identify_btn.setEnabled(sensor_mode and idle)
             self._identify_analyze_btn.setEnabled(sensor_mode and idle)
             self._continuous_btn.setEnabled(sensor_mode and idle)
+            self._continuous_dt_btn.setEnabled(
+                sensor_mode and self._latest_continuous_calibration is not None
+            )
 
     @Slot()
     def _rebuild_exp_data_widgets(self) -> None:
@@ -3079,6 +3096,12 @@ class ModelUpdatingTab(QWidget):
         self._identify_analyze_btn.setEnabled(not busy and sensor_mode)
         # During a continuous run the button stays enabled as the Stop control.
         self._continuous_btn.setEnabled((continuous or not busy) and sensor_mode)
+        self._continuous_dt_btn.setEnabled(
+            sensor_mode
+            and self._latest_continuous_calibration is not None
+            and not self._continuous_handoff_selected
+            and (continuous or not busy)
+        )
         self._status.setText(status)
 
     # ------------------------------------------------------------------
@@ -3101,6 +3124,10 @@ class ModelUpdatingTab(QWidget):
 
         self._sensor_chain = []
         self._calibration_state = _CalibrationState()
+        self._latest_continuous_calibration = None
+        self._latest_continuous_signature = None
+        self._continuous_handoff_selected = False
+        self._continuous_dt_btn.setEnabled(False)
         self._log.clear()
 
         # Reset the figure area to placeholders.
@@ -3340,6 +3367,10 @@ class ModelUpdatingTab(QWidget):
         settings = self._continuous_settings()
         if settings is None:
             return
+        self._latest_continuous_calibration = None
+        self._latest_continuous_signature = None
+        self._continuous_handoff_selected = False
+        self._continuous_dt_btn.setEnabled(False)
         # Size the capture buffer WITH HEADROOM over the snapshot window. A buffer
         # equal to the window can never deliver a full window (the trailing snapshot
         # and cross-sensor alignment always trim a little), which stalled the loop.
@@ -3385,7 +3416,7 @@ class ModelUpdatingTab(QWidget):
         # "update interval". The modal buffer is sized generously in _start_continuous
         # (decoupled from this window, like the Spectrum tab's 120 s buffer).
         dur = self._double_spin(
-            CONTINUOUS_MIN_DURATION_S, 600.0, float(self._sensor_window.value()), 1)
+            CONTINUOUS_MIN_DURATION_S, 600.0, 30.0, 1)
         dur.setToolTip(
             "Length of each record-and-update cycle. The loop records this many seconds "
             "of fresh data, identifies the modes, updates the model, then records the "
@@ -3429,8 +3460,54 @@ class ModelUpdatingTab(QWidget):
         # Cache both right-panel renders; show whichever the checkbox selects.
         self._cont_fig2_fdd = payload.get("fig2_fdd_png") or payload.get("fig2_png")
         self._cont_fig2_track = payload.get("fig2_track_png")
+        if not self._continuous_handoff_selected and bool(payload.get("success", False)):
+            calibrated = payload.get("calibrated_params")
+            signature = payload.get("signature")
+            if isinstance(calibrated, dict) and isinstance(signature, str):
+                self._latest_continuous_calibration = copy.deepcopy(calibrated)
+                self._latest_continuous_signature = signature
+                self._continuous_dt_btn.setEnabled(True)
+                cycle = payload.get("cycle")
+                self._status.setText(
+                    f"Continuous update cycle {cycle} complete. "
+                    "Latest calibration is available for the Digital Twin."
+                )
         self._cont_view_active = True
         self._show_cont_fig2()
+
+    @Slot()
+    def _use_latest_continuous_for_digital_twin(self) -> None:
+        params = self._latest_continuous_calibration
+        signature = self._latest_continuous_signature
+        if not isinstance(params, dict) or not isinstance(signature, str):
+            QMessageBox.information(
+                self,
+                "Continuous update",
+                "No completed Continuous Update calibration is available yet.",
+            )
+            return
+
+        self._calibration_state = _CalibrationState(
+            available=True,
+            input_signature=signature,
+            calibrated_params=copy.deepcopy(params),
+        )
+        self._continuous_handoff_selected = True
+        self._continuous_dt_btn.setEnabled(False)
+        self._append_log(
+            "\n─── Latest Continuous Update calibration selected for Digital Twin. "
+            "Model Definition values were not changed. ───\n"
+        )
+
+        if self._continuous_worker is not None:
+            self._stop_continuous()
+            self._status.setText(
+                "Latest calibration frozen. Stopping Continuous Update before Digital Twin use…"
+            )
+        else:
+            self._status.setText(
+                "Latest Continuous Update calibration is ready for the Digital Twin."
+            )
 
     def _show_cont_fig2(self) -> None:
         """Display the right-panel view the checkbox selects (cached PNG, no recompute)."""
@@ -3455,4 +3532,10 @@ class ModelUpdatingTab(QWidget):
         self._continuous_worker = None
         self._continuous_thread = None
         self._continuous_btn.setText("Start Continuous Update")
-        self._set_busy(False, "Continuous update stopped.")
+        if self._continuous_handoff_selected:
+            self._set_busy(
+                False,
+                "Latest Continuous Update calibration is ready for the Digital Twin.",
+            )
+        else:
+            self._set_busy(False, "Continuous update stopped.")
