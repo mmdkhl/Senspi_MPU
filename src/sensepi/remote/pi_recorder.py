@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import shlex
 from pathlib import Path, PurePosixPath
 from typing import Callable, Iterable, Optional
@@ -10,9 +11,18 @@ from ..config.app_config import DEFAULT_BASE_PATH
 from ..config.pi_logger_config import PiLoggerConfig
 from .ssh_client import Host, SSHClient
 
+logger = logging.getLogger(__name__)
+
 
 class PiRecorder:
     """Launches Raspberry Pi logger scripts over SSH."""
+
+    # Standalone OLED status display, if present alongside the logger scripts
+    # (see raspberrypi_scripts_4_sensor/oled_status.py). It reads the
+    # heartbeat file the logger writes and is intentionally decoupled from
+    # it -- a crash in either process can't take down the other -- so it's
+    # started independently here rather than bundled into the logger command.
+    OLED_SCRIPT = "oled_status.py"
 
     def __init__(self, host: Host, base_path: Optional[Path] = None) -> None:
         self.host = host
@@ -32,6 +42,29 @@ class PiRecorder:
     def close(self) -> None:
         """Close the SSH connection (does not kill remote loggers)."""
         self.client.close()
+
+    def clear_recording_output(self, output_dir: str) -> None:
+        """Delete previous recording files from the configured Pi output folder."""
+
+        target = PurePosixPath(str(output_dir))
+        target_text = target.as_posix()
+        if target_text in {"", "/", "/home"} or target.name != "mpu":
+            raise ValueError(f"Refusing to clear unsafe recording folder: {target_text!r}")
+
+        quoted_target = shlex.quote(target_text)
+        cmd = (
+            f"mkdir -p {quoted_target} && "
+            f"find {quoted_target} -mindepth 1 -maxdepth 1 -exec rm -rf -- {{}} +"
+        )
+        _stdin, stdout, stderr = self.client.run(cmd)
+        exit_status = stdout.channel.recv_exit_status()
+        if exit_status != 0:
+            message = stderr.read()
+            if isinstance(message, bytes):
+                message = message.decode("utf-8", errors="ignore")
+            raise RuntimeError(
+                f"Failed to clear recording folder {target_text}: {message}"
+            )
 
     # ------------------------------------------------------------------ simple runner
     def start_logger(
@@ -56,6 +89,46 @@ class PiRecorder:
         self.connect()
         _, stdout, stderr = self.client.run(command)
         return stdout, stderr
+
+    # ------------------------------------------------------------------ OLED display
+    def _ensure_oled_running(self) -> None:
+        """
+        Start the Pi-side OLED status display if it isn't already running.
+
+        Best-effort and idempotent: if it's already running this is a no-op;
+        if the Pi has no OLED script deployed or no display wired up, the
+        remote command fails silently and recording proceeds unaffected.
+        Deliberately left running after recording stops (rather than killed
+        in :meth:`close`/`stop`) so the display keeps showing status between
+        sessions instead of going blank.
+
+        The check and the launch are two *separate* SSH commands, not one
+        combined ``pgrep ... || nohup ...`` shell line. ``pgrep -f`` matches
+        against every process's full command line, including its own parent
+        shell's -- so if the check and the launch shared one shell
+        invocation, the parent shell's own command text (which necessarily
+        contains "oled_status.py" from the launch half) would always match
+        the check, and the launch half would silently never run. Splitting
+        them avoids that self-match. The ``[o]`` bracket in the check
+        pattern is the standard trick to also keep the check itself from
+        matching its own argv (same idea as ``ps aux | grep '[o]led'``).
+        """
+        try:
+            self.connect()
+            _, stdout, _ = self.client.run("pgrep -f '[o]led_status.py'")
+            already_running = stdout.channel.recv_exit_status() == 0
+            if already_running:
+                return
+
+            base = self.base_path.as_posix()
+            launch_cmd = (
+                f"cd {shlex.quote(base)} && "
+                f"nohup python3 {shlex.quote(self.OLED_SCRIPT)} --interval 1.0 "
+                f">/tmp/sensepi_oled.log 2>&1 &"
+            )
+            self.client.run(launch_cmd)
+        except Exception:
+            logger.warning("Could not start OLED status display on %s", self.host.host, exc_info=True)
 
     # ------------------------------------------------------------------ streaming
     def _stream_logger(
@@ -121,6 +194,8 @@ class PiRecorder:
         if session_name and not has_session_flag:
             extra.extend(["--session-name", session_name])
 
+        self._ensure_oled_running()
+
         cmd_parts = cfg.build_command(extra_cli=" ".join(extra))
         cmd = " ".join(shlex.quote(part) for part in cmd_parts)
         return self.client.exec_stream(cmd, cwd=self.base_path.as_posix())
@@ -130,11 +205,41 @@ class PiRecorder:
         Start the logger on the Pi in record-only mode (no stdout streaming).
         """
 
+        self._ensure_oled_running()
+
         cmd_parts = cfg.build_command()
         cmd = " ".join(shlex.quote(part) for part in cmd_parts)
         return self.client.exec_stream(cmd, cwd=self.base_path.as_posix())
 
     # ------------------------------------------------------------------ convenience
+    def stop_remote_logger(self) -> None:
+        """
+        Explicitly terminate the remote ``mpu6050_multi_logger.py`` process.
+
+        Closing the local SSH channel/stream is not enough to stop it: the
+        script's per-sample loop catches the broken-pipe error that results
+        from a closed channel internally (so its stdout stream can survive a
+        dropped GUI connection) and just keeps looping, still sampling
+        sensors and refreshing the "publishing" OLED heartbeat forever. This
+        sends SIGTERM instead, which the script's own signal handler turns
+        into a clean shutdown -- heartbeat flips to "not publishing", per
+        sensor writers flushed and closed. Best-effort: failures here are
+        logged, not raised, so a stop action never gets stuck on this.
+
+        Note this matches by script name (``pkill -f``), so it will also
+        stop any other ``mpu6050_multi_logger.py`` instance running on the
+        same Pi outside the GUI (e.g. a manually started
+        ``run_all_sensors.sh``) -- deliberate, since a stray instance is
+        exactly what would otherwise keep the OLED stuck on "publishing".
+        """
+        try:
+            self.connect()
+            self.client.run("pkill -f mpu6050_multi_logger.py")
+        except Exception:
+            logger.warning(
+                "Could not stop remote logger on %s", self.host.host, exc_info=True
+            )
+
     def stop(self) -> None:
         """Alias for :meth:`close` to match older code."""
         self.close()

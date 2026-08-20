@@ -54,6 +54,14 @@ from ...dataio import modal_session_loader as msl
 
 REQUIRED_MODULES = ("openseespy", "opsvis")
 
+# Sensor->story placement: label for "this sensor is not on any story of the
+# model". Lets a sensor that isn't mounted on the structure (spare, or fixed to
+# the base/ground, which is not a model DOF) be excluded from the mode shapes
+# rather than forced onto a story, where it would be averaged into that story's
+# value and bias the shape. map_to_stories() ignores any sensor missing from the
+# map, so an unassigned sensor never enters the calculation.
+UNASSIGNED_STORY = "—"
+
 # Input files bundled with the opensees_model_updating package
 _OPENSEES_INPUT_DIR = Path(__file__).resolve().parents[3] / "opensees_model_updating" / "input"
 
@@ -1004,6 +1012,9 @@ def _make_calibration_signature(params: dict[str, Any]) -> str:
         "floor_masses",
         "numModes",
         "zeta",
+        "load_type",
+        "cyclic_frequency_hz",
+        "cyclic_amplitude_ms2",
         "gmFactor",
         "gmFile",
         "dtGM",
@@ -1640,6 +1651,9 @@ class _ContinuousUpdateWorker(QObject):
                     fdd, self._params["sensor_f_min"], self._params["sensor_f_max"]),
                 "fig2_track_png": _render_freq_tracking_png(self._history),
                 "cycle": cycle,
+                "success": bool(success),
+                "calibrated_params": copy.deepcopy(calib),
+                "signature": _make_calibration_signature(initial_params),
             })
 
             if max_cycles and cycle >= max_cycles:
@@ -1726,6 +1740,9 @@ class ModelUpdatingTab(QWidget):
         self._recorder_controller = None
         self._continuous_thread: QThread | None = None
         self._continuous_worker: _ContinuousUpdateWorker | None = None
+        self._latest_continuous_calibration: dict[str, Any] | None = None
+        self._latest_continuous_signature: str | None = None
+        self._continuous_handoff_selected = False
         # Remaining follow-up actions after a sensor identification (e.g.
         # ["calibrate", "run"] for the Identify & Analyze button). Each step is
         # launched from _clear_worker once the previous thread has finished.
@@ -1788,12 +1805,19 @@ class ModelUpdatingTab(QWidget):
             "Shows the Run Analysis output computed from sensor results."
         )
         self._continuous_btn = QPushButton("Start Continuous Update", self)
+        self._continuous_dt_btn = QPushButton("Use Latest Calibration for Digital Twin", self)
+        self._continuous_dt_btn.setToolTip(
+            "Freeze the latest completed Continuous Update calibration and make it "
+            "available to the Digital Twin. Model Definition fields are not changed."
+        )
         self._identify_btn.setEnabled(False)
         self._identify_analyze_btn.setEnabled(False)
         self._continuous_btn.setEnabled(False)
+        self._continuous_dt_btn.setEnabled(False)
         actions.addWidget(self._identify_btn)
         actions.addWidget(self._identify_analyze_btn)
         actions.addWidget(self._continuous_btn)
+        actions.addWidget(self._continuous_dt_btn)
 
         self._reset_btn = QPushButton("Reset", self)
         self._reset_btn.setToolTip("Clear results/log and return to a ready state for a new analysis.")
@@ -1811,6 +1835,7 @@ class ModelUpdatingTab(QWidget):
             lambda: self._start_identify(chain=["calibrate", "run"])
         )
         self._continuous_btn.clicked.connect(self._toggle_continuous)
+        self._continuous_dt_btn.clicked.connect(self._use_latest_continuous_for_digital_twin)
         self._reset_btn.clicked.connect(self._reset_tab)
 
     def _build_model_tab(self) -> None:
@@ -1938,26 +1963,40 @@ class ModelUpdatingTab(QWidget):
         self._num_modes.setRange(2, 20)
         self._num_modes.setValue(3)
         self._zeta = self._double_spin(0.0, 1.0, 0.005, 4)
-        self._gm_factor = self._double_spin(-1.0e6, 1.0e6, 9.81, 4)
+
+        # Applied loading: either a user-defined sinusoidal base acceleration
+        # or an earthquake acceleration record loaded from a text file.
+        self._load_type = QComboBox(self)
+        self._load_type.addItem("Cyclic loading", userData="cyclic")
+        self._load_type.addItem(
+            "Earthquake loading (from file)",
+            userData="earthquake",
+        )
+
+        # Cyclic loading: a_g(t) = A * sin(2*pi*f*t).
+        self._cyclic_frequency_hz = self._double_spin(0.01, 100.0, 1.0, 3)
+        self._cyclic_frequency_hz.setSingleStep(0.1)
+        self._cyclic_frequency_hz.setToolTip(
+            "Frequency of the sinusoidal base excitation."
+        )
+        self._cyclic_amplitude_ms2 = self._double_spin(0.0, 1.0e6, 0.981, 4)
+        self._cyclic_amplitude_ms2.setSingleStep(0.1)
+        self._cyclic_amplitude_ms2.setToolTip(
+            "Peak acceleration amplitude of the sinusoidal base excitation "
+            "in m/s². For example, 0.981 m/s² = 0.1 g."
+        )
+
+        # The time step is used for both generated cyclic loading and
+        # earthquake records.
         self._dt_gm = self._double_spin(1.0e-8, 10.0, 0.01, 6)
-        self._run_transient = QCheckBox(self)
-        self._run_transient.setChecked(True)
-        self._show_info = QCheckBox(self)
 
-        # Ground-motion preset selector
-        self._gm_preset = QComboBox(self)
-        _GM_PRESETS = [
-            ("1 Hz sine  (sine_1Hz_accel.txt)",  "sine_1Hz_accel.txt"),
-            ("2 Hz sine  (sine_2Hz_accel.txt)",  "sine_2Hz_accel.txt"),
-            ("3 Hz sine  (sine_3Hz_accel.txt)",  "sine_3Hz_accel.txt"),
-            ("5 Hz sine  (sine_5Hz_accel.txt)",  "sine_5Hz_accel.txt"),
-            ("Custom (browse below)",             ""),
-        ]
-        self._gm_preset_files = _GM_PRESETS
-        for label, _ in _GM_PRESETS:
-            self._gm_preset.addItem(label)
-
-        # Ground-motion custom file row (shown for all presets; editable for Custom)
+        # Earthquake loading controls.
+        self._gm_factor = self._double_spin(-1.0e6, 1.0e6, 9.81, 4)
+        self._gm_factor.setToolTip(
+            "Multiplier applied to every value in the earthquake file. "
+            "Use 9.81 when the file contains acceleration in g, or 1.0 "
+            "when the file already contains m/s²."
+        )
         self._gm_file_edit = QLineEdit(self)
         gm_row = QHBoxLayout()
         gm_row.addWidget(self._gm_file_edit, stretch=1)
@@ -1966,19 +2005,26 @@ class ModelUpdatingTab(QWidget):
         gm_widget = QWidget(self)
         gm_widget.setLayout(gm_row)
 
+        self._run_transient = QCheckBox(self)
+        self._run_transient.setChecked(True)
+        self._show_info = QCheckBox(self)
+
         form.addRow("Number of modes:", self._num_modes)
         form.addRow("Damping ratio:", self._zeta)
-        form.addRow("Ground-motion factor:", self._gm_factor)
+        form.addRow("Applied load:", self._load_type)
+        form.addRow("Cyclic frequency (Hz):", self._cyclic_frequency_hz)
+        form.addRow("Cyclic amplitude (m/s²):", self._cyclic_amplitude_ms2)
         form.addRow("Ground-motion dt (s):", self._dt_gm)
-        form.addRow("Ground-motion preset:", self._gm_preset)
-        form.addRow("Ground-motion file:", gm_widget)
+        form.addRow("Earthquake scale factor:", self._gm_factor)
+        form.addRow("Earthquake file:", gm_widget)
         form.addRow("Run transient analysis:", self._run_transient)
         form.addRow("Verbose OpenSees output:", self._show_info)
         layout.addWidget(group)
         layout.addStretch(1)
 
         self._browse_gm_btn.clicked.connect(self._browse_ground_motion)
-        self._gm_preset.currentIndexChanged.connect(self._on_gm_preset_changed)
+        self._load_type.currentIndexChanged.connect(self._on_load_type_changed)
+        self._on_load_type_changed(self._load_type.currentIndex())
 
     @staticmethod
     def _scrollable_tab(tab_widget: QWidget) -> QVBoxLayout:
@@ -2173,12 +2219,12 @@ class ModelUpdatingTab(QWidget):
         self._rebuild_exp_data_widgets()
         self._on_exp_source_changed()
 
-    # Sensor IDs available from the hardware (fixed at 3 MPU6050 units). This is a
-    # HARDWARE fact, not a story-count assumption (NS-5): when nStory > 3 the rig
+    # Sensor IDs available from the hardware (fixed at 4 MPU6050 units). This is a
+    # HARDWARE fact, not a story-count assumption (NS-5): when nStory > 4 the rig
     # cannot fully instrument every floor, so calibration falls back to PARTIAL
     # coverage (measured floors only) or frequency-only — handled by B1 + the
     # 3-state coverage message. nStory itself is unconstrained (Stories spinbox 1–20).
-    _SENSOR_IDS = (1, 2, 3)
+    _SENSOR_IDS = (1, 2, 3, 4)
 
     def _build_sensors_panel(self) -> QWidget:
         """Sensor Configuration panel shown when data source is 'From Sensors'."""
@@ -2195,6 +2241,7 @@ class ModelUpdatingTab(QWidget):
             "1 bottom + 2 top",
             "Fully instrumented (1 per floor)",
             "Bottom + top only",
+            "2 bottom + 2 top",
             "Custom",
         ])
         map_form.addRow("Preset:", self._sensor_preset)
@@ -2283,12 +2330,15 @@ class ModelUpdatingTab(QWidget):
         if not hasattr(self, "_sensor_story_combos"):
             return
         n_story = int(self._story_count.value())
+        # Any sensor may sit on any story, several may share one, and any may be
+        # left unassigned (not mounted on a model story) -- see UNASSIGNED_STORY.
+        options = [UNASSIGNED_STORY] + [str(s) for s in range(1, n_story + 1)]
         for sid, combo in self._sensor_story_combos.items():
             prev = combo.currentText()
             combo.blockSignals(True)
             combo.clear()
-            combo.addItems([str(s) for s in range(1, n_story + 1)])
-            if prev and prev in [str(s) for s in range(1, n_story + 1)]:
+            combo.addItems(options)
+            if prev and prev in options:
                 combo.setCurrentText(prev)
             combo.blockSignals(False)
         self._apply_sensor_preset()
@@ -2303,17 +2353,46 @@ class ModelUpdatingTab(QWidget):
             self._sensor_guidance.setText("Custom: set each sensor's story manually.")
             return
         if preset == "Fully instrumented (1 per floor)":
-            mapping = {sid: min(i + 1, n_story) for i, sid in enumerate(self._SENSOR_IDS)}
-            guide = "Place one sensor on each of stories 1, 2, 3 (full mode shapes)."
+            # Only as many sensors as there are stories can each get their own
+            # story; any extras are left unassigned rather than doubled up.
+            mapping = {
+                sid: i + 1
+                for i, sid in enumerate(self._SENSOR_IDS)
+                if i < n_story
+            }
+            placed = ", ".join(str(s) for s in range(1, min(len(self._SENSOR_IDS), n_story) + 1))
+            guide = f"One sensor on each of stories {placed} (full mode shapes)."
         elif preset == "Bottom + top only":
             mapping = {1: 1, 2: n_story, 3: n_story}
-            guide = f"Sensor 1 on story 1; sensors 2 & 3 on the top story ({n_story})."
+            guide = (
+                f"Sensor 1 on story 1; sensors 2 & 3 on the top story ({n_story}). "
+                "Sensor 4 left unassigned — set it manually or use "
+                "\"2 bottom + 2 top\"."
+            )
+        elif preset == "2 bottom + 2 top":
+            mapping = {1: 1, 2: 1, 3: n_story, 4: n_story}
+            guide = (
+                f"Sensors 1 & 2 on story 1 (bottom); sensors 3 & 4 on the top "
+                f"story ({n_story})."
+            )
         else:  # "1 bottom + 2 top"
             mapping = {1: 1, 2: n_story, 3: n_story}
-            guide = f"Sensor 1 on story 1 (bottom); sensors 2 & 3 on the top story ({n_story}) corners."
-        for sid, story in mapping.items():
-            combo = self._sensor_story_combos.get(sid)
-            if combo is not None:
+            guide = (
+                f"Sensor 1 on story 1 (bottom); sensors 2 & 3 on the top story "
+                f"({n_story}) corners. Sensor 4 left unassigned — set it "
+                "manually or use \"2 bottom + 2 top\"."
+            )
+        # Apply to every sensor, not just those in `mapping`: a sensor a preset
+        # doesn't place must be explicitly unassigned, otherwise it keeps a
+        # stale story from a previously selected preset and quietly biases that
+        # story's averaged mode-shape value.
+        for sid, combo in self._sensor_story_combos.items():
+            if combo is None:
+                continue
+            story = mapping.get(sid)
+            if story is None:
+                combo.setCurrentText(UNASSIGNED_STORY)
+            else:
                 combo.setCurrentText(str(min(story, n_story)))
         self._sensor_guidance.setText(guide)
 
@@ -2349,6 +2428,9 @@ class ModelUpdatingTab(QWidget):
             self._identify_btn.setEnabled(sensor_mode and idle)
             self._identify_analyze_btn.setEnabled(sensor_mode and idle)
             self._continuous_btn.setEnabled(sensor_mode and idle)
+            self._continuous_dt_btn.setEnabled(
+                sensor_mode and self._latest_continuous_calibration is not None
+            )
 
     @Slot()
     def _rebuild_exp_data_widgets(self) -> None:
@@ -2492,13 +2574,16 @@ class ModelUpdatingTab(QWidget):
             self._exp_json_edit.setText(path)
 
     @Slot(int)
-    def _on_gm_preset_changed(self, index: int) -> None:
-        _, filename = self._gm_preset_files[index]
-        if filename:
-            self._gm_file_edit.setText(str(_OPENSEES_INPUT_DIR / filename))
-            self._gm_file_edit.setReadOnly(True)
-        else:
-            self._gm_file_edit.setReadOnly(False)
+    def _on_load_type_changed(self, index: int) -> None:
+        load_type = self._load_type.currentData()
+        cyclic = load_type == "cyclic"
+
+        self._cyclic_frequency_hz.setEnabled(cyclic)
+        self._cyclic_amplitude_ms2.setEnabled(cyclic)
+
+        self._gm_factor.setEnabled(not cyclic)
+        self._gm_file_edit.setEnabled(not cyclic)
+        self._browse_gm_btn.setEnabled(not cyclic)
 
     def _build_output_tab(self) -> None:
         outer = QVBoxLayout(self._output_tab)
@@ -2589,8 +2674,17 @@ class ModelUpdatingTab(QWidget):
 
     def _set_defaults(self) -> None:
         self._project_dir_edit.setText(str(_default_workspace_dir()))
-        self._gm_file_edit.setText(str(_OPENSEES_INPUT_DIR / "sine_1Hz_accel.txt"))
+
+        # Default cyclic input matches the previous 1 Hz / 0.1 g preset:
+        # 0.1 g * 9.81 m/s²/g = 0.981 m/s².
+        self._load_type.setCurrentIndex(0)
+        self._cyclic_frequency_hz.setValue(1.0)
+        self._cyclic_amplitude_ms2.setValue(0.981)
+
+        # An earthquake file is only required when earthquake loading is selected.
+        self._gm_file_edit.clear()
         self._exp_json_edit.setText(str(_OPENSEES_INPUT_DIR / "experimental_modal_data.json"))
+        self._on_load_type_changed(self._load_type.currentIndex())
 
     def _double_spin(
         self,
@@ -2789,10 +2883,16 @@ class ModelUpdatingTab(QWidget):
 
     @Slot()
     def _browse_ground_motion(self) -> None:
+        current_path = self._gm_file_edit.text().strip()
+        start_dir = (
+            str(Path(current_path).parent)
+            if current_path
+            else str(_OPENSEES_INPUT_DIR)
+        )
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Choose acceleration input",
-            str(Path(self._gm_file_edit.text().strip()).parent),
+            "Choose earthquake acceleration input",
+            start_dir,
             "Text Files (*.txt);;All Files (*)",
         )
         if path:
@@ -2823,9 +2923,54 @@ class ModelUpdatingTab(QWidget):
             }
             additional_masses[story] = list(mass_data.get(story, [0.0, 0.0, 0.0, 0.0, 0.0]))
 
-        gm_file = Path(self._gm_file_edit.text().strip())
-        if not gm_file.exists():
-            raise ValueError(f"Ground-motion file not found: {gm_file}")
+        # --------------------------------------------------------------
+        # Applied ground motion
+        # --------------------------------------------------------------
+        load_type = str(self._load_type.currentData())
+        dt_gm = float(self._dt_gm.value())
+        cyclic_frequency_hz = None
+        cyclic_amplitude_ms2 = None
+
+        if load_type == "cyclic":
+            cyclic_frequency_hz = float(self._cyclic_frequency_hz.value())
+            cyclic_amplitude_ms2 = float(self._cyclic_amplitude_ms2.value())
+
+            # Prevent undersampling of the requested sinusoidal excitation.
+            nyquist_hz = 0.5 / dt_gm
+            if cyclic_frequency_hz >= nyquist_hz:
+                raise ValueError(
+                    f"Cyclic frequency ({cyclic_frequency_hz:.3f} Hz) is too high "
+                    f"for dt = {dt_gm:.6f} s.\n"
+                    f"The Nyquist frequency is {nyquist_hz:.3f} Hz. "
+                    "Use a smaller ground-motion dt."
+                )
+
+            # Keep the same 20-second duration used by the existing sine presets.
+            cyclic_duration_s = 20.0
+            n_steps = max(1, int(round(cyclic_duration_s / dt_gm)))
+            time_values = np.arange(n_steps + 1, dtype=float) * dt_gm
+            accel_values = cyclic_amplitude_ms2 * np.sin(
+                2.0 * np.pi * cyclic_frequency_hz * time_values
+            )
+
+            # The existing transient-analysis pipeline expects gmFile/gmFactor/dtGM.
+            # Generate a temporary project-local input file and reuse that pipeline
+            # unchanged. Values in this generated file are already in m/s².
+            generated_dir = project_dir.resolve() / "output"
+            generated_dir.mkdir(parents=True, exist_ok=True)
+            gm_file = generated_dir / "generated_cyclic_ground_motion.txt"
+            np.savetxt(gm_file, accel_values, fmt="%.12e")
+            gm_factor = 1.0
+        else:
+            earthquake_path = self._gm_file_edit.text().strip()
+            if not earthquake_path:
+                raise ValueError("Select an earthquake ground-motion file.")
+
+            gm_file = Path(earthquake_path).expanduser()
+            if not gm_file.exists():
+                raise ValueError(f"Ground-motion file not found: {gm_file}")
+            gm_file = gm_file.resolve()
+            gm_factor = float(self._gm_factor.value())
 
         params = {
             "Lx": float(self._lx.value()),
@@ -2841,9 +2986,12 @@ class ModelUpdatingTab(QWidget):
             "nu": float(self._poisson.value()),
             "numModes": int(self._num_modes.value()),
             "zeta": float(self._zeta.value()),
-            "gmFactor": float(self._gm_factor.value()),
+            "load_type": load_type,
+            "cyclic_frequency_hz": cyclic_frequency_hz,
+            "cyclic_amplitude_ms2": cyclic_amplitude_ms2,
+            "gmFactor": gm_factor,
             "gmFile": str(gm_file),
-            "dtGM": float(self._dt_gm.value()),
+            "dtGM": dt_gm,
             "show_info": bool(self._show_info.isChecked()),
             "run_transient": bool(self._run_transient.isChecked()),
             "enable_calibration": bool(self._enable_calibration.isChecked()),
@@ -3079,6 +3227,12 @@ class ModelUpdatingTab(QWidget):
         self._identify_analyze_btn.setEnabled(not busy and sensor_mode)
         # During a continuous run the button stays enabled as the Stop control.
         self._continuous_btn.setEnabled((continuous or not busy) and sensor_mode)
+        self._continuous_dt_btn.setEnabled(
+            sensor_mode
+            and self._latest_continuous_calibration is not None
+            and not self._continuous_handoff_selected
+            and (continuous or not busy)
+        )
         self._status.setText(status)
 
     # ------------------------------------------------------------------
@@ -3101,6 +3255,10 @@ class ModelUpdatingTab(QWidget):
 
         self._sensor_chain = []
         self._calibration_state = _CalibrationState()
+        self._latest_continuous_calibration = None
+        self._latest_continuous_signature = None
+        self._continuous_handoff_selected = False
+        self._continuous_dt_btn.setEnabled(False)
         self._log.clear()
 
         # Reset the figure area to placeholders.
@@ -3133,11 +3291,19 @@ class ModelUpdatingTab(QWidget):
             pass
 
     def _collect_sensor_params(self) -> dict[str, Any]:
-        story_map = {
-            sid: int(combo.currentText())
-            for sid, combo in self._sensor_story_combos.items()
-            if combo.count()
-        }
+        # Sensors left unassigned are omitted, so map_to_stories() never sees
+        # them and they contribute to no story's mode-shape value.
+        story_map: dict[int, int] = {}
+        for sid, combo in self._sensor_story_combos.items():
+            if not combo.count():
+                continue
+            text = combo.currentText()
+            if text == UNASSIGNED_STORY:
+                continue
+            try:
+                story_map[sid] = int(text)
+            except ValueError:
+                continue
         fmin = float(self._sensor_fmin.value())
         fmax = float(self._sensor_fmax.value())
         if fmax <= fmin:
@@ -3340,6 +3506,10 @@ class ModelUpdatingTab(QWidget):
         settings = self._continuous_settings()
         if settings is None:
             return
+        self._latest_continuous_calibration = None
+        self._latest_continuous_signature = None
+        self._continuous_handoff_selected = False
+        self._continuous_dt_btn.setEnabled(False)
         # Size the capture buffer WITH HEADROOM over the snapshot window. A buffer
         # equal to the window can never deliver a full window (the trailing snapshot
         # and cross-sensor alignment always trim a little), which stalled the loop.
@@ -3385,7 +3555,7 @@ class ModelUpdatingTab(QWidget):
         # "update interval". The modal buffer is sized generously in _start_continuous
         # (decoupled from this window, like the Spectrum tab's 120 s buffer).
         dur = self._double_spin(
-            CONTINUOUS_MIN_DURATION_S, 600.0, float(self._sensor_window.value()), 1)
+            CONTINUOUS_MIN_DURATION_S, 600.0, 30.0, 1)
         dur.setToolTip(
             "Length of each record-and-update cycle. The loop records this many seconds "
             "of fresh data, identifies the modes, updates the model, then records the "
@@ -3429,8 +3599,54 @@ class ModelUpdatingTab(QWidget):
         # Cache both right-panel renders; show whichever the checkbox selects.
         self._cont_fig2_fdd = payload.get("fig2_fdd_png") or payload.get("fig2_png")
         self._cont_fig2_track = payload.get("fig2_track_png")
+        if not self._continuous_handoff_selected and bool(payload.get("success", False)):
+            calibrated = payload.get("calibrated_params")
+            signature = payload.get("signature")
+            if isinstance(calibrated, dict) and isinstance(signature, str):
+                self._latest_continuous_calibration = copy.deepcopy(calibrated)
+                self._latest_continuous_signature = signature
+                self._continuous_dt_btn.setEnabled(True)
+                cycle = payload.get("cycle")
+                self._status.setText(
+                    f"Continuous update cycle {cycle} complete. "
+                    "Latest calibration is available for the Digital Twin."
+                )
         self._cont_view_active = True
         self._show_cont_fig2()
+
+    @Slot()
+    def _use_latest_continuous_for_digital_twin(self) -> None:
+        params = self._latest_continuous_calibration
+        signature = self._latest_continuous_signature
+        if not isinstance(params, dict) or not isinstance(signature, str):
+            QMessageBox.information(
+                self,
+                "Continuous update",
+                "No completed Continuous Update calibration is available yet.",
+            )
+            return
+
+        self._calibration_state = _CalibrationState(
+            available=True,
+            input_signature=signature,
+            calibrated_params=copy.deepcopy(params),
+        )
+        self._continuous_handoff_selected = True
+        self._continuous_dt_btn.setEnabled(False)
+        self._append_log(
+            "\n─── Latest Continuous Update calibration selected for Digital Twin. "
+            "Model Definition values were not changed. ───\n"
+        )
+
+        if self._continuous_worker is not None:
+            self._stop_continuous()
+            self._status.setText(
+                "Latest calibration frozen. Stopping Continuous Update before Digital Twin use…"
+            )
+        else:
+            self._status.setText(
+                "Latest Continuous Update calibration is ready for the Digital Twin."
+            )
 
     def _show_cont_fig2(self) -> None:
         """Display the right-panel view the checkbox selects (cached PNG, no recompute)."""
@@ -3455,4 +3671,10 @@ class ModelUpdatingTab(QWidget):
         self._continuous_worker = None
         self._continuous_thread = None
         self._continuous_btn.setText("Start Continuous Update")
-        self._set_busy(False, "Continuous update stopped.")
+        if self._continuous_handoff_selected:
+            self._set_busy(
+                False,
+                "Latest Continuous Update calibration is ready for the Digital Twin.",
+            )
+        else:
+            self._set_busy(False, "Continuous update stopped.")
