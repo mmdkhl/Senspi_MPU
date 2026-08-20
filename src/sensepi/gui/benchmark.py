@@ -26,7 +26,7 @@ class BenchmarkOptions:
     channel_count: int = 18
     log_interval_s: float = 1.0
     csv_path: Optional[Path] = Path("benchmark_results.csv")
-    sensor_count: int = 3
+    sensor_count: int = 4
     keep_open: bool = False
 
 

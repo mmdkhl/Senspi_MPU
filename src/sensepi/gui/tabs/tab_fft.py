@@ -55,7 +55,7 @@ DEFAULT_FFT_UPDATE_MS = 500  # fallback if config missing
 MIN_FFT_UPDATE_MS = 50
 MAX_FFT_UPDATE_MS = 2000
 
-DEFAULT_MAX_FREQUENCY_HZ = 200.0  # cap plotted frequency if useful
+DEFAULT_MAX_FREQUENCY_HZ = 20.0
 
 # The spectrum shows only the structural horizontal axes (T11.1).
 SPECTRUM_CHANNELS: tuple[str, ...] = ("ax", "ay")
@@ -71,6 +71,15 @@ FINAL_VALUES_BATCH_S = 20.0
 # Distinct colours for the (up to) three identified natural frequencies — also
 # reused to mark those frequencies on the per-sensor grid (Window 1).
 _EIGEN_COLORS = ("#ff5252", "#448aff", "#69f0ae")
+
+# Sensor->floor placement: label for "this sensor is not on any story of the
+# model". Needed so a sensor that isn't mounted on the structure (spare, or
+# fixed to the shake-table base / ground, which is not a model DOF) can be
+# excluded from the mode shapes instead of being forced onto a floor, where it
+# would be silently averaged into that floor's value and bias the shape.
+# map_to_stories() drops any sensor whose story is outside 1..n_story, so an
+# unassigned sensor simply never enters the calculation.
+UNASSIGNED_FLOOR = "—"
 
 logger = logging.getLogger(__name__)
 
@@ -299,7 +308,7 @@ class FftTab(QWidget):
         self._last_damping_error: str = ""
 
         # Sensor→floor placement (only meaningful for mode shapes). Fixed rig set.
-        self._shape_sensor_ids = (1, 2, 3)
+        self._shape_sensor_ids = (1, 2, 3, 4)
         # Rolling/overlapping cadence for Window 2 (recompute every EIGEN_UPDATE_S
         # using the last EIGEN_BATCH_S of data from the 120 s modal buffer).
         self._eig_timer = QTimer(self)
@@ -431,7 +440,7 @@ class FftTab(QWidget):
         self._right_view_combo.currentTextChanged.connect(self._on_view_changed)
         self._damping_sensor_label = QLabel("Damping sensor:")
         self._damping_sensor_combo = QComboBox()
-        for sid in (1, 2, 3):
+        for sid in (1, 2, 3, 4):
             self._damping_sensor_combo.addItem(f"S{sid}", sid)
         self._damping_sensor_combo.setCurrentIndex(2)  # default top-story sensor S3
         self._damping_sensor_combo.currentIndexChanged.connect(self._on_damping_sensor_changed)
@@ -899,7 +908,11 @@ class FftTab(QWidget):
         row.addWidget(QLabel("Floors:"))
         self._shape_floors = QSpinBox()
         self._shape_floors.setRange(1, 20)
-        self._shape_floors.setValue(3)
+        self._shape_floors.setValue(len(self._shape_sensor_ids))
+        self._shape_floors.setToolTip(
+            "Number of stories in the model. Sensors may be placed on any of "
+            "them, in any combination."
+        )
         self._shape_floors.valueChanged.connect(self._refresh_shape_floor_combos)
         row.addWidget(self._shape_floors)
         row.addSpacing(12)
@@ -907,6 +920,14 @@ class FftTab(QWidget):
         for sid in self._shape_sensor_ids:
             row.addWidget(QLabel(f"S{sid}→"))
             combo = QComboBox()
+            combo.setToolTip(
+                f"Story that sensor {sid} is mounted on. Several sensors may "
+                f"share a story (their values are averaged, and their spread is "
+                f"reported as a torsion indicator). Choose "
+                f"'{UNASSIGNED_FLOOR}' if sensor {sid} is not mounted on a "
+                f"story of the model — it is then excluded from the mode "
+                f"shapes rather than biasing a floor."
+            )
             combo.currentTextChanged.connect(lambda *_: self._launch_eigen_compute())
             self._shape_combos[sid] = combo
             row.addWidget(combo)
@@ -1212,21 +1233,47 @@ class FftTab(QWidget):
 
     def _refresh_shape_floor_combos(self) -> None:
         n = int(self._shape_floors.value())
+        # Every sensor may sit on any story, several may share one, and any may
+        # be left unassigned -- so each combo offers the identical full set of
+        # options rather than a per-sensor restricted range.
+        options = [UNASSIGNED_FLOOR] + [str(s) for s in range(1, n + 1)]
         for i, (sid, combo) in enumerate(self._shape_combos.items()):
             prev = combo.currentText()
             combo.blockSignals(True)
             combo.clear()
-            combo.addItems([str(s) for s in range(1, n + 1)])
-            options = [str(s) for s in range(1, n + 1)]
-            combo.setCurrentText(prev if prev in options else str(min(i + 1, n)))
+            combo.addItems(options)
+            if prev in options:
+                # Preserve an explicit choice across floor-count changes.
+                combo.setCurrentText(prev)
+            elif i < n:
+                # First-run fallback only: one sensor per story, bottom-up.
+                # This is a starting guess, not a claim about the real rig --
+                # the user is expected to set the actual placement.
+                combo.setCurrentText(str(i + 1))
+            else:
+                # More sensors than stories: leave the extras unassigned rather
+                # than silently piling them onto the top story.
+                combo.setCurrentText(UNASSIGNED_FLOOR)
             combo.blockSignals(False)
 
     def _shape_sensor_story_map(self) -> dict[int, int]:
-        """{sensor_id: 1-based floor} from the placement combos."""
+        """
+        {sensor_id: 1-based floor} from the placement combos.
+
+        Sensors left on ``UNASSIGNED_FLOOR`` are omitted entirely, so
+        map_to_stories() never sees them and they contribute to no story.
+        """
         out: dict[int, int] = {}
         for sid, combo in getattr(self, "_shape_combos", {}).items():
-            if combo.count():
-                out[sid] = int(combo.currentText())
+            if not combo.count():
+                continue
+            text = combo.currentText()
+            if text == UNASSIGNED_FLOOR:
+                continue
+            try:
+                out[sid] = int(text)
+            except ValueError:
+                continue
         return out
 
     def _current_right_view(self) -> str:

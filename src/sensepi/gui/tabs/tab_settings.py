@@ -64,18 +64,8 @@ from ...config.sampling import RECORDING_MODES, SamplingConfig
 from ...remote.ssh_client import SSHClient
 from ..config.acquisition_state import SensorSelectionConfig
 
-# Conservative device-rate options used by the Settings tab.
-BASE_DEVICE_RATES_HZ: list[float] = [50.0, 100.0, 125.0, 200.0, 250.0]
-
-# (sensor_count, channels_per_sensor) -> safe max device rate [Hz]
-SAFE_MAX_DEVICE_RATE_HZ: dict[tuple[int, int], float] = {
-    (1, 3): 250.0,
-    (1, 6): 250.0,
-    (2, 3): 125.0,
-    (2, 6): 125.0,
-    (3, 3): 100.0,
-    (3, 6): 100.0,
-}
+# Fixed device sampling rate used by recording and streaming.
+FIXED_DEVICE_RATE_HZ = 100.0
 
 
 class SettingsTab(QWidget):
@@ -209,11 +199,12 @@ class SettingsTab(QWidget):
         # High-level sensor selection defaults (used as app-wide defaults)
         sensor_selection_form = QFormLayout()
 
-        # 1/2/3 sensors instead of free-text "1,2,3"
+        # 1/2/3/4 sensors instead of free-text "1,2,3,4"
         self.mpu_sensor_count_combo = QComboBox(sensors_group)
         self.mpu_sensor_count_combo.addItem("1 sensor", 1)
         self.mpu_sensor_count_combo.addItem("2 sensors", 2)
         self.mpu_sensor_count_combo.addItem("3 sensors", 3)
+        self.mpu_sensor_count_combo.addItem("4 sensors", 4)
         # Old default was "1,2,3" -> 3 sensors
         self.mpu_sensor_count_combo.setCurrentIndex(2)
         sensor_selection_form.addRow("Number of sensors:", self.mpu_sensor_count_combo)
@@ -224,15 +215,13 @@ class SettingsTab(QWidget):
         sampling_group = QGroupBox("Sampling (single source of truth)", sensors_group)
         sampling_form = QFormLayout(sampling_group)
 
-        # Drop-down of allowed device rates driven by sensors/channels
-        self.device_rate_combo = QComboBox(sampling_group)
-        self.device_rate_combo.setEditable(False)
+        self.device_rate_label = QLabel(f"{FIXED_DEVICE_RATE_HZ:.0f} Hz", sampling_group)
 
         self.mode_combo = QComboBox(sampling_group)
         for key, mode in RECORDING_MODES.items():
             self.mode_combo.addItem(mode.label, userData=key)
 
-        sampling_form.addRow("Sampling (device) rate [Hz]:", self.device_rate_combo)
+        sampling_form.addRow("Sampling (device) rate:", self.device_rate_label)
         sampling_form.addRow("Mode:", self.mode_combo)
 
         # MPU6050 defaults (unchanged)
@@ -306,14 +295,14 @@ class SettingsTab(QWidget):
             self._on_sensor_ui_changed
         )
 
-        # Sampling rate choices depend on number of sensors + channels
+        # Sampling rate is fixed; sensor/channel changes still update selection state.
         self.mpu_sensor_count_combo.currentIndexChanged.connect(
             self._refresh_sampling_rate_choices
         )
         self.mpu_channels.currentIndexChanged.connect(self._refresh_sampling_rate_choices)
         self.mpu_channels.currentIndexChanged.connect(self._on_sensor_ui_changed)
 
-        # Populate initial sampling choices (will be refined once sensors.yaml loads)
+        # Populate initial fixed sampling display.
         self._refresh_sampling_rate_choices()
 
         self.mpu_dlpf.valueChanged.connect(self._update_mpu_dlpf_info)
@@ -679,7 +668,7 @@ class SettingsTab(QWidget):
         self.mpu_dlpf.setValue(int(mpu_cfg.get("dlpf", 3)))
         self.mpu_include_temp.setChecked(bool(mpu_cfg.get("include_temperature", False)))
 
-        # Rebuild the device-rate combo according to the loaded sampling config
+        # Keep the displayed sampling rate at the fixed configured value.
         self._refresh_sampling_rate_choices()
 
     def _current_sampling_from_widgets(self) -> SamplingConfig:
@@ -688,102 +677,24 @@ class SettingsTab(QWidget):
         """
         mode_key = self.mode_combo.currentData()
 
-        rate = self.device_rate_combo.currentData()
-        if rate is None:
-            # Fall back to last loaded sampling config or a conservative default
-            if isinstance(self._sampling_config, SamplingConfig):
-                rate = float(self._sampling_config.device_rate_hz)
-            else:
-                rate = max(BASE_DEVICE_RATES_HZ)
-
         return SamplingConfig(
-            device_rate_hz=float(rate),
+            device_rate_hz=FIXED_DEVICE_RATE_HZ,
             mode_key=str(mode_key or "high_fidelity"),
         )
 
     def _refresh_sampling_rate_choices(self) -> None:
         """
-        Update the device-rate combo based on the number of sensors and
-        channels-per-sensor, clamping to a conservative safe maximum.
+        Update the fixed device-rate display and cached sampling config.
         """
-        # --- Determine current sensor/channels selection ----------------
-        try:
-            sensor_count = int(self.mpu_sensor_count_combo.currentData() or 3)
-        except (TypeError, ValueError):
-            sensor_count = 3
-
-        if sensor_count < 1:
-            sensor_count = 1
-        elif sensor_count > 3:
-            sensor_count = 3
-
-        channels_per_sensor = 3
-        try:
-            preset = str(self.mpu_channels.currentData() or "default")
-        except Exception:
-            preset = "default"
-        if preset == "both":
-            channels_per_sensor = 6
-
-        safe_max = SAFE_MAX_DEVICE_RATE_HZ.get(
-            (sensor_count, channels_per_sensor),
-            max(BASE_DEVICE_RATES_HZ),
-        )
-
-        allowed_rates = [r for r in BASE_DEVICE_RATES_HZ if r <= safe_max]
-        if not allowed_rates:
-            # Fallback to at least the lowest base rate
-            allowed_rates = [min(BASE_DEVICE_RATES_HZ)]
-            safe_max = allowed_rates[-1]
-
-        # --- Decide which rate we *want* to keep if possible -----------
-        desired_rate: float | None = None
-
+        self.device_rate_label.setText(f"{FIXED_DEVICE_RATE_HZ:.0f} Hz")
         if isinstance(self._sampling_config, SamplingConfig):
-            desired_rate = float(self._sampling_config.device_rate_hz)
+            mode_key = self._sampling_config.mode_key
         else:
-            current_data = self.device_rate_combo.currentData()
-            if current_data is not None:
-                try:
-                    desired_rate = float(current_data)
-                except (TypeError, ValueError):
-                    desired_rate = None
-
-        if desired_rate is None:
-            desired_rate = safe_max
-
-        # --- Rebuild the combo without firing external slots -----------
-        self.device_rate_combo.blockSignals(True)
-        try:
-            self.device_rate_combo.clear()
-            for rate in allowed_rates:
-                if float(rate).is_integer():
-                    label = f"{int(rate)} Hz"
-                else:
-                    label = f"{rate:g} Hz"
-                self.device_rate_combo.addItem(label, rate)
-
-            # Prefer exact match; otherwise fall back to the highest allowed
-            selected_index = -1
-            for i, rate in enumerate(allowed_rates):
-                if abs(rate - desired_rate) < 1e-6:
-                    selected_index = i
-                    break
-            if selected_index < 0:
-                selected_index = len(allowed_rates) - 1
-
-            self.device_rate_combo.setCurrentIndex(selected_index)
-        finally:
-            self.device_rate_combo.blockSignals(False)
-
-        # Keep our cached sampling config in sync with the clamped rate
-        if isinstance(self._sampling_config, SamplingConfig):
-            effective_rate = self.device_rate_combo.currentData()
-            if effective_rate is not None:
-                self._sampling_config = SamplingConfig(
-                    device_rate_hz=float(effective_rate),
-                    mode_key=self._sampling_config.mode_key,
-                )
+            mode_key = "high_fidelity"
+        self._sampling_config = SamplingConfig(
+            device_rate_hz=FIXED_DEVICE_RATE_HZ,
+            mode_key=mode_key,
+        )
 
     def _build_sensor_defaults_payload(self) -> tuple[Dict[str, Any], SamplingConfig]:
         sensors_model = dict(self._sensors) if isinstance(self._sensors, dict) else {}
@@ -816,7 +727,7 @@ class SettingsTab(QWidget):
         """
         Build a SensorSelectionConfig from the current UI state.
 
-        - Uses the sensor-count combo (1/2/3 sensors).
+        - Uses the sensor-count combo (1/2/3/4 sensors).
         - Chooses active_channels based on the channels combo.
         """
         try:
@@ -826,8 +737,8 @@ class SettingsTab(QWidget):
 
         if count < 1:
             count = 1
-        elif count > 3:
-            count = 3
+        elif count > 4:
+            count = 4
 
         active_sensors = list(range(1, count + 1))
 

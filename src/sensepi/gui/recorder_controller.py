@@ -7,7 +7,7 @@ import threading
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Deque, Dict, Optional, Tuple
 
 from datetime import datetime
@@ -16,7 +16,13 @@ from PySide6.QtCore import QObject, QMetaObject, QThread, QTimer, Qt, Signal, Sl
 
 from .config.acquisition_state import GuiAcquisitionConfig, SensorSelectionConfig
 from ..analysis.rate import RateController
-from ..config.app_config import AppPaths, HostConfig, HostInventory, SensorDefaults
+from ..config.app_config import (
+    AppPaths,
+    HostConfig,
+    HostInventory,
+    SensorDefaults,
+    normalize_remote_path,
+)
 from ..dataio.smart_recorder import SmartRecorder
 from ..config.pi_logger_config import PiLoggerConfig
 from ..config.sampling import GuiSamplingDisplay, SamplingConfig
@@ -71,7 +77,7 @@ def _decimate_for(measured_hz: float, requested_hz: float) -> int:
 class MpuGuiConfig:
     enabled: bool = True
     rate_hz: float = 100.0
-    sensors: str = "1,2,3"
+    sensors: str = "1,2,3,4"
     channels: str = "default"
     include_temp: bool = False
     limit_duration: bool = False
@@ -235,7 +241,7 @@ class RecorderController(QObject):
             config = self._sensor_defaults.load()
             sampling = SamplingConfig.from_mapping(config)
         except Exception:
-            sampling = SamplingConfig(device_rate_hz=200.0)
+            sampling = SamplingConfig(device_rate_hz=100.0)
         self._sampling_config = sampling
         return sampling
 
@@ -510,7 +516,7 @@ class RecorderController(QObject):
                       else (self._data_buffer.get_sensor_ids()
                             if self._data_buffer is not None else []))
         if not sensor_ids:
-            sensor_ids = [1, 2, 3]
+            sensor_ids = [1, 2, 3, 4]
 
         # Accurate PER-SENSOR rate (audit fix). Keep the combined estimate as a
         # diagnostic; fall back to combined/N only if the per-sensor measure was sparse.
@@ -630,6 +636,12 @@ class RecorderController(QObject):
         self._clear_sample_queue()
 
         recorder = self._create_pi_recorder_for_host(host_cfg)
+        if recording_enabled or record_only:
+            output_dir = PurePosixPath(
+                normalize_remote_path(host_cfg.data_dir, host_cfg.user)
+            ) / "mpu"
+            logger.info("Clearing previous Pi recordings in %s", output_dir)
+            recorder.clear_recording_output(output_dir.as_posix())
 
         if record_only:
             logger.info("Starting record-only capture on %s", host_cfg.name)
@@ -700,6 +712,15 @@ class RecorderController(QObject):
                 close()
             except Exception:
                 logger.exception("Failed to close active stream")
+        # Closing the local SSH channel above does not stop the remote
+        # logger process by itself (see PiRecorder.stop_remote_logger) --
+        # without this it keeps sampling and refreshing the OLED heartbeat
+        # indefinitely after the GUI thinks the stream has stopped.
+        if self._pi_recorder is not None:
+            try:
+                self._pi_recorder.stop_remote_logger()
+            except Exception:
+                logger.exception("Failed to stop remote logger")
 
     def _clear_sample_queue(self) -> None:
         try:

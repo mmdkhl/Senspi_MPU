@@ -90,7 +90,7 @@ class SamplingConfig:
         cls,
         mapping: Mapping[str, Any] | None,
         *,
-        default_device_rate: float = 200.0,
+        default_device_rate: float = 100.0,
         default_mode: str = "high_fidelity",
     ) -> "SamplingConfig":
         """
