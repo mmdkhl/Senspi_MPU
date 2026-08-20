@@ -1,6 +1,6 @@
 mpu6050:
   output_dir: /home/verwalter/logs/mpu
-  sample_rate_hz: 50
+  sample_rate_hz: 100
   stream_every: 1
   channels: default
   dlpf: 3

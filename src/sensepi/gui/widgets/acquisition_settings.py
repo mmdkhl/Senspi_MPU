@@ -21,7 +21,7 @@ from sensepi.config.sampling import (
 from ..config.acquisition_state import GuiAcquisitionConfig, SensorSelectionConfig
 
 
-DEFAULT_DEVICE_RATE_HZ = 50.0
+DEFAULT_DEVICE_RATE_HZ = 100.0
 DEFAULT_SIGNALS_REFRESH_MS = 50
 DEFAULT_FFT_REFRESH_MS = 750
 DEFAULT_MODE_KEY = "high_fidelity"

@@ -76,7 +76,7 @@ def _decimate_for(measured_hz: float, requested_hz: float) -> int:
 @dataclass
 class MpuGuiConfig:
     enabled: bool = True
-    rate_hz: float = 50.0
+    rate_hz: float = 100.0
     sensors: str = "1,2,3,4"
     channels: str = "default"
     include_temp: bool = False
@@ -241,7 +241,7 @@ class RecorderController(QObject):
             config = self._sensor_defaults.load()
             sampling = SamplingConfig.from_mapping(config)
         except Exception:
-            sampling = SamplingConfig(device_rate_hz=50.0)
+            sampling = SamplingConfig(device_rate_hz=100.0)
         self._sampling_config = sampling
         return sampling
 

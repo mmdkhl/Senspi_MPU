@@ -65,7 +65,7 @@ from ...remote.ssh_client import SSHClient
 from ..config.acquisition_state import SensorSelectionConfig
 
 # Fixed device sampling rate used by recording and streaming.
-FIXED_DEVICE_RATE_HZ = 50.0
+FIXED_DEVICE_RATE_HZ = 100.0
 
 
 class SettingsTab(QWidget):
