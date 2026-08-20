@@ -1012,6 +1012,9 @@ def _make_calibration_signature(params: dict[str, Any]) -> str:
         "floor_masses",
         "numModes",
         "zeta",
+        "load_type",
+        "cyclic_frequency_hz",
+        "cyclic_amplitude_ms2",
         "gmFactor",
         "gmFile",
         "dtGM",
@@ -1960,26 +1963,40 @@ class ModelUpdatingTab(QWidget):
         self._num_modes.setRange(2, 20)
         self._num_modes.setValue(3)
         self._zeta = self._double_spin(0.0, 1.0, 0.005, 4)
-        self._gm_factor = self._double_spin(-1.0e6, 1.0e6, 9.81, 4)
+
+        # Applied loading: either a user-defined sinusoidal base acceleration
+        # or an earthquake acceleration record loaded from a text file.
+        self._load_type = QComboBox(self)
+        self._load_type.addItem("Cyclic loading", userData="cyclic")
+        self._load_type.addItem(
+            "Earthquake loading (from file)",
+            userData="earthquake",
+        )
+
+        # Cyclic loading: a_g(t) = A * sin(2*pi*f*t).
+        self._cyclic_frequency_hz = self._double_spin(0.01, 100.0, 1.0, 3)
+        self._cyclic_frequency_hz.setSingleStep(0.1)
+        self._cyclic_frequency_hz.setToolTip(
+            "Frequency of the sinusoidal base excitation."
+        )
+        self._cyclic_amplitude_ms2 = self._double_spin(0.0, 1.0e6, 0.981, 4)
+        self._cyclic_amplitude_ms2.setSingleStep(0.1)
+        self._cyclic_amplitude_ms2.setToolTip(
+            "Peak acceleration amplitude of the sinusoidal base excitation "
+            "in m/s². For example, 0.981 m/s² = 0.1 g."
+        )
+
+        # The time step is used for both generated cyclic loading and
+        # earthquake records.
         self._dt_gm = self._double_spin(1.0e-8, 10.0, 0.01, 6)
-        self._run_transient = QCheckBox(self)
-        self._run_transient.setChecked(True)
-        self._show_info = QCheckBox(self)
 
-        # Ground-motion preset selector
-        self._gm_preset = QComboBox(self)
-        _GM_PRESETS = [
-            ("1 Hz sine  (sine_1Hz_accel.txt)",  "sine_1Hz_accel.txt"),
-            ("2 Hz sine  (sine_2Hz_accel.txt)",  "sine_2Hz_accel.txt"),
-            ("3 Hz sine  (sine_3Hz_accel.txt)",  "sine_3Hz_accel.txt"),
-            ("5 Hz sine  (sine_5Hz_accel.txt)",  "sine_5Hz_accel.txt"),
-            ("Custom (browse below)",             ""),
-        ]
-        self._gm_preset_files = _GM_PRESETS
-        for label, _ in _GM_PRESETS:
-            self._gm_preset.addItem(label)
-
-        # Ground-motion custom file row (shown for all presets; editable for Custom)
+        # Earthquake loading controls.
+        self._gm_factor = self._double_spin(-1.0e6, 1.0e6, 9.81, 4)
+        self._gm_factor.setToolTip(
+            "Multiplier applied to every value in the earthquake file. "
+            "Use 9.81 when the file contains acceleration in g, or 1.0 "
+            "when the file already contains m/s²."
+        )
         self._gm_file_edit = QLineEdit(self)
         gm_row = QHBoxLayout()
         gm_row.addWidget(self._gm_file_edit, stretch=1)
@@ -1988,19 +2005,26 @@ class ModelUpdatingTab(QWidget):
         gm_widget = QWidget(self)
         gm_widget.setLayout(gm_row)
 
+        self._run_transient = QCheckBox(self)
+        self._run_transient.setChecked(True)
+        self._show_info = QCheckBox(self)
+
         form.addRow("Number of modes:", self._num_modes)
         form.addRow("Damping ratio:", self._zeta)
-        form.addRow("Ground-motion factor:", self._gm_factor)
+        form.addRow("Applied load:", self._load_type)
+        form.addRow("Cyclic frequency (Hz):", self._cyclic_frequency_hz)
+        form.addRow("Cyclic amplitude (m/s²):", self._cyclic_amplitude_ms2)
         form.addRow("Ground-motion dt (s):", self._dt_gm)
-        form.addRow("Ground-motion preset:", self._gm_preset)
-        form.addRow("Ground-motion file:", gm_widget)
+        form.addRow("Earthquake scale factor:", self._gm_factor)
+        form.addRow("Earthquake file:", gm_widget)
         form.addRow("Run transient analysis:", self._run_transient)
         form.addRow("Verbose OpenSees output:", self._show_info)
         layout.addWidget(group)
         layout.addStretch(1)
 
         self._browse_gm_btn.clicked.connect(self._browse_ground_motion)
-        self._gm_preset.currentIndexChanged.connect(self._on_gm_preset_changed)
+        self._load_type.currentIndexChanged.connect(self._on_load_type_changed)
+        self._on_load_type_changed(self._load_type.currentIndex())
 
     @staticmethod
     def _scrollable_tab(tab_widget: QWidget) -> QVBoxLayout:
@@ -2550,13 +2574,16 @@ class ModelUpdatingTab(QWidget):
             self._exp_json_edit.setText(path)
 
     @Slot(int)
-    def _on_gm_preset_changed(self, index: int) -> None:
-        _, filename = self._gm_preset_files[index]
-        if filename:
-            self._gm_file_edit.setText(str(_OPENSEES_INPUT_DIR / filename))
-            self._gm_file_edit.setReadOnly(True)
-        else:
-            self._gm_file_edit.setReadOnly(False)
+    def _on_load_type_changed(self, index: int) -> None:
+        load_type = self._load_type.currentData()
+        cyclic = load_type == "cyclic"
+
+        self._cyclic_frequency_hz.setEnabled(cyclic)
+        self._cyclic_amplitude_ms2.setEnabled(cyclic)
+
+        self._gm_factor.setEnabled(not cyclic)
+        self._gm_file_edit.setEnabled(not cyclic)
+        self._browse_gm_btn.setEnabled(not cyclic)
 
     def _build_output_tab(self) -> None:
         outer = QVBoxLayout(self._output_tab)
@@ -2647,8 +2674,17 @@ class ModelUpdatingTab(QWidget):
 
     def _set_defaults(self) -> None:
         self._project_dir_edit.setText(str(_default_workspace_dir()))
-        self._gm_file_edit.setText(str(_OPENSEES_INPUT_DIR / "sine_1Hz_accel.txt"))
+
+        # Default cyclic input matches the previous 1 Hz / 0.1 g preset:
+        # 0.1 g * 9.81 m/s²/g = 0.981 m/s².
+        self._load_type.setCurrentIndex(0)
+        self._cyclic_frequency_hz.setValue(1.0)
+        self._cyclic_amplitude_ms2.setValue(0.981)
+
+        # An earthquake file is only required when earthquake loading is selected.
+        self._gm_file_edit.clear()
         self._exp_json_edit.setText(str(_OPENSEES_INPUT_DIR / "experimental_modal_data.json"))
+        self._on_load_type_changed(self._load_type.currentIndex())
 
     def _double_spin(
         self,
@@ -2847,10 +2883,16 @@ class ModelUpdatingTab(QWidget):
 
     @Slot()
     def _browse_ground_motion(self) -> None:
+        current_path = self._gm_file_edit.text().strip()
+        start_dir = (
+            str(Path(current_path).parent)
+            if current_path
+            else str(_OPENSEES_INPUT_DIR)
+        )
         path, _ = QFileDialog.getOpenFileName(
             self,
-            "Choose acceleration input",
-            str(Path(self._gm_file_edit.text().strip()).parent),
+            "Choose earthquake acceleration input",
+            start_dir,
             "Text Files (*.txt);;All Files (*)",
         )
         if path:
@@ -2881,9 +2923,54 @@ class ModelUpdatingTab(QWidget):
             }
             additional_masses[story] = list(mass_data.get(story, [0.0, 0.0, 0.0, 0.0, 0.0]))
 
-        gm_file = Path(self._gm_file_edit.text().strip())
-        if not gm_file.exists():
-            raise ValueError(f"Ground-motion file not found: {gm_file}")
+        # --------------------------------------------------------------
+        # Applied ground motion
+        # --------------------------------------------------------------
+        load_type = str(self._load_type.currentData())
+        dt_gm = float(self._dt_gm.value())
+        cyclic_frequency_hz = None
+        cyclic_amplitude_ms2 = None
+
+        if load_type == "cyclic":
+            cyclic_frequency_hz = float(self._cyclic_frequency_hz.value())
+            cyclic_amplitude_ms2 = float(self._cyclic_amplitude_ms2.value())
+
+            # Prevent undersampling of the requested sinusoidal excitation.
+            nyquist_hz = 0.5 / dt_gm
+            if cyclic_frequency_hz >= nyquist_hz:
+                raise ValueError(
+                    f"Cyclic frequency ({cyclic_frequency_hz:.3f} Hz) is too high "
+                    f"for dt = {dt_gm:.6f} s.\n"
+                    f"The Nyquist frequency is {nyquist_hz:.3f} Hz. "
+                    "Use a smaller ground-motion dt."
+                )
+
+            # Keep the same 20-second duration used by the existing sine presets.
+            cyclic_duration_s = 20.0
+            n_steps = max(1, int(round(cyclic_duration_s / dt_gm)))
+            time_values = np.arange(n_steps + 1, dtype=float) * dt_gm
+            accel_values = cyclic_amplitude_ms2 * np.sin(
+                2.0 * np.pi * cyclic_frequency_hz * time_values
+            )
+
+            # The existing transient-analysis pipeline expects gmFile/gmFactor/dtGM.
+            # Generate a temporary project-local input file and reuse that pipeline
+            # unchanged. Values in this generated file are already in m/s².
+            generated_dir = project_dir.resolve() / "output"
+            generated_dir.mkdir(parents=True, exist_ok=True)
+            gm_file = generated_dir / "generated_cyclic_ground_motion.txt"
+            np.savetxt(gm_file, accel_values, fmt="%.12e")
+            gm_factor = 1.0
+        else:
+            earthquake_path = self._gm_file_edit.text().strip()
+            if not earthquake_path:
+                raise ValueError("Select an earthquake ground-motion file.")
+
+            gm_file = Path(earthquake_path).expanduser()
+            if not gm_file.exists():
+                raise ValueError(f"Ground-motion file not found: {gm_file}")
+            gm_file = gm_file.resolve()
+            gm_factor = float(self._gm_factor.value())
 
         params = {
             "Lx": float(self._lx.value()),
@@ -2899,9 +2986,12 @@ class ModelUpdatingTab(QWidget):
             "nu": float(self._poisson.value()),
             "numModes": int(self._num_modes.value()),
             "zeta": float(self._zeta.value()),
-            "gmFactor": float(self._gm_factor.value()),
+            "load_type": load_type,
+            "cyclic_frequency_hz": cyclic_frequency_hz,
+            "cyclic_amplitude_ms2": cyclic_amplitude_ms2,
+            "gmFactor": gm_factor,
             "gmFile": str(gm_file),
-            "dtGM": float(self._dt_gm.value()),
+            "dtGM": dt_gm,
             "show_info": bool(self._show_info.isChecked()),
             "run_transient": bool(self._run_transient.isChecked()),
             "enable_calibration": bool(self._enable_calibration.isChecked()),
