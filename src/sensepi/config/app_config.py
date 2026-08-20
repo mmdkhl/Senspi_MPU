@@ -216,7 +216,7 @@ class AppConfig:
         default_factory=PlotPerformanceConfig
     )
     sampling_config: SamplingConfig = field(
-        default_factory=lambda: SamplingConfig(device_rate_hz=50.0)
+        default_factory=lambda: SamplingConfig(device_rate_hz=100.0)
     )
 
 

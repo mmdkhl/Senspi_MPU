@@ -54,6 +54,14 @@ from ...dataio import modal_session_loader as msl
 
 REQUIRED_MODULES = ("openseespy", "opsvis")
 
+# Sensor->story placement: label for "this sensor is not on any story of the
+# model". Lets a sensor that isn't mounted on the structure (spare, or fixed to
+# the base/ground, which is not a model DOF) be excluded from the mode shapes
+# rather than forced onto a story, where it would be averaged into that story's
+# value and bias the shape. map_to_stories() ignores any sensor missing from the
+# map, so an unassigned sensor never enters the calculation.
+UNASSIGNED_STORY = "—"
+
 # Input files bundled with the opensees_model_updating package
 _OPENSEES_INPUT_DIR = Path(__file__).resolve().parents[3] / "opensees_model_updating" / "input"
 
@@ -2298,12 +2306,15 @@ class ModelUpdatingTab(QWidget):
         if not hasattr(self, "_sensor_story_combos"):
             return
         n_story = int(self._story_count.value())
+        # Any sensor may sit on any story, several may share one, and any may be
+        # left unassigned (not mounted on a model story) -- see UNASSIGNED_STORY.
+        options = [UNASSIGNED_STORY] + [str(s) for s in range(1, n_story + 1)]
         for sid, combo in self._sensor_story_combos.items():
             prev = combo.currentText()
             combo.blockSignals(True)
             combo.clear()
-            combo.addItems([str(s) for s in range(1, n_story + 1)])
-            if prev and prev in [str(s) for s in range(1, n_story + 1)]:
+            combo.addItems(options)
+            if prev and prev in options:
                 combo.setCurrentText(prev)
             combo.blockSignals(False)
         self._apply_sensor_preset()
@@ -2318,13 +2329,20 @@ class ModelUpdatingTab(QWidget):
             self._sensor_guidance.setText("Custom: set each sensor's story manually.")
             return
         if preset == "Fully instrumented (1 per floor)":
-            mapping = {sid: min(i + 1, n_story) for i, sid in enumerate(self._SENSOR_IDS)}
-            guide = "Place one sensor on each of stories 1, 2, 3, 4 (full mode shapes)."
+            # Only as many sensors as there are stories can each get their own
+            # story; any extras are left unassigned rather than doubled up.
+            mapping = {
+                sid: i + 1
+                for i, sid in enumerate(self._SENSOR_IDS)
+                if i < n_story
+            }
+            placed = ", ".join(str(s) for s in range(1, min(len(self._SENSOR_IDS), n_story) + 1))
+            guide = f"One sensor on each of stories {placed} (full mode shapes)."
         elif preset == "Bottom + top only":
             mapping = {1: 1, 2: n_story, 3: n_story}
             guide = (
                 f"Sensor 1 on story 1; sensors 2 & 3 on the top story ({n_story}). "
-                "Sensor 4 not set by this preset — place manually or use "
+                "Sensor 4 left unassigned — set it manually or use "
                 "\"2 bottom + 2 top\"."
             )
         elif preset == "2 bottom + 2 top":
@@ -2337,12 +2355,20 @@ class ModelUpdatingTab(QWidget):
             mapping = {1: 1, 2: n_story, 3: n_story}
             guide = (
                 f"Sensor 1 on story 1 (bottom); sensors 2 & 3 on the top story "
-                f"({n_story}) corners. Sensor 4 not set by this preset — place "
+                f"({n_story}) corners. Sensor 4 left unassigned — set it "
                 "manually or use \"2 bottom + 2 top\"."
             )
-        for sid, story in mapping.items():
-            combo = self._sensor_story_combos.get(sid)
-            if combo is not None:
+        # Apply to every sensor, not just those in `mapping`: a sensor a preset
+        # doesn't place must be explicitly unassigned, otherwise it keeps a
+        # stale story from a previously selected preset and quietly biases that
+        # story's averaged mode-shape value.
+        for sid, combo in self._sensor_story_combos.items():
+            if combo is None:
+                continue
+            story = mapping.get(sid)
+            if story is None:
+                combo.setCurrentText(UNASSIGNED_STORY)
+            else:
                 combo.setCurrentText(str(min(story, n_story)))
         self._sensor_guidance.setText(guide)
 
@@ -3175,11 +3201,19 @@ class ModelUpdatingTab(QWidget):
             pass
 
     def _collect_sensor_params(self) -> dict[str, Any]:
-        story_map = {
-            sid: int(combo.currentText())
-            for sid, combo in self._sensor_story_combos.items()
-            if combo.count()
-        }
+        # Sensors left unassigned are omitted, so map_to_stories() never sees
+        # them and they contribute to no story's mode-shape value.
+        story_map: dict[int, int] = {}
+        for sid, combo in self._sensor_story_combos.items():
+            if not combo.count():
+                continue
+            text = combo.currentText()
+            if text == UNASSIGNED_STORY:
+                continue
+            try:
+                story_map[sid] = int(text)
+            except ValueError:
+                continue
         fmin = float(self._sensor_fmin.value())
         fmax = float(self._sensor_fmax.value())
         if fmax <= fmin:

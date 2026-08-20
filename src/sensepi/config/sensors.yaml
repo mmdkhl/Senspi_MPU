@@ -1,5 +1,5 @@
 sampling:
-  device_rate_hz: 50.0
+  device_rate_hz: 100.0
   mode: high_fidelity
 sensors:
   mpu6050:
