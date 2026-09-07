@@ -14,15 +14,11 @@ __pycache__/
 logs/*
 !logs/.gitkeep
 
+# One root for everything the application produces: sensor_recordings/,
+# model/, digital_twin/, sonification/. The old data/ tree is gone — recordings
+# now live under output/sensor_recordings.
 output/*
 !output/.gitkeep
-
-data/*
-!data/.gitkeep
-data/raw/*
-!data/raw/.gitkeep
-data/processed/*
-!data/processed/.gitkeep
 DigitalTwin OpenSees/__MACOSX/
 DigitalTwin OpenSees/DigitalTwin OpenSees/.DS_Store
 DigitalTwin OpenSees/DigitalTwin OpenSees/output/*.out

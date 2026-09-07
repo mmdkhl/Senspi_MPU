@@ -89,39 +89,78 @@ class AppPaths:
     """
     Commonly used paths for the desktop application.
 
-    ``SENSEPI_DATA_ROOT`` and ``SENSEPI_LOG_DIR`` override the default
-    ``data``/``logs`` folders relative to the repository root so that
-    packaged installs and alternate layouts can store files elsewhere.
+    One root holds everything the application writes::
+
+        output/
+          sensor_recordings/   Smart Recording  (time- and rate-corrected)
+          model/               OpenSees calibration and analysis
+          digital_twin/        experiments
+          processed/           other exports
+
+    ``logs/`` stays separate — it is diagnostics, not results.
+
+    ``SENSEPI_OUTPUT_ROOT`` moves the whole tree; ``SENSEPI_DATA_ROOT`` moves the
+    recordings folder alone; ``SENSEPI_LOG_DIR`` moves the logs.
     """
 
     # repo_root points at the project root (one level above src/)
     repo_root: Path = field(default_factory=_default_repo_root)
+    logs: Path = field(init=False)
+    config_dir: Path = field(init=False)
+    #: Where Smart Recording writes: time-corrected, rate-corrected sensor data,
+    #: one folder per host. Everything that reads a recording reads it from here,
+    #: so there is exactly one answer to "where did that recording go".
+    sensor_recordings: Path = field(init=False)
+    # Legacy names, kept pointing at the new locations. Any caller missed during
+    # the move therefore lands in the right place instead of silently writing to
+    # a folder nobody looks in — which is the failure this move exists to end.
     data_root: Path = field(init=False)
     raw_data: Path = field(init=False)
     processed_data: Path = field(init=False)
-    logs: Path = field(init=False)
-    config_dir: Path = field(init=False)
+    # One root for everything the application PRODUCES, kept separate from
+    # ``data`` (what came in) and ``logs`` (diagnostics). Until this existed,
+    # OpenSees results landed wherever the process working directory happened to
+    # be pointing, which is how a stray ``output/`` grew at the repo root.
+    output_root: Path = field(init=False)
+    model_output: Path = field(init=False)
+    twin_output: Path = field(init=False)
+    sonification_output: Path = field(init=False)
 
     def __post_init__(self) -> None:
-        env_data_root = os.environ.get("SENSEPI_DATA_ROOT")
-        if env_data_root:
-            self.data_root = Path(env_data_root).expanduser()
-        else:
-            self.data_root = self.repo_root / "data"
-
         env_logs_dir = os.environ.get("SENSEPI_LOG_DIR")
         if env_logs_dir:
             self.logs = Path(env_logs_dir).expanduser()
         else:
             self.logs = self.repo_root / "logs"
 
-        self.raw_data = self.data_root / "raw"
-        self.processed_data = self.data_root / "processed"
         self.config_dir = self.repo_root / "src" / "sensepi" / "config"
+
+        env_output_root = os.environ.get("SENSEPI_OUTPUT_ROOT")
+        if env_output_root:
+            self.output_root = Path(env_output_root).expanduser()
+        else:
+            self.output_root = self.repo_root / "output"
+
+        # SENSEPI_DATA_ROOT used to point at the old data/ tree. It keeps
+        # working, now as the override for the recordings folder specifically,
+        # which is the only thing anyone actually used it for.
+        env_recordings = os.environ.get("SENSEPI_DATA_ROOT")
+        if env_recordings:
+            self.sensor_recordings = Path(env_recordings).expanduser()
+        else:
+            self.sensor_recordings = self.output_root / "sensor_recordings"
+
+        self.model_output = self.output_root / "model"
+        self.twin_output = self.output_root / "digital_twin"
+        self.sonification_output = self.output_root / "sonification"
+
+        self.raw_data = self.sensor_recordings
+        self.data_root = self.output_root
+        self.processed_data = self.output_root / "processed"
 
     def ensure(self) -> None:
         """Create directories if they do not yet exist."""
-        for path in (self.data_root, self.raw_data, self.processed_data, self.logs):
+        for path in (self.output_root, self.sensor_recordings, self.logs):
             path.mkdir(parents=True, exist_ok=True)
 
 

@@ -126,6 +126,7 @@ class SmartRecorder:
         probe_combined_hz: Optional[float] = None,
         audit: bool = True,
         save_raw: bool = True,
+        sensor_map: Optional[dict] = None,
     ) -> None:
         self._out_dir = Path(out_dir)
         self._session_name = session_name
@@ -142,6 +143,10 @@ class SmartRecorder:
         self._probe_seconds = probe_seconds
         self._audit = bool(audit)
         self._save_raw = bool(save_raw)
+        # Where each sensor physically sat during this recording. Written
+        # into the sidecars so a session is self-describing: a CSV alone
+        # cannot say which floor sensor 3 was on.
+        self._sensor_map = dict(sensor_map) if sensor_map else None
         self._queue: "queue.SimpleQueue" = queue.SimpleQueue()
         self._writers: dict[int, StreamingCsvWriter] = {}
         self._data_paths: dict[int, Path] = {}
@@ -356,11 +361,26 @@ class SmartRecorder:
                 )
                 if self._raw_writers.get(sid) is not None:
                     meta["raw_audit_file"] = self._raw_writers[sid].path.name
+            placement = self._placement_for(sid)
+            if placement is not None:
+                meta["placement"] = placement
             write_recording_meta(self._meta_paths[sid], **meta)
 
         if self._audit and self._audit_dir is not None:
             self._write_audit_summary(pc_stop, pc_wall_s)
         return dict(self._written)
+
+    def _placement_for(self, sid: int) -> Optional[dict]:
+        """This sensor's floor/cell/role from the placement map, if there is one."""
+        if not self._sensor_map:
+            return None
+        for row in self._sensor_map.get("placements") or []:
+            if int(row.get("sensor_id", -1)) == int(sid):
+                out = dict(row)
+                out["axis"] = self._sensor_map.get("axis")
+                out["n_floors"] = self._sensor_map.get("n_floors")
+                return out
+        return None
 
     def _write_audit_summary(self, pc_stop: datetime, pc_wall_s: float) -> None:
         """One bundled JSON per recording (global + per-sensor) for offline auditing."""
@@ -377,6 +397,7 @@ class SmartRecorder:
             "rate_probe_combined_hz": self._probe_combined_hz,      # raw all-sensors (diagnostic)
             "decimate": self._decimate,
             "sensors": {str(sid): self._timing_audit(sid) for sid in self._sensor_ids},
+            "sensor_map": self._sensor_map,
             "note": ("rate_incoming_hz is the TRUE per-sensor delivered rate measured "
                      "from sample timestamps; compare to rate_requested_hz to audit "
                      "PRE-3 under-sampling. rate_probe_hz is the PER-SENSOR 5 s probe "

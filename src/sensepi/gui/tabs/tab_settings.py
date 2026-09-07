@@ -38,6 +38,8 @@ from PySide6.QtCore import QSignalBlocker, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
+    QFrame,
+    QScrollArea,
     QComboBox,
     QFormLayout,
     QGroupBox,
@@ -63,6 +65,7 @@ from ...config.app_config import (
 from ...config.sampling import RECORDING_MODES, SamplingConfig
 from ...remote.ssh_client import SSHClient
 from ..config.acquisition_state import SensorSelectionConfig
+from ..widgets.sensor_map import SensorMapWidget
 
 # Fixed device sampling rate used by recording and streaming.
 FIXED_DEVICE_RATE_HZ = 100.0
@@ -82,6 +85,7 @@ class SettingsTab(QWidget):
     """
 
     # Emitted after a successful save of the corresponding YAML file
+    sensorMapChanged = Signal(object)   # SensorMap
     hostsUpdated = Signal(list)   # list[dict] – entries from the active host config
     sensorsUpdated = Signal(dict) # dict      – full sensors.yaml mapping
     # New signal emitted whenever the sensor selection changes.
@@ -120,7 +124,16 @@ class SettingsTab(QWidget):
     # UI construction
     # ------------------------------------------------------------------
     def _build_ui(self) -> None:
-        root = QVBoxLayout(self)
+        # The tab is taller than most windows. Without a scroll area Qt squeezes
+        # every group to fit, which crushes labels and hides whole rows.
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        content = QWidget()
+        root = QVBoxLayout(content)
 
         # ----- Host configuration --------------------------------------
         hosts_group = QGroupBox("Raspberry Pi hosts", self)
@@ -205,8 +218,9 @@ class SettingsTab(QWidget):
         self.mpu_sensor_count_combo.addItem("2 sensors", 2)
         self.mpu_sensor_count_combo.addItem("3 sensors", 3)
         self.mpu_sensor_count_combo.addItem("4 sensors", 4)
-        # Old default was "1,2,3" -> 3 sensors
-        self.mpu_sensor_count_combo.setCurrentIndex(2)
+        # Default is 4 sensors: the rig now runs four and the placement map
+        # below is built around that.
+        self.mpu_sensor_count_combo.setCurrentIndex(3)
         sensor_selection_form.addRow("Number of sensors:", self.mpu_sensor_count_combo)
 
         sensors_layout.addLayout(sensor_selection_form)
@@ -269,6 +283,26 @@ class SettingsTab(QWidget):
         sensors_layout.addLayout(buttons_sync_row)
 
         root.addWidget(sensors_group)
+
+        # Sensor placement map. PREVIEW: visible and interactive, but nothing
+        # downstream consumes it yet -- wiring is a separate step.
+        self.sensor_map = SensorMapWidget(self)
+        self.sensor_map.set_sensor_count(
+            self.mpu_sensor_count_combo.currentData() or 4)
+        self.mpu_sensor_count_combo.currentIndexChanged.connect(
+            lambda _i: self.sensor_map.set_sensor_count(
+                self.mpu_sensor_count_combo.currentData() or 4))
+        # Placement map sits ABOVE Sensor defaults: it is what the user sets up
+        # per rig, while the defaults below (count, sampling, MPU6050) change
+        # rarely. The map has to be built after the sensor-count combo exists,
+        # so it is inserted at index 1 rather than appended.
+        root.insertWidget(1, self.sensor_map)
+        self.sensor_map.mapChanged.connect(self.sensorMapChanged)
+
+        # keep groups at their natural height; the scroll area supplies the rest
+        root.addStretch(1)
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
 
         # ----- signal wiring ------------------------------------------
         for edit in (
@@ -638,6 +672,15 @@ class SettingsTab(QWidget):
         """
         Populate sampling + MPU6050 widgets from the in-memory sensors.yaml mapping.
         """
+        # Restore a previously saved placement map, if there is one.
+        stored = (self._sensors or {}).get("sensor_map")
+        if stored and hasattr(self, "sensor_map"):
+            from ..widgets.sensor_map import SensorMap
+            try:
+                self.sensor_map.apply_map(SensorMap.from_mapping(stored))
+            except Exception:
+                pass                      # a bad map must never block Settings
+
         # Sampling config from sensors.yaml (single source of truth)
         sampling_cfg = SamplingConfig.from_mapping(self._sensors)
         self._sampling_config = sampling_cfg
@@ -717,11 +760,18 @@ class SettingsTab(QWidget):
         mpu_cfg.pop("sample_rate_hz", None)
         sensors_block["mpu6050"] = mpu_cfg
 
+        # placement map travels with sensors.yaml so it survives restarts and is
+        # the one authoritative answer to "which sensor is where"
+        sensors_model["sensor_map"] = self.sensor_map.current_map().to_mapping()
         sensors_model["sampling"] = sampling_cfg.to_mapping()["sampling"]
         sensors_model["sensors"] = sensors_block
         sensors_model.pop("mpu6050", None)
         sensors_model.pop("adxl203_ads1115", None)
         return sensors_model, sampling_cfg
+
+    def current_sensor_map(self):
+        """The authoritative sensor placement (see widgets/sensor_map.py)."""
+        return self.sensor_map.current_map()
 
     def current_sensor_selection(self) -> SensorSelectionConfig:
         """

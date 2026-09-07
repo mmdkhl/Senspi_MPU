@@ -29,6 +29,6 @@ def session_directory(name: str, base: Path | None = None) -> Path:
     Example: "shake_test_20251204_153045"
     """
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    root = base or AppPaths().raw_data
+    root = base or AppPaths().sensor_recordings
     safe_name = _sanitize_session_name(name)
     return root / f"{safe_name}_{timestamp}"
