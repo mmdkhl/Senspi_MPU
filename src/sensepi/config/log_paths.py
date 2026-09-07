@@ -23,9 +23,10 @@ DEFAULT_PI_LOG_ROOT = Path("~").expanduser() / "logs"
 # Match the desktop application's AppPaths raw-data directory. Fall back
 # to a repo-relative path so imports succeed even if app_config breaks.
 try:
-    DEFAULT_PC_RAW_ROOT = _AppPaths().raw_data
+    DEFAULT_PC_RAW_ROOT = _AppPaths().sensor_recordings
 except Exception:  # pragma: no cover - extremely defensive
-    DEFAULT_PC_RAW_ROOT = Path("data") / "raw"
+    # Fallback only for when AppPaths cannot be imported; must match it.
+    DEFAULT_PC_RAW_ROOT = Path("output") / "sensor_recordings"
 
 # Sensor-specific subdirectory names. These names appear on both Pi and PC.
 LOG_SUBDIR_MPU = "mpu"

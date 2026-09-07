@@ -38,7 +38,7 @@ python -m unittest discover -s tests
 ## 2) Repository layout (what lives where)
 
 - `src/sensepi/gui/`  
-  Qt application + tabs (Live Signals / Spectrum / Settings)
+  Qt application + the six tabs, `MainWindow`, and `RecorderController`
 
 - `src/sensepi/remote/`  
   SSH + remote process control + log sync
@@ -49,8 +49,41 @@ python -m unittest discover -s tests
 - `src/sensepi/config/`  
   YAML + dataclasses for hosts/sensors/sampling and shared path conventions
 
-- `data/` and `logs/`  
-  Local runtime folders (created automatically; usually git-ignored)
+- `src/sensepi/analysis/`  
+  Pure NumPy/SciPy, no Qt: modal identification (`modal.py`), the sensor-map
+  adapter (`sensor_layout.py`), base-referenced identification
+  (`transmissibility.py`) and torsion indicators (`torsion.py`)
+
+- `src/sensepi/digital_twin/`, `src/sensepi/sonification/`  
+  The engines behind those two tabs, also Qt-free so they stay testable
+
+- `src/opensees_model_updating/`  
+  The OpenSees calibration package. Also runs standalone — see `paths.py` for how
+  its output location is resolved without assuming a working directory
+
+- `docs/`  
+  `DEVELOPERS.md` (this file), `gui_pipeline_diagram.mmd`, the user manual, and
+  `hardware/` — enclosure and bracket design source (Fusion `.f3d`, PCB `.dxf`,
+  printable `.stl`, plus the `trimesh` script that generates the OLED bracket).
+  Both the manual and the hardware files predate the current software and are
+  kept for reference, not as a description of it.
+
+- `output/` and `logs/`  
+  Local runtime folders (created automatically; git-ignored). Everything the
+  application *produces* lives under one root:
+
+  ```
+  output/
+    sensor_recordings/<host>/mpu/   Smart Recording — time- and rate-corrected
+    model/                          OpenSees calibration and analysis
+    digital_twin/                   experiment runs
+    sonification/                   audio captures
+  logs/                             diagnostics — deliberately separate
+  ```
+
+  Resolve these through `AppPaths` (`src/sensepi/config/app_config.py`), never by
+  building a relative path. `SENSEPI_OUTPUT_ROOT` moves the whole tree,
+  `SENSEPI_DATA_ROOT` moves the recordings folder alone, `SENSEPI_LOG_DIR` the logs.
 
 ---
 
@@ -78,8 +111,25 @@ The main window builds these tabs:
 - **Live Signals** (`src/sensepi/gui/tabs/tab_signals.py`)
 - **Spectrum / FFT** (`src/sensepi/gui/tabs/tab_fft.py`)
 - **Model Updating** (`src/sensepi/gui/tabs/tab_model_updating.py`)
-- **Sonification** (`src/sensepi/gui/tabs/tab_sonification.py`)
+- **Sonification** (`src/sensepi/gui/tabs/tab_sonification.py`) — a container with
+  one sub-tab per model
+- **Digital Twin Experiment** (`src/sensepi/gui/tabs/tab_digital_twin.py`) — runs
+  the calibrated model in wall-clock time beside the real structure and compares them
 - **Settings** (`src/sensepi/gui/tabs/tab_settings.py`)
+
+### Sensor placement: defined once, in Settings
+Where each sensor sits — its floor and its plan cell on a 3x3 grid — is set **only**
+in Settings (`gui/widgets/sensor_map.py`) and fanned out by `MainWindow` to every
+tab that needs it, through `apply_sensor_map()`.
+
+**Do not add a sensor, floor or storey picker to any other tab.** Four of them used
+to exist, they could disagree about the same rig, and they were removed. If a tab
+needs to know where a sensor is, it takes the map and converts it with
+`analysis/sensor_layout.py`, which answers the questions that actually matter:
+which sensors are structural responses, which one is the shaker (floor 0, an
+*input*, excluded from output-only identification), which channel the excitation
+axis implies, how many modes the sensor count can support, and where a
+differenceable pair exists for torsion.
 
 ### The “controller” layer
 The GUI does not run SSH logic directly from the plotting tabs. Instead:
@@ -143,8 +193,12 @@ The GUI uses the host’s `data_dir` and the sensor prefix (e.g. `mpu`) to decid
 ## 7) Where to make common changes
 
 ### A) Add / change UI controls
-- Add widgets in `tab_signals.py`, `tab_fft.py`, or `tab_settings.py`
+- Add widgets in the relevant `tab_*.py`
 - Wire actions into `RecorderController` (preferred) instead of doing SSH inside tabs
+- Cross-tab wiring belongs in `MainWindow._wire_signals()` — that is the only place
+  tabs are connected to each other. Do not reach into another tab's private members;
+  add a public method instead (`ModelUpdatingTab.model_definition_snapshot()` is the
+  worked example of replacing three such reach-ins with one documented seam).
 
 ### B) Add a new plot based on the live stream
 - Subscribe to the shared buffer (or expose a signal from the controller)
@@ -162,6 +216,11 @@ You typically need:
 ## 8) Tips for performance and stability
 
 - Keep all SSH + file sync in worker threads.
+- **Never call `os.chdir()`.** It is process-global: it moves the working directory
+  for every thread, not the caller. This application runs SSH ingest, an audio
+  worker and a model worker at once, so a relative path in any of them can resolve
+  somewhere else for the duration. Pass an explicit directory instead. A test fails
+  if `os.chdir` reappears under `src/sensepi`.
 - Avoid building new Matplotlib objects every frame; update existing lines/curves.
 - Use bounded buffers (ring buffers) for live views.
 - Be conservative with default sampling/plot rates so slower PCs stay responsive.

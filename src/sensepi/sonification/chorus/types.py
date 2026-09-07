@@ -75,8 +75,17 @@ class ControlFrame:
     exc_freq_hz: float = 0.0
     exc_conf: float = 0.0
     sync: np.ndarray = field(default_factory=lambda: np.zeros(3))          # 0..1 per mode
-    torsion: float = 0.0
-    torsion_pan: float = 0.0
+    torsion: float = 0.0             # loudest floor's twist, 0..1
+    torsion_pan: float = 0.0         # LIVE rotation direction, -1..+1
+    # Per structural row: how much that floor is twisting, 0..1. A single global
+    # number could only say "something is twisting"; this says which floor, so
+    # the twist can be heard where it happens instead of everywhere at once.
+    torsion_floor: np.ndarray = field(default_factory=lambda: np.zeros(0))
+    # Row index -> floor number, and row index -> stereo pan taken from the plan
+    # cell (column A/B/C becomes left/centre/right). Both come from the Settings
+    # placement map, so the chorus is laid out like the actual rig.
+    floor_of: tuple = ()
+    pan_of: tuple = ()
     rate_hz: float = 0.0
     nan_ratio: float = 0.0
     psd_freqs: np.ndarray | None = None
@@ -148,6 +157,12 @@ class ChorusConfig:
     f_min: float = 0.25
     f_max: float = 20.0
     axis: str = "ax"
+    # Placement from Settings, as the plain dict SensorMap.to_mapping() makes.
+    # Kept as a dict rather than the widget so this module stays Qt-free (G7) and
+    # the value can cross into the worker thread. None = not configured yet, in
+    # which case every sensor is treated as an unplaced response, exactly as
+    # before this existed.
+    sensor_map: dict | None = None
     reid_interval_s: float = 8.0
     id_window_s: float = 30.0
     fast_window_s: float = 6.0

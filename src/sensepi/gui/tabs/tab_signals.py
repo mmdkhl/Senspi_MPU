@@ -923,8 +923,9 @@ class SignalPlotWidgetPyQtGraph(SignalPlotWidgetBase):
                     base_label = f"{base_label} [{unit}]"
 
                 if col_idx == 0:
-                    # Label rows as S0, S1, S2... regardless of underlying sensor_id
-                    plot.setLabel("left", f"S{row_idx}\n{base_label}")
+                    # Label by the REAL sensor id. This used to print the plot row
+                    # index, so sensor 1 read "S0" and every label was off by one.
+                    plot.setLabel("left", f"S{int(sid)}\n{base_label}")
                 else:
                     plot.setLabel("left", base_label)
 
@@ -1019,7 +1020,7 @@ class SignalsTab(QWidget):
         self._synthetic_active = False
         # Provide a sensible default before SettingsTab sends anything.
         self._current_sensor_selection = SensorSelectionConfig(
-            active_sensors=[1, 2, 3],
+            active_sensors=[1, 2, 3, 4],
             active_channels=["ax", "ay", "az", "gx", "gy", "gz"],
         )
         self._current_gui_acquisition_config: GuiAcquisitionConfig | None = None
@@ -1052,6 +1053,13 @@ class SignalsTab(QWidget):
         self._acquisition_widget.hide()
         record_only_checkbox = getattr(self._acquisition_widget, "record_only_checkbox", None)
         if record_only_checkbox is not None:
+            # Removing the tab's checkbox is not enough on its own: this second
+            # copy still drives duration_limit_enabled(), so Start would keep
+            # behaving as record-only whenever it happened to be checked. Force it
+            # off and hide it so Start always means live streaming.
+            with QSignalBlocker(record_only_checkbox):
+                record_only_checkbox.setChecked(False)
+            record_only_checkbox.setVisible(False)
             record_only_checkbox.stateChanged.connect(self._on_record_only_toggled)
         self._acquisition_widget.samplingChanged.connect(
             self._on_acquisition_widget_changed
@@ -1151,12 +1159,11 @@ class SignalsTab(QWidget):
         )
         top_row.addWidget(self.refresh_profile_combo)
 
-        self.record_only_check = QCheckBox(
-            "Record only (no live streaming)", top_row_group
-        )
-        self.record_only_check.setToolTip(
-            "When enabled, data is recorded on the Pi but not streamed live to this GUI."
-        )
+        # "Record only (no live streaming)" was removed from the UI: Live Signals
+        # now has ONE recording method, Smart Record. The pipeline behind it is
+        # untouched (GuiAcquisitionConfig.record_only, duration_limit_enabled and
+        # the Pi-side path all still exist) -- only the control is gone, and the
+        # remaining acquisition-widget copy is forced off in _build_ui.
         # "Stop after" + its own duration box were removed: the recording length is
         # now driven by the single "Rec length" field for BOTH methods (see
         # duration_limit_enabled/seconds, which derive from record-only + Rec length).
@@ -1228,10 +1235,8 @@ class SignalsTab(QWidget):
 
         self.start_button.clicked.connect(self._on_start_clicked)
         self.stop_button.clicked.connect(self._on_stop_clicked)
-        self.record_only_check.stateChanged.connect(self._on_record_only_toggled)
         self.sync_logs_button.clicked.connect(self._on_sync_logs_clicked)
 
-        top_row.addWidget(self.record_only_check)
         top_row.addWidget(QLabel("Session:", top_row_group))
         top_row.addWidget(self._session_name_edit)
         top_row.addWidget(self.start_button)

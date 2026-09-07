@@ -195,12 +195,20 @@ def run_offline(ax_session, gz_session=None, cfg: ChorusConfig | None = None,
     if gz is not None and gz.ndim == 1:
         gz = gz[None, :]
 
+    # Carries sensor_ids so the offline path honours the placement map exactly
+    # as the live path does — otherwise a rendered recording would treat the
+    # shaker as a floor while the live tab excluded it, and the two would not
+    # sound the same.
+    sensor_ids = list(getattr(ax_session, "sensor_ids", None)
+                      or range(1, data.shape[0] + 1))
+
     class _Snap:
-        __slots__ = ("data", "fs")
+        __slots__ = ("data", "fs", "sensor_ids")
 
         def __init__(self, d, f):
             self.data = d
             self.fs = f
+            self.sensor_ids = sensor_ids[:d.shape[0]] if d.ndim == 2 else sensor_ids
 
     n_ticks = max(1, int(total * CONTROL_HZ))
     fast = int(cfg.fast_window_s * fs)

@@ -39,6 +39,30 @@ def _as_array(snapshot) -> tuple[np.ndarray, float]:
     return arr, fs
 
 
+def _layout_of(cfg):
+    """The placement as analysis inputs, recomputed only when the map changes."""
+    from ...analysis import sensor_layout as slayout
+    return slayout.layout_from_mapping(getattr(cfg, "sensor_map", None),
+                                       requested_modes=int(getattr(cfg, "n_modes", 3)))
+
+
+def _row_geometry(layout, sensor_ids):
+    """``(floor_of, pan_of)`` for the rows actually being rendered.
+
+    ``pan_of`` turns the plan column into a stereo position — A left, B centre,
+    C right — so four sensors produce an image of the rig rather than four
+    voices in arbitrary places. Rows with no placement fall back to centre.
+    """
+    floors, pans = [], []
+    for sid in sensor_ids:
+        sid = int(sid)
+        floors.append(int(layout.story_map.get(sid, 0)))
+        cell = str(layout.cell_map.get(sid, "B2"))
+        col = "ABC".find(cell[:1].upper())
+        pans.append(0.0 if col < 0 else (col - 1) * 0.85)
+    return tuple(floors), tuple(pans)
+
+
 class FeatureExtractor:
     """Turns short data snapshots into :class:`ControlFrame` observations."""
 
@@ -65,11 +89,43 @@ class FeatureExtractor:
             self._be_hist.clear()
 
     @staticmethod
+    def _push(hist: deque, value):
+        """Append to a rolling history, dropping it first if the width changed.
+
+        Every history here is per-mode or per-sensor wide, and both counts move
+        at runtime: identification returns two modes instead of three when a peak
+        drops below the prominence threshold, and a sensor can stop streaming.
+        A deque holding rows of two different widths cannot be stacked —
+        ``np.asarray(list(hist), dtype=float)`` raises on the inhomogeneous
+        shape, which killed the chorus worker mid-sound.
+
+        Clearing is the right response, not padding: these histories exist to
+        supply a rolling percentile, and a percentile taken across a column that
+        meant "mode 3" before and "nothing" after is not a statistic. A cleared
+        history simply returns 0 until it refills, which is what the ``< 6``
+        guard in :meth:`_normalise` already does at start-up.
+        """
+        v = np.atleast_1d(np.asarray(value, dtype=float))
+        if hist and np.shape(hist[-1]) != v.shape:
+            hist.clear()
+        hist.append(v)
+        return v
+
+    @staticmethod
     def _normalise(hist: deque, value: np.ndarray | float):
-        """Rolling percentile normalisation (10th -> 0, 95th -> 1)."""
-        arr = np.asarray(list(hist), dtype=float)
-        if arr.shape[0] < 6:
-            return np.zeros_like(np.atleast_1d(value), dtype=float)
+        """Rolling percentile normalisation (10th -> 0, 95th -> 1).
+
+        Defensive about ragged content as well as :meth:`_push`: this runs inside
+        the audio worker, where an exception is silence.
+        """
+        zero = np.zeros_like(np.atleast_1d(np.asarray(value, dtype=float)), dtype=float)
+        rows = list(hist)
+        if len(rows) < 6:
+            return zero
+        width = np.shape(rows[-1])
+        if any(np.shape(r) != width for r in rows):
+            return zero
+        arr = np.asarray(rows, dtype=float)
         lo = np.percentile(arr, 10, axis=0)
         hi = np.percentile(arr, 95, axis=0)
         span = np.maximum(hi - lo, 1e-12)
@@ -122,27 +178,54 @@ class FeatureExtractor:
                 raw_be = np.array([
                     _band_peak(sb, fb, float(fm)) for fm in freqs
                 ]) if freqs.size else np.zeros(n_modes)
-                self._be_hist.append(raw_be)
+                self._push(self._be_hist, raw_be)
                 frame.band_energy = np.asarray(
                     self._normalise(self._be_hist, raw_be), dtype=float).ravel()[:n_modes]
 
-        # torsion from the gyro channel
+        # ---------------- TORSION (per floor, from the gyro) ---------------
+        # gz is a direct yaw rate, so each sensor already measures its own
+        # floor's rotation — no differencing and no lever arm needed. This used
+        # to average every gyro into ONE number, which is the one operation that
+        # throws away where the twisting is: a top floor twisting hard and a
+        # still ground floor average to "a bit of twist everywhere".
         gz, gfs = _as_array(gz_snapshot)
         if gz.size:
             gz = np.nan_to_num(gz, nan=0.0, posinf=0.0, neginf=0.0)
             gz = gz - gz.mean(axis=1, keepdims=True)
-            g = gz.mean(axis=0)
-            raw_t = float(np.sqrt(np.mean(g ** 2)))
-            self._tors_hist.append(raw_t)
-            rel = float(np.asarray(self._normalise(self._tors_hist, raw_t)).ravel()[0])
-            med = float(np.median(list(self._tors_hist))) if len(self._tors_hist) > 8 else 0.0
-            # must be genuinely above its own typical level, not merely in the
-            # top percentile of an otherwise quiet gyro
-            # a gyro that has been perfectly still makes ANY rotation meaningful,
-            # so an all-zero history must not gate the signal away entirely
-            quiet_before = med <= 1e-9
-            frame.torsion = rel if (raw_t > 1.8 * med or (quiet_before and raw_t > 1e-9)) else 0.0
-            frame.torsion_pan = float(np.tanh(np.mean(g) * 3.0))
+            raw_rows = np.sqrt(np.mean(gz ** 2, axis=1))
+            self._push(self._tors_hist, raw_rows)
+            rel_rows = np.asarray(
+                self._normalise(self._tors_hist, raw_rows), dtype=float).ravel()
+            rows = list(self._tors_hist)
+            med_rows = (np.median(np.asarray(rows), axis=0)
+                        if len(rows) > 8 and np.shape(rows[-1]) == raw_rows.shape
+                        else np.zeros_like(raw_rows))
+            # Must be genuinely above its own typical level, not merely in the
+            # top percentile of an otherwise quiet gyro. A gyro that has been
+            # perfectly still makes ANY rotation meaningful, so an all-zero
+            # history must not gate the signal away entirely.
+            quiet = med_rows <= 1e-9
+            # Soft gate, not a cliff. The old hard ">1.8x median" test made
+            # torsion a SURPRISE detector: a floor twisting steadily through a
+            # resonance sweep sat just under the threshold and stayed silent,
+            # which is the one moment it most needs to be heard. Ramping from
+            # 1.0x to 1.8x keeps "above its own typical level" as the meaning
+            # while letting a sustained twist sing.
+            ratio = raw_rows / np.maximum(med_rows, 1e-12)
+            gate = np.clip((ratio - 1.0) / 0.8, 0.0, 1.0)
+            gate = np.where(quiet, (raw_rows > 1e-9).astype(float), gate)
+            frame.torsion_floor = rel_rows * gate
+            frame.torsion = float(np.max(frame.torsion_floor)) \
+                if frame.torsion_floor.size else 0.0
+
+            # Pan follows the LIVE direction of rotation, so the twist audibly
+            # swings left and right in time with the structure. The old value
+            # averaged a detrended window, which is ~0 by construction — the
+            # torsion voice was pinned to the centre and never moved.
+            lead = int(np.argmax(raw_rows)) if raw_rows.size else 0
+            g = gz[lead]
+            scale = float(raw_rows[lead]) * 2.5 + 1e-12
+            frame.torsion_pan = float(np.tanh(float(g[-1]) / scale))
 
         # ---------------- IMPACT (E7) --------------------------------------
         # a knock shows up as a floor envelope jumping well above its own recent
@@ -152,7 +235,7 @@ class FeatureExtractor:
         # is gone before the next tick; against the slow window it stands out.
         short_n = max(8, int(0.3 * fs))
         env_short = np.sqrt(np.mean(data[:, -short_n:] ** 2, axis=1))
-        self._floor_hist.append(frame.env_floor.copy())
+        self._push(self._floor_hist, frame.env_floor)
         if len(self._floor_hist) >= 12:
             hist = np.asarray(list(self._floor_hist))
             med = np.median(hist[:-1], axis=0) + 1e-12
@@ -206,7 +289,7 @@ class FeatureExtractor:
                 tot = float(np.sqrt(np.mean(data[i] ** 2)) + np.sqrt(np.mean(data[i + 1] ** 2)))
                 pairs.append(rel / (tot + 1e-12))
             raw = np.asarray(pairs)
-            self._drift_hist.append(raw)
+            self._push(self._drift_hist, raw)
             rel = np.asarray(self._normalise(self._drift_hist, raw), dtype=float).ravel()
             # A percentile rank alone says "more than usual", which is true most
             # of the time during a sweep. Require real ABSOLUTE separation too,
@@ -251,13 +334,20 @@ class FeatureExtractor:
             if self._prox_prev is not None and self._prox_prev.size == prox.size:
                 d = np.maximum(0.0, prox - self._prox_prev) * CONTROL_HZ
                 raw = d * prox
-                self._appr_hist.append(raw)
+                self._push(self._appr_hist, raw)
                 frame.approach = np.asarray(
                     self._normalise(self._appr_hist, raw), dtype=float).ravel()
             self._prox_prev = prox.copy()
 
         # instantaneous per-sensor motion for the animated structure figure
         frame.motion = data[:, -1].astype(float) if data.shape[1] else np.zeros(data.shape[0])
+
+        # Where each row sits, so the renderer can place its voices like the rig.
+        ids = getattr(ax_snapshot, "sensor_ids", None)
+        if ids is None:
+            ids = list(range(1, data.shape[0] + 1))
+        frame.floor_of, frame.pan_of = _row_geometry(
+            _layout_of(self.cfg), list(ids)[:data.shape[0]])
         return frame
 
 
@@ -285,12 +375,29 @@ class ModalTracker:
         if data.size == 0 or not np.isfinite(fs) or fs <= 2.0:
             self._state.message = "waiting for data…"
             return self._state
+
+        # The floor-0 sensor measures the shaker INPUT. Feeding it in as if it
+        # were a response biases the picked modes toward the excitation — the
+        # same correction that moved a real mode by ~2 % in the Spectrum tab.
+        # Modes are also capped by how many measurement points there are: you
+        # cannot identify more modes than sensors, and asking for more just
+        # promotes noise peaks into animals that sing about nothing.
+        layout = _layout_of(cfg)
+        n_modes = int(cfg.n_modes)
+        if layout.is_valid:
+            ids = list(getattr(snapshot, "sensor_ids", []) or [])
+            if ids:
+                rows = layout.response_rows(ids)
+                if rows and len(rows) < len(ids):
+                    data = data[rows, :]
+            n_modes = layout.max_modes(n_modes)
+
         try:
             from ...analysis.modal import identify_modes
             res = identify_modes(
                 np.nan_to_num(data), fs,
                 f_min=cfg.f_min, f_max=min(cfg.f_max, fs / 2 - 0.5),
-                n_modes=cfg.n_modes,
+                n_modes=n_modes,
             )
         except Exception as exc:                       # keep the sound alive
             logger.debug("chorus: identification failed: %s", exc)

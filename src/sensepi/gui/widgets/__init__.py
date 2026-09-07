@@ -9,3 +9,4 @@ __all__ = [
     "AcquisitionSettingsWidget",
     "CollapsibleSection",
 ]
+from .sensor_map import SensorMapWidget  # noqa: F401

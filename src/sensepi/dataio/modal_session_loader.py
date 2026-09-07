@@ -1,7 +1,8 @@
 """Load a recorded sensor session into per-sensor ``ax`` arrays for modal ID.
 
 The authoritative recording is the Pi logger's ``.jsonl`` / ``.csv`` files,
-downloaded into ``data/raw/<session>/`` by ``remote.log_sync``. Each JSONL line
+downloaded into ``output/sensor_recordings/<session>/`` by ``remote.log_sync``.
+Each JSONL line
 carries ``sensor_id``, ``ax`` and a timestamp. This module parses those lines
 with the shared :func:`sensepi.sensors.mpu6050.parse_line`, groups samples by
 sensor, trims to the requested window, and resamples every sensor onto one
@@ -72,8 +73,8 @@ class ModalSession:
 
 
 def list_sessions(base: Path | None = None) -> list[Path]:
-    """Return recorded-session directories under ``data/raw``, newest first."""
-    root = base or AppPaths().raw_data
+    """Return recorded-session directories under the recordings root, newest first."""
+    root = base or AppPaths().sensor_recordings
     if not root.is_dir():
         return []
     sessions = [p for p in root.iterdir() if p.is_dir()]

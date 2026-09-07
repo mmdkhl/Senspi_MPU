@@ -364,6 +364,14 @@ class RecorderController(QObject):
         self.error_reported.emit(str(message))
 
     # --------------------------------------------------------------- wiring helpers
+    def apply_sensor_map(self, sensor_map) -> None:
+        """Remember the placement map so recordings can record where sensors sat."""
+        try:
+            self._sensor_map = (sensor_map.to_mapping()
+                                if hasattr(sensor_map, "to_mapping") else sensor_map)
+        except Exception:
+            self._sensor_map = None
+
     def apply_sensor_selection(self, cfg: SensorSelectionConfig) -> None:
         self._current_sensor_selection = cfg
 
@@ -541,12 +549,13 @@ class RecorderController(QObject):
         self.rate_warning.emit(msg)
 
         host = ctx["host"]
-        out_dir = AppPaths().raw_data / host.name / "mpu"
+        out_dir = AppPaths().sensor_recordings / host.name / "mpu"
         self._smart_recorder = SmartRecorder(
             out_dir=out_dir, session_name=ctx["session"], sensor_ids=sensor_ids,
             start_dt=datetime.now(), requested_hz=requested, actual_hz=measured,
             decimate=decimate, host_name=host.name, probe_seconds=self._probe_seconds,
-            probe_combined_hz=combined)
+            probe_combined_hz=combined,
+            sensor_map=getattr(self, "_sensor_map", None))
         self._smart_recorder.start()
         self.recording_started.emit()
         # SF-4: PC-controlled fixed duration.
