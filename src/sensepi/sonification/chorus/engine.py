@@ -60,6 +60,11 @@ class ChorusEngine:
         self.renderer.set_config(self.cfg)
         if key in ("f_lo", "f_hi", "c_lo", "c_hi"):
             self.cfg.autofit = False        # the user is driving the map now
+        if key in ("sensor_map", "axis", "n_modes"):
+            # The placement decides which rows are responses and how many modes
+            # may be claimed: re-identify on the next tick rather than singing
+            # from the old identification for up to reid_interval_s.
+            self.tracker._last_t = -1e9
         if key in ("f_lo", "f_hi", "c_lo", "c_hi", "n_chorus", "n_ambient",
                    "enabled_roles", "chorus_size", "pitch_rise", "depth"):
             # Do NOT recast here. A slider emits on every pixel of drag, and a

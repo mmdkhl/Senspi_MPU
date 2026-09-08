@@ -360,7 +360,14 @@ class SmartRecorder:
                     audit=audit,
                 )
                 if self._raw_writers.get(sid) is not None:
-                    meta["raw_audit_file"] = self._raw_writers[sid].path.name
+                    raw = self._raw_writers[sid]
+                    # The main file keeps the locked 3-channel order the Pi
+                    # recordings share; the six-channel copy lives here. Say so,
+                    # so nobody concludes az/gx/gy were never recorded.
+                    meta["raw_audit_file"] = raw.path.name
+                    meta["raw_audit_schema"] = list(getattr(raw, "_header", []) or [])
+                    meta["channels_note"] = (
+                        "main file: ax ay gz (locked order); all six channels: raw_audit_file")
             placement = self._placement_for(sid)
             if placement is not None:
                 meta["placement"] = placement

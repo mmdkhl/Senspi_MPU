@@ -631,7 +631,10 @@ class BioacousticChorusTab(QWidget):
         self._btn_snapshot.clicked.connect(self._on_snapshot)
         # SOLO: the fastest way to learn which animal belongs to which mode
         self._solo_buttons = []
-        for i, label in enumerate(("All", "1", "2", "3")):
+        # One button per mode the identification can return (the spinbox allows
+        # up to 4, and four sensors support four); mode 4 could be heard but
+        # never soloed.
+        for i, label in enumerate(("All", "1", "2", "3", "4")):
             b = QPushButton(label)
             b.setCheckable(True)
             b.setMaximumWidth(46)
@@ -824,8 +827,19 @@ class BioacousticChorusTab(QWidget):
 
     @Slot(str, float)
     def _on_expression(self, _attr: str, value) -> None:
-        """Scale every case voice together, relative to its default."""
-        scale = float(value)
+        """Scale every case voice together, relative to its default.
+
+        Coalesced to one application per event-loop turn: a slider emits on
+        every pixel, and each application pushes seven options to the worker.
+        """
+        self._pending_expression = float(value)
+        if not getattr(self, "_expression_scheduled", False):
+            self._expression_scheduled = True
+            QTimer.singleShot(0, self._apply_expression)
+
+    def _apply_expression(self) -> None:
+        self._expression_scheduled = False
+        scale = float(getattr(self, "_pending_expression", 1.0))
         for attr, default in _CASE_VOICES.items():
             self._on_knob(attr, default * scale)
             row = self._rows.get(attr)

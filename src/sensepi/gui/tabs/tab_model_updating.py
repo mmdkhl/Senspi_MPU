@@ -50,6 +50,9 @@ from PySide6.QtWidgets import (
 
 from ...analysis import modal as modal_id
 from ...analysis import sensor_layout as slayout
+from ...digital_twin import decisions as twin_decisions
+from ..widgets.decision_panel import DecisionPanel
+from ..widgets.wireframe import LiveStructureView
 from ...analysis import modal_tracker as modal_trk
 from ...dataio import modal_session_loader as msl
 
@@ -101,7 +104,7 @@ def _default_workspace_dir() -> Path:
     its default location moves, under the one root the application writes to.
     """
     from ...config.app_config import AppPaths
-    return AppPaths().output_root / "model"
+    return AppPaths().model_output
 
 
 @dataclass
@@ -1061,6 +1064,11 @@ def _make_calibration_signature(params: dict[str, Any]) -> str:
         "story_column_layout",
         "column_orientation_layout",
         "additional_masses",
+        # Placement now arrives from Settings, so a change there must age a
+        # calibration made under the old placement (it used to stay "available").
+        "sensor_story_map",
+        "sensor_axis",
+        "sensor_n_modes",
     ]
     return json.dumps(
         {key: _round_for_signature(params.get(key)) for key in keys},
@@ -1266,6 +1274,13 @@ def _build_sensor_exp_dict(session: "msl.ModalSession", params: dict[str, Any]):
     Pure: no OpenSees, no Qt.
     """
     method = params.get("sensor_method", "fdd")
+    # Structural rows only. The floor-0 sensor measures the shaker INPUT; as a
+    # response it biased mode 2 by ~2 % on the real rig. Spectrum and Digital
+    # Twin already slice it; this tab was the last to feed it in.
+    story_map = {int(k): int(v) for k, v in dict(params.get("sensor_story_map") or {}).items()}
+    keep = [i for i, sid in enumerate(session.sensor_ids) if int(sid) in story_map]
+    if keep and len(keep) < len(list(session.sensor_ids)):
+        session = msl.sliced_session(session, keep)
     result = modal_id.identify_modes(
         session.data, session.fs,
         f_min=params["sensor_f_min"], f_max=params["sensor_f_max"],
@@ -1367,9 +1382,10 @@ class _IdentifyWorker(QObject):
             self.log.emit(f"  {result.message}\n")
             for m, f in enumerate(result.frequencies_hz):
                 period = 1.0 / f if f > 0 else float("nan")
-                zeta = result.damping_ratios[m] if m < len(result.damping_ratios) else float("nan")
-                zeta_str = f"{zeta * 100:.1f} %" if zeta == zeta else "n/a"  # nan check
-                self.log.emit(f"    Mode {m + 1}:  f = {f:6.3f} Hz   T = {period:6.3f} s   ζ = {zeta_str}\n")
+                # Half-power ζ measured 17-186 % wrong against known damping
+                # (DEBT-8); printing it as a figure invites trusting it.
+                self.log.emit(f"    Mode {m + 1}:  f = {f:6.3f} Hz   T = {period:6.3f} s   "
+                              f"ζ = n/a (use Spectrum → damping ratio)\n")
 
             shape_kind = "magnitude" if result.method == "fft" else "signed"
             self.log.emit(f"\n  Per-sensor mode shapes ({shape_kind}, |max| = 1):\n")
@@ -1532,6 +1548,16 @@ class _ContinuousUpdateWorker(QObject):
             f"Continuous update started ({method}, Stage-1 tracker λ={trk_lambda:g}, "
             f"c={trk_c:g}). Each cycle records {duration:g}s, identifies, then updates; "
             f"the loop runs until you press Stop.\n")
+        # The placement is read ONCE, here. Say so: a user who edits Settings
+        # mid-run would otherwise have no way to know this run did not follow.
+        frozen = ", ".join(f"S{sid}→{st}" for sid, st in
+                           sorted(dict(self._params.get("sensor_story_map") or {}).items()))
+        self.log.emit(f"  Placement frozen at {time.strftime('%H:%M:%S')}: {frozen} "
+                      f"(axis {self._params.get('sensor_axis', '?')}). Changes in Settings "
+                      f"apply to the next run.\n")
+        warning = self._params.get("sensor_coverage_warning") or ""
+        if warning:
+            self.log.emit("  " + warning)
         while self._running:
             cycle += 1
             cycle_start = time.monotonic()
@@ -1667,6 +1693,23 @@ class _ContinuousUpdateWorker(QObject):
             })
             self._history = self._history[-40:]  # keep last 40 cycles for the plots
 
+            # Digital-twin decisions for THIS cycle and for the rolling average of
+            # the last N cycles' calibrated E and masses — computed here, in the
+            # worker, against the frozen design (initial_params). Pure functions;
+            # only plain dataclasses cross to the GUI.
+            roll_n = max(1, int(self._settings.get("twin_rolling_cycles", 5)))
+            recent = self._history[-roll_n:]
+            rolled = {
+                "E": float(np.mean([h["E"] for h in recent])),
+                "floor_masses": [float(v) for v in np.mean(
+                    [h["masses"] for h in recent], axis=0)],
+            }
+            decisions_cycle = twin_decisions.decide(initial_params, calib)
+            decisions_roll = twin_decisions.decide(initial_params, rolled)
+            self.log.emit(
+                f"  twin · this cycle: {decisions_cycle.summary()}  ·  rolling {len(recent)}: "
+                f"{decisions_roll.summary()}\n")
+
             # Render BOTH right-panel views every cycle; the GUI checkbox picks which
             # to show, so toggling is instant and needs no recompute (G1/G4: both are
             # rendered here in the worker thread, only PNG bytes cross to the GUI).
@@ -1681,6 +1724,9 @@ class _ContinuousUpdateWorker(QObject):
                 "success": bool(success),
                 "calibrated_params": copy.deepcopy(calib),
                 "signature": _make_calibration_signature(initial_params),
+                "twin_decisions_cycle": decisions_cycle,
+                "twin_decisions_rolling": decisions_roll,
+                "twin_rolling_n": len(recent),
             })
 
             if max_cycles and cycle >= max_cycles:
@@ -2295,7 +2341,9 @@ class ModelUpdatingTab(QWidget):
         # CU-9 / D2: default upper band 12 Hz (was 20) so the picker ignores the
         # 13–20 Hz noise region that out-prominenced the real ~8 Hz mode. The band is
         # independent of the Spectrum tab's band — both are user-adjustable.
-        self._sensor_fmax = self._double_spin(0.10, 1000.0, 12.0, 3)
+        # 0.5-20 Hz, the same band Spectrum uses: both tabs now identify from
+        # the same buffer and placement, and should find the same mode set.
+        self._sensor_fmax = self._double_spin(0.10, 1000.0, 20.0, 3)
         self._sensor_nmodes = QSpinBox(self)
         self._sensor_nmodes.setRange(1, 12)
         self._sensor_nmodes.setValue(3)
@@ -2355,6 +2403,8 @@ class ModelUpdatingTab(QWidget):
             mapping = mapping.to_mapping()
         self._sensor_mapping = dict(mapping) if isinstance(mapping, dict) else None
         self._refresh_sensor_map_summary()
+        if hasattr(self, "_twin_live_view"):
+            self._twin_live_view.apply_sensor_map(self._sensor_mapping)
 
     def current_sensor_layout(self):
         """The placement as analysis inputs. Never None; check ``is_valid``."""
@@ -2604,16 +2654,35 @@ class ModelUpdatingTab(QWidget):
         self._cont_fig2_fdd: bytes | None = None      # per-iteration FDD spectrum
         self._cont_fig2_track: bytes | None = None     # consolidated frequency tracking
         self._cont_view_active = False                 # True while Mode-B results are shown
+        # Continuous Update — right panel is a SELECTION now, not a toggle:
+        # per-cycle spectrum, frequency tracking, or the digital twin (the same
+        # live structure + decision lights the experiment tab shows, here fed by
+        # every cycle or by the rolling average of the last N cycles).
         header = QHBoxLayout()
         header.addStretch(1)
-        self._cont_track_view = QCheckBox("Show frequency tracking (Continuous Update right panel)", self)
-        self._cont_track_view.setToolTip(
-            "Continuous Update — right panel view:\n"
-            "  unchecked = per-cycle FDD spectrum (this window's identified modes)\n"
-            "  checked   = consolidated f̂ ±1σ tracks + raw per-cycle identifications")
-        self._cont_track_view.toggled.connect(self._on_cont_view_toggled)
-        header.addWidget(self._cont_track_view)
+        header.addWidget(QLabel("Continuous Update view:", self))
+        self._cont_view_combo = QComboBox(self)
+        self._cont_view_combo.addItem("Per-cycle spectrum", "fdd")
+        self._cont_view_combo.addItem("Frequency tracking (f̂ per cycle)", "track")
+        self._cont_view_combo.addItem("Digital twin (live structure + decisions)", "twin")
+        self._cont_view_combo.currentIndexChanged.connect(self._on_cont_view_toggled)
+        header.addWidget(self._cont_view_combo)
+        header.addSpacing(12)
+        header.addWidget(QLabel("Decide on:", self))
+        self._twin_react_combo = QComboBox(self)
+        self._twin_react_combo.addItem("each cycle", "cycle")
+        self._twin_react_combo.addItem("rolling average", "rolling")
+        self._twin_react_combo.currentIndexChanged.connect(self._on_cont_view_toggled)
+        header.addWidget(self._twin_react_combo)
+        self._twin_roll_spin = QSpinBox(self)
+        self._twin_roll_spin.setRange(2, 40)
+        self._twin_roll_spin.setValue(5)
+        self._twin_roll_spin.setPrefix("N = ")
+        self._twin_roll_spin.setToolTip(
+            "Cycles averaged for the rolling decision (calibrated E and masses).")
+        header.addWidget(self._twin_roll_spin)
         outer.addLayout(header)
+        self._cont_view_combo.setCurrentIndex(2)
 
         # Left side: static PNG (calibrate) or live roof response curves (run).
         self._fig1_label = _ScaledImageLabel(
@@ -2657,11 +2726,24 @@ class ModelUpdatingTab(QWidget):
         run_grid.setRowStretch(1, 1)
         self._run_right_widget.hide()
 
+        # Digital twin view: the shared live structure + decision lights.
+        self._twin_widget = QWidget(self)
+        twin_row = QHBoxLayout(self._twin_widget)
+        twin_row.setContentsMargins(0, 0, 0, 0)
+        self._twin_live_view = LiveStructureView(self._twin_widget)
+        self._twin_live_view.set_controller(self._recorder_controller)
+        self._twin_panel = DecisionPanel(parent=self._twin_widget)
+        twin_row.addWidget(self._twin_live_view, stretch=3)
+        twin_row.addWidget(self._twin_panel, stretch=2)
+        self._twin_widget.hide()
+        self._last_twin_payload: dict | None = None
+
         right_col = QWidget(self)
         right_layout = QVBoxLayout(right_col)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.addWidget(self._fig2_label, stretch=1)
         right_layout.addWidget(self._run_right_widget, stretch=1)
+        right_layout.addWidget(self._twin_widget, stretch=1)
 
         fig_row = QWidget(self)
         fig_layout = QHBoxLayout(fig_row)
@@ -3312,6 +3394,21 @@ class ModelUpdatingTab(QWidget):
     # no import error, just a failure at run time when someone pressed a button.
     # One documented method, returning a deep copy, replaces all three.
     # ------------------------------------------------------------------
+    def is_busy(self) -> bool:
+        """True while a calibration, run or continuous update is in progress."""
+        return self._thread is not None or self._continuous_thread is not None
+
+    def calibration_snapshot(self) -> dict[str, Any] | None:
+        """A deep copy of the last calibrated parameters, or ``None``.
+
+        The Digital Twin tab falls back to this when it has not calibrated on
+        its own. It used to read ``_calibration_state`` directly.
+        """
+        state = self._calibration_state
+        if state is None or not state.available or not state.calibrated_params:
+            return None
+        return copy.deepcopy(state.calibrated_params)
+
     def model_definition_snapshot(self) -> dict[str, Any]:
         """A self-contained copy of the model as currently defined here.
 
@@ -3363,7 +3460,7 @@ class ModelUpdatingTab(QWidget):
             "sensor_window_s": float(self._sensor_window.value()),
             "sensor_f_min": fmin,
             "sensor_f_max": fmax,
-            "sensor_n_modes": int(self._sensor_nmodes.value()),
+            "sensor_n_modes": layout.max_modes(int(self._sensor_nmodes.value())),
             "sensor_story_map": story_map,
             "sensor_target_fs": target_fs,
             "nStory": int(self._story_count.value()),
@@ -3487,6 +3584,8 @@ class ModelUpdatingTab(QWidget):
             {
                 "frequencies_hz": freqs,
                 "mode_shapes_ux": shapes,
+                "coverage_stories": list(exp_dict.get("coverage_stories") or []),
+                "measured_dof_indices": list(exp_dict.get("measured_dof_indices") or []),
                 "source_file": "Spectrum final values",
                 "notes": "Loaded from Spectrum final-values calculation",
             },
@@ -3514,14 +3613,25 @@ class ModelUpdatingTab(QWidget):
         shapes = exp_dict.get("mode_shapes_ux", {})
         self._analysis_scope.setCurrentIndex(1 if (shapes_available and shapes) else 0)
         if shapes_available and shapes:
+            # Shape vectors span the MEASURED storeys, in coverage order. Map
+            # each value to its storey's row rather than to the list index —
+            # under partial coverage those differ, and the old code wrote
+            # storey 4's value into storey 3's row.
+            rows_for = exp_dict.get("measured_dof_indices")
+            if not rows_for and exp_dict.get("coverage_stories"):
+                rows_for = [int(c) - 1 for c in exp_dict["coverage_stories"]]
             for c in range(self._exp_mode_table.columnCount()):
                 key = str(c + 1)
-                if key in shapes:
-                    for r, val in enumerate(shapes[key]):
-                        if r < self._exp_mode_table.rowCount():
-                            w = self._exp_mode_table.cellWidget(r, c)
-                            if isinstance(w, QDoubleSpinBox):
-                                w.setValue(float(val))
+                if key not in shapes:
+                    continue
+                vals = shapes[key]
+                targets = (list(rows_for) if rows_for and len(rows_for) == len(vals)
+                           else list(range(len(vals))))
+                for r, val in zip(targets, vals):
+                    if 0 <= int(r) < self._exp_mode_table.rowCount():
+                        w = self._exp_mode_table.cellWidget(int(r), c)
+                        if isinstance(w, QDoubleSpinBox):
+                            w.setValue(float(val))
         # Switch to Manual input so the user can review/edit before calibrating.
         self._exp_source.setCurrentText("Manual input")
 
@@ -3555,6 +3665,8 @@ class ModelUpdatingTab(QWidget):
             return
 
         settings = self._continuous_settings()
+        if settings is not None:
+            settings["twin_rolling_cycles"] = int(self._twin_roll_spin.value())
         if settings is None:
             return
         self._latest_continuous_calibration = None
@@ -3568,6 +3680,9 @@ class ModelUpdatingTab(QWidget):
         ctrl.set_modal_window_seconds(max(120.0, float(settings["duration_s"]) + 15.0))
 
         worker = _ContinuousUpdateWorker(params, settings, ctrl.snapshot_modal_capture)
+        self._twin_live_view.set_controller(ctrl)
+        self._twin_live_view.apply_sensor_map(self._sensor_mapping)
+        self._twin_live_view.start()
         thread = QThread(self)
         worker.moveToThread(thread)
         worker.log.connect(self._append_log)
@@ -3650,6 +3765,7 @@ class ModelUpdatingTab(QWidget):
         # Cache both right-panel renders; show whichever the checkbox selects.
         self._cont_fig2_fdd = payload.get("fig2_fdd_png") or payload.get("fig2_png")
         self._cont_fig2_track = payload.get("fig2_track_png")
+        self._last_twin_payload = payload
         if not self._continuous_handoff_selected and bool(payload.get("success", False)):
             calibrated = payload.get("calibrated_params")
             signature = payload.get("signature")
@@ -3700,15 +3816,35 @@ class ModelUpdatingTab(QWidget):
             )
 
     def _show_cont_fig2(self) -> None:
-        """Display the right-panel view the checkbox selects (cached PNG, no recompute)."""
-        show_track = self._cont_track_view.isChecked()
-        png = self._cont_fig2_track if show_track else self._cont_fig2_fdd
-        # Graceful fallback if one view is missing (e.g. very first cycle).
+        """Display the selected right-panel view (cached data, no recompute)."""
+        view = str(self._cont_view_combo.currentData() or "fdd")
+        if view == "twin":
+            self._fig2_label.hide()
+            self._twin_widget.show()
+            self._refresh_twin_panel()
+            return
+        self._twin_widget.hide()
+        self._fig2_label.show()
+        png = self._cont_fig2_track if view == "track" else self._cont_fig2_fdd
         self._display_png(self._fig2_label, png or self._cont_fig2_fdd or self._cont_fig2_track)
 
-    @Slot(bool)
-    def _on_cont_view_toggled(self, _checked: bool) -> None:
-        """Swap the Continuous-Update right panel (pure GUI, G1 — just re-shows a cached PNG)."""
+    def _refresh_twin_panel(self) -> None:
+        payload = self._last_twin_payload
+        if not payload:
+            self._twin_panel.set_decisions(None)
+            return
+        react = str(self._twin_react_combo.currentData() or "cycle")
+        if react == "rolling":
+            decisions = payload.get("twin_decisions_rolling")
+            source = f"rolling average of {payload.get('twin_rolling_n', '?')} cycle(s)"
+        else:
+            decisions = payload.get("twin_decisions_cycle")
+            source = f"cycle {payload.get('cycle', '?')}"
+        self._twin_panel.set_decisions(decisions, source=source)
+
+    @Slot()
+    def _on_cont_view_toggled(self, *_: object) -> None:
+        """Swap the Continuous-Update right panel (pure GUI, G1 — cached data only)."""
         if self._cont_view_active:
             self._show_cont_fig2()
 
@@ -3721,6 +3857,7 @@ class ModelUpdatingTab(QWidget):
     def _on_continuous_finished(self) -> None:
         self._continuous_worker = None
         self._continuous_thread = None
+        self._twin_live_view.stop()
         self._continuous_btn.setText("Start Continuous Update")
         if self._continuous_handoff_selected:
             self._set_busy(

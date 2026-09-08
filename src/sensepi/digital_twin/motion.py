@@ -147,9 +147,15 @@ def displacement_at(x: np.ndarray, fs: float, *, band=DEFAULT_BAND,
 
 
 def angle_at(gz: np.ndarray, fs: float, *, band=DEFAULT_BAND,
-             setback_s: float = SETBACK_S) -> float:
-    """Reconstructed yaw angle in radians, read back from the edge."""
-    return read_back(integrate_once(gz, fs, band=band), fs, setback_s)
+             setback_s: float = SETBACK_S, degrees_per_second: bool = True) -> float:
+    """Reconstructed yaw angle in **radians**, read back from the edge.
+
+    The MPU6050 reports gyro rates in deg/s (the Pi logger scales raw / 131),
+    so the default converts. Integrating deg/s as if it were rad/s made the
+    wireframe's floors spin by tens of degrees on a real recording.
+    """
+    angle = read_back(integrate_once(gz, fs, band=band), fs, setback_s)
+    return float(np.deg2rad(angle)) if degrees_per_second else float(angle)
 
 
 def normalising_scale(values, target: float = 0.9) -> float:

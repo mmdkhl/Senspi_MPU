@@ -74,12 +74,19 @@ python -m unittest discover -s tests
 
   ```
   output/
-    sensor_recordings/<host>/mpu/   Smart Recording — time- and rate-corrected
-    model/                          OpenSees calibration and analysis
-    digital_twin/                   experiment runs
+    sensor_recordings/<host>/mpu/<stamp>[_<name>]/   one folder per Smart Record
+                                                     (main CSVs + audit_<stamp>/ six-channel copy)
+    model/                          the default model workspace: input/ and output/
+                                    (OpenSees recorders and calibration files)
+    digital_twin/<stamp>/           experiment runs
     sonification/                   audio captures
   logs/                             diagnostics — deliberately separate
   ```
+
+  Smart Record writes the samples **as received** (timestamps, decimation) plus an
+  audit of rate, gaps and clock drift; alignment onto a common grid happens on the
+  read side, in `dataio.modal_session_loader.align_per_sensor_series`, every time a
+  session is loaded.
 
   Resolve these through `AppPaths` (`src/sensepi/config/app_config.py`), never by
   building a relative path. `SENSEPI_OUTPUT_ROOT` moves the whole tree,
@@ -94,7 +101,10 @@ python -m unittest discover -s tests
   List of Pis (host, user, password, paths)
 
 - `src/sensepi/config/sensors.yaml`  
-  Sensor defaults + sampling defaults
+  Sensor defaults + sampling defaults  
+  Tracked template. Per-machine state (the sensor placement map, the sensor count)
+  is written to the gitignored `sensors.local.yaml`, which takes precedence when
+  present — the same pattern as `hosts.local.yaml`.
 
 ### Pi-side
 - `pi_config.yaml` (uploaded to each Pi)  

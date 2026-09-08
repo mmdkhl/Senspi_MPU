@@ -134,3 +134,27 @@ class TestDampingSensor(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTorsionPresets(unittest.TestCase):
+    """Every torsion preset's pair sits on the A3 / C1 diagonal and can see
+    torsion on BOTH axes (a same-row or same-column pair would be blind on one)."""
+
+    def test_presets_place_the_pair_on_a3_c1(self):
+        from sensepi.gui.widgets.sensor_map import PRESETS
+        from sensepi.analysis import torsion as tor
+        checked = 0
+        for name, (n_floors, layout) in PRESETS.items():
+            if "torsion" not in name:
+                continue
+            by_floor = {}
+            for sid, (floor, cell) in layout.items():
+                by_floor.setdefault(floor, []).append(cell)
+            pairs = [cells for cells in by_floor.values() if len(cells) == 2]
+            self.assertEqual(len(pairs), 1, name)
+            self.assertEqual(set(pairs[0]), {"A3", "C1"}, name)
+            a, b = pairs[0]
+            self.assertEqual(abs(tor.lever_arm_cells(a, b, "ax")), 2.0, name)
+            self.assertEqual(abs(tor.lever_arm_cells(a, b, "ay")), 2.0, name)
+            checked += 1
+        self.assertGreaterEqual(checked, 4)
