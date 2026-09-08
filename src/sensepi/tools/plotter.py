@@ -6,7 +6,8 @@ the same NumPy-based downsampling routines that power the standalone CLI
 plotter. When executed as a script (see ``LocalPlotRunner``), it opens a
 Matplotlib window that can either replay a log once (``--mode replay``) or
 periodically reload a log for a faux-live view (``--mode follow``). If
-``--file`` is omitted the newest ``*.csv``/``*.jsonl`` under ``data/raw/``,
+``--file`` is omitted the newest ``*.csv``/``*.jsonl`` under
+``output/sensor_recordings/``,
 ``logs/``, or the project root is selected automatically.
 """
 
@@ -482,7 +483,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=str,
         help=(
             "Path to a log file (.csv or .jsonl). If omitted, the newest log "
-            "found under data/raw, logs, or the project root is used."
+            "found under output/sensor_recordings, logs, or the project root is used."
         ),
     )
     parser.add_argument(
@@ -521,14 +522,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         csv_path = find_latest_log(
             [
-                REPO_ROOT / "data" / "raw",
+                REPO_ROOT / "output" / "sensor_recordings",
                 REPO_ROOT / "logs",
                 REPO_ROOT,
             ]
         )
         if csv_path is None:
             parser.error(
-                "No log files found in data/raw, logs, or the project root.\n"
+                "No log files found in output/sensor_recordings, logs, or the project root.\n"
                 "Specify a file explicitly with --file."
             )
         print(f"[INFO] Using latest log: {csv_path}")

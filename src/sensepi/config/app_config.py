@@ -89,39 +89,78 @@ class AppPaths:
     """
     Commonly used paths for the desktop application.
 
-    ``SENSEPI_DATA_ROOT`` and ``SENSEPI_LOG_DIR`` override the default
-    ``data``/``logs`` folders relative to the repository root so that
-    packaged installs and alternate layouts can store files elsewhere.
+    One root holds everything the application writes::
+
+        output/
+          sensor_recordings/   Smart Recording  (time- and rate-corrected)
+          model/               OpenSees calibration and analysis
+          digital_twin/        experiments
+          processed/           other exports
+
+    ``logs/`` stays separate — it is diagnostics, not results.
+
+    ``SENSEPI_OUTPUT_ROOT`` moves the whole tree; ``SENSEPI_DATA_ROOT`` moves the
+    recordings folder alone; ``SENSEPI_LOG_DIR`` moves the logs.
     """
 
     # repo_root points at the project root (one level above src/)
     repo_root: Path = field(default_factory=_default_repo_root)
+    logs: Path = field(init=False)
+    config_dir: Path = field(init=False)
+    #: Where Smart Recording writes: time-corrected, rate-corrected sensor data,
+    #: one folder per host. Everything that reads a recording reads it from here,
+    #: so there is exactly one answer to "where did that recording go".
+    sensor_recordings: Path = field(init=False)
+    # Legacy names, kept pointing at the new locations. Any caller missed during
+    # the move therefore lands in the right place instead of silently writing to
+    # a folder nobody looks in — which is the failure this move exists to end.
     data_root: Path = field(init=False)
     raw_data: Path = field(init=False)
     processed_data: Path = field(init=False)
-    logs: Path = field(init=False)
-    config_dir: Path = field(init=False)
+    # One root for everything the application PRODUCES, kept separate from
+    # ``data`` (what came in) and ``logs`` (diagnostics). Until this existed,
+    # OpenSees results landed wherever the process working directory happened to
+    # be pointing, which is how a stray ``output/`` grew at the repo root.
+    output_root: Path = field(init=False)
+    model_output: Path = field(init=False)
+    twin_output: Path = field(init=False)
+    sonification_output: Path = field(init=False)
 
     def __post_init__(self) -> None:
-        env_data_root = os.environ.get("SENSEPI_DATA_ROOT")
-        if env_data_root:
-            self.data_root = Path(env_data_root).expanduser()
-        else:
-            self.data_root = self.repo_root / "data"
-
         env_logs_dir = os.environ.get("SENSEPI_LOG_DIR")
         if env_logs_dir:
             self.logs = Path(env_logs_dir).expanduser()
         else:
             self.logs = self.repo_root / "logs"
 
-        self.raw_data = self.data_root / "raw"
-        self.processed_data = self.data_root / "processed"
         self.config_dir = self.repo_root / "src" / "sensepi" / "config"
+
+        env_output_root = os.environ.get("SENSEPI_OUTPUT_ROOT")
+        if env_output_root:
+            self.output_root = Path(env_output_root).expanduser()
+        else:
+            self.output_root = self.repo_root / "output"
+
+        # SENSEPI_DATA_ROOT used to point at the old data/ tree. It keeps
+        # working, now as the override for the recordings folder specifically,
+        # which is the only thing anyone actually used it for.
+        env_recordings = os.environ.get("SENSEPI_DATA_ROOT")
+        if env_recordings:
+            self.sensor_recordings = Path(env_recordings).expanduser()
+        else:
+            self.sensor_recordings = self.output_root / "sensor_recordings"
+
+        self.model_output = self.output_root / "model"
+        self.twin_output = self.output_root / "digital_twin"
+        self.sonification_output = self.output_root / "sonification"
+
+        self.raw_data = self.sensor_recordings
+        self.data_root = self.output_root
+        self.processed_data = self.output_root / "processed"
 
     def ensure(self) -> None:
         """Create directories if they do not yet exist."""
-        for path in (self.data_root, self.raw_data, self.processed_data, self.logs):
+        for path in (self.output_root, self.sensor_recordings, self.logs):
             path.mkdir(parents=True, exist_ok=True)
 
 
@@ -163,7 +202,9 @@ class PlotPerformanceConfig:
     signal_update_hz: float = 50.0
     time_window_seconds: float = 3.0
     fft_update_hz: float = 10.0
-    max_signal_subplots: int = 18
+    # 4 sensors x 6 channels. At 18 the all-channels preset was silently cut
+    # to four channels per sensor — dropping gz, the torsion channel.
+    max_signal_subplots: int = 24
     max_lines_per_subplot: int = 1
     signal_max_points_per_line: int = 2000
 
@@ -189,7 +230,7 @@ class PlotPerformanceConfig:
         try:
             value = int(self.max_signal_subplots)
         except (TypeError, ValueError):
-            value = 18
+            value = 24
         return max(1, value)
 
     def normalized_max_lines(self) -> int:
@@ -232,6 +273,13 @@ class SensorDefaults:
     """
 
     sensors_file: Path = AppPaths().config_dir / "sensors.yaml"
+    # Same pattern as hosts: the tracked file is a template, the ignored local
+    # file holds this machine's state (placement map, sensor count). Without it
+    # the placement autosave dirtied the tracked sensors.yaml on every launch.
+    local_file: Path = AppPaths().config_dir / "sensors.local.yaml"
+
+    def _source_file(self) -> Path:
+        return self.local_file if self.local_file.exists() else self.sensors_file
 
     def _normalize(
         self,
@@ -260,7 +308,7 @@ class SensorDefaults:
 
     def load(self) -> Dict[str, Any]:
         """Load and return the full sensors.yaml mapping (or ``{}`` if missing)."""
-        raw, sampling = load_sensor_defaults(self.sensors_file)
+        raw, sampling = load_sensor_defaults(self._source_file())
         return self._normalize(raw, sampling)
 
     def load_sampling_config(self, data: Dict[str, Any] | None = None) -> SamplingConfig:
@@ -278,7 +326,7 @@ class SensorDefaults:
         """
         sampling_cfg = SamplingConfig.from_mapping(data)
         normalized = self._normalize(data, sampling_cfg)
-        save_sensor_defaults(self.sensors_file, normalized, sampling_cfg)
+        save_sensor_defaults(self.local_file, normalized, sampling_cfg)
 
     # ------------------------------------------------------------------
     # Convenience helpers for RecorderTab / other callers

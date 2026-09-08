@@ -96,9 +96,11 @@ class LogSyncWorker(QObject):
                     raise RuntimeError(f"No logs found at: {remote_target}")
 
                 if self._session_name:
-                    local_target = app_paths.raw_data / slugify_session_name(self._session_name)
+                    local_target = (app_paths.sensor_recordings
+                                    / slugify_session_name(self._session_name))
                 else:
-                    local_target = app_paths.raw_data / str(host_cfg.name) / self._sensor_prefix
+                    local_target = (app_paths.sensor_recordings
+                                    / str(host_cfg.name) / self._sensor_prefix)
 
                 self.progress.emit(f"Syncing {remote_target} → {local_target} …")
 

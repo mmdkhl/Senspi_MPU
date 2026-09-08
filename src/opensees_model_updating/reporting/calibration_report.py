@@ -6,6 +6,7 @@ Contains make_modal_comparison_report(), report_to_text(),
 and save_calibration_summary_figure() from DigitalTwin_V8.py.
 """
 
+from ..paths import output_path as _out_path
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
@@ -365,7 +366,7 @@ def generate_calibration_summary_png(exp_data, modal_before, modal_after,
 
 def save_calibration_summary_figure(exp_data, modal_before, modal_after,
                                      original_params, calibrated_params,
-                                     save_path="output/calibration_summary.png"):
+                                     save_path=None, output_base=None):
     """
     Generate and save the calibration summary figure (4 subplots).
 
@@ -383,7 +384,12 @@ def save_calibration_summary_figure(exp_data, modal_before, modal_after,
         Original model parameters.
     calibrated_params : dict
         Calibrated model parameters.
-    save_path : str
+    save_path : str or Path, optional
+        Explicit destination. When omitted the file goes to the resolved output
+        directory (see ``opensees_model_updating.paths``).
+    output_base : str or Path, optional
+        Output directory to resolve ``save_path`` against when it is omitted.
+    _unused : str
         Output file path for the figure.
     """
     n_use = exp_data["n_modes_used"]
@@ -501,4 +507,8 @@ def save_calibration_summary_figure(exp_data, modal_before, modal_after,
 
     fig.tight_layout()
     canvas.draw()
+    # Resolved rather than hardcoded: "output/calibration_summary.png" as a
+    # default argument put the file wherever the process happened to be running.
+    if save_path is None:
+        save_path = _out_path("calibration_summary.png", output_base)
     fig.savefig(save_path, dpi=220, bbox_inches="tight")

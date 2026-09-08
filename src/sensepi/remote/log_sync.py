@@ -93,7 +93,7 @@ def sync_logs_from_pi(
     session_name = (session_name or "").strip() or None
     session_slug = slugify_session_name(session_name) if session_name else None
 
-    raw_root = raw_root or AppPaths().raw_data
+    raw_root = raw_root or AppPaths().sensor_recordings
 
     local_root = build_pc_session_root(
         raw_root=raw_root,

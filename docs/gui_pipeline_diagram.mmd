@@ -1,22 +1,30 @@
+%% SensePi GUI pipeline. Update this when a tab, worker or backend is added.
+%% Two things are worth reading off this diagram:
+%%   1. no tab talks to the Pi — RecorderController owns every SSH session;
+%%   2. sensor placement has ONE source, Settings, and is pushed to consumers.
 flowchart TB
     main["main.py"]
     app["sensepi.gui.application<br/>create_app() / main()"]
-    window["MainWindow"]
+    window["MainWindow<br/>owns all cross-tab wiring"]
 
-    settings["SettingsTab"]
+    settings["SettingsTab<br/>+ SensorMapWidget"]
     signals["SignalsTab"]
-    fft["FftTab"]
+    fft["FftTab (Spectrum)"]
     modelupdating["ModelUpdatingTab"]
-    sonify["SonificationTab"]
+    sonify["SonificationTab<br/>Bioacoustic Chorus | Team Model"]
+    twin["DigitalTwinExperimentTab"]
 
-    controller["RecorderController"]
-    buffer["StreamingDataBuffer"]
+    controller["RecorderController<br/>the only owner of SSH"]
+    buffer["StreamingDataBuffer<br/>+ 120 s modal accumulator"]
     pirec["PiRecorder"]
     ingest["SensorIngestWorker<br/>(QThread)"]
     pi["Raspberry Pi logger<br/>mpu6050_multi_logger.py"]
 
-    opensees_project["opensees-model-updating<br/>OpenSeesPy modules"]
-    sonify_backend["sensepi.sonification.structural<br/>offline WAV export"]
+    layout["analysis.sensor_layout<br/>map to analysis inputs"]
+    analysis["analysis.modal / transmissibility / torsion<br/>pure NumPy, no Qt"]
+    opensees["opensees_model_updating<br/>calibration + OpenSeesPy"]
+    chorus["sonification.chorus<br/>live engine + audio out"]
+    twinlib["digital_twin<br/>decisions / motion / runner"]
 
     main -->|"launch"| app
     app -->|"build GUI"| window
@@ -26,7 +34,16 @@ flowchart TB
     window --> fft
     window --> modelupdating
     window --> sonify
+    window --> twin
     window -->|"owns"| controller
+
+    %% one source of placement, pushed out
+    settings -->|"sensorMapChanged"| window
+    window -->|"apply_sensor_map()"| fft
+    window -->|"apply_sensor_map()"| modelupdating
+    window -->|"apply_sensor_map()"| sonify
+    window -->|"apply_sensor_map()"| twin
+    window -->|"apply_sensor_map()"| controller
 
     controller -->|"updates"| buffer
     controller -->|"start / stop"| pirec
@@ -35,9 +52,21 @@ flowchart TB
     ingest -->|"parsed samples"| controller
 
     buffer -->|"live traces"| signals
-    buffer -->|"FFT input"| fft
-    modelupdating -->|"run calibration / analysis"| opensees_project
-    sonify -->|"file-based sonification"| sonify_backend
+    buffer -->|"spectra + snapshot_modal_capture"| fft
+    buffer -->|"snapshot_modal_capture"| sonify
+    buffer -->|"snapshot_modal_capture"| twin
+    buffer -->|"snapshot_modal_capture"| modelupdating
+
+    fft --> layout
+    modelupdating --> layout
+    sonify --> layout
+    twin --> layout
+    layout --> analysis
+
+    modelupdating -->|"calibrate / analyse"| opensees
+    twin -->|"calibrates HERE, then runs it live"| opensees
+    twin --> twinlib
+    sonify --> chorus
 
     classDef core fill:#dbeafe,stroke:#1d4ed8,stroke-width:1.5px,color:#111827;
     classDef tab fill:#dcfce7,stroke:#15803d,stroke-width:1.5px,color:#111827;
@@ -45,6 +74,6 @@ flowchart TB
     classDef backend fill:#f3e8ff,stroke:#7e22ce,stroke-width:1.5px,color:#111827;
 
     class main,app,window,controller core;
-    class settings,signals,fft,modelupdating,sonify tab;
+    class settings,signals,fft,modelupdating,sonify,twin tab;
     class buffer,pirec,ingest,pi runtime;
-    class opensees_project,sonify_backend backend;
+    class layout,analysis,opensees,chorus,twinlib backend;

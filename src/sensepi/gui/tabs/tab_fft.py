@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Dict, Optional, Sequence, Tuple, TYPE_CHECKING
 
@@ -30,6 +31,9 @@ from PySide6.QtWidgets import (
 
 from ...analysis import filters
 from ...analysis import modal as modal_id
+from ...analysis import sensor_layout as slayout
+from ...analysis import torsion as torsion_id
+from ...analysis import transmissibility as transmiss
 from ..config.acquisition_state import (
     CalibrationOffsets,
     GuiAcquisitionConfig,
@@ -57,6 +61,10 @@ MAX_FFT_UPDATE_MS = 2000
 
 DEFAULT_MAX_FREQUENCY_HZ = 20.0
 
+# Text lines reserved for the placement summary. Enough for the placement line
+# wrapping to two, the axis line, and one combined warning line.
+PLACEMENT_SUMMARY_LINES = 4
+
 # The spectrum shows only the structural horizontal axes (T11.1).
 SPECTRUM_CHANNELS: tuple[str, ...] = ("ax", "ay")
 # Window 2 eigen-frequency identification uses a rolling batch of this length.
@@ -68,18 +76,20 @@ EIGEN_BATCH_S = 12.0
 # "as fast as possible" once the first 12 s of data has accumulated).
 EIGEN_UPDATE_S = 4.0
 FINAL_VALUES_BATCH_S = 20.0
+# Base-referenced identification needs a longer record than the output-only
+# methods: its coherence gate only means anything once the segment length buys
+# enough resolution to resolve the first mode (see analysis/transmissibility.py).
+# The controller's modal buffer holds 120 s, so this is available.
+BASE_REF_BATCH_S = 40.0
 # Distinct colours for the (up to) three identified natural frequencies — also
 # reused to mark those frequencies on the per-sensor grid (Window 1).
 _EIGEN_COLORS = ("#ff5252", "#448aff", "#69f0ae")
 
-# Sensor->floor placement: label for "this sensor is not on any story of the
-# model". Needed so a sensor that isn't mounted on the structure (spare, or
-# fixed to the shake-table base / ground, which is not a model DOF) can be
-# excluded from the mode shapes instead of being forced onto a floor, where it
-# would be silently averaged into that floor's value and bias the shape.
-# map_to_stories() drops any sensor whose story is outside 1..n_story, so an
-# unassigned sensor simply never enters the calculation.
-UNASSIGNED_FLOOR = "—"
+# Where each sensor sits is NOT decided here. It comes from the single sensor
+# placement map in Settings, arrives via ``apply_sensor_map()``, and is turned
+# into analysis inputs by ``analysis.sensor_layout``. This tab used to own a
+# floor spinbox and one combo per sensor; that was the third of four rival
+# pickers in the app, and two of them could disagree about the same rig.
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +112,7 @@ class _EigenFreqWorker(QObject):
     finished = Signal()
 
     def __init__(self, capture_fn, fs, method, f_min, f_max, n_modes, batch_s,
-                 placement=None, n_story=0, damping_sensor_id=3):
+                 layout=None, channel="ax", damping_sensor_id=3):
         super().__init__()
         self._capture_fn = capture_fn
         self._fs = fs
@@ -111,29 +121,147 @@ class _EigenFreqWorker(QObject):
         self._f_max = f_max
         self._n_modes = n_modes
         self._batch_s = batch_s
-        self._placement = dict(placement or {})  # {sensor_id: floor}
-        self._n_story = int(n_story)
+        # Frozen dataclass of plain values (analysis.sensor_layout.AnalysisLayout).
+        # Safe to hand to a worker thread: nothing in it is a widget (G1).
+        self._layout = layout
+        self._channel = str(channel)
         self._damping_sensor_id = int(damping_sensor_id)
+
+    def _compute_torsion(self, layout, data, sensor_ids, session, frequencies):
+        """Torsion indicators from the placement's pairs and from the gyroscope.
+
+        Runs on the worker thread. The gyroscope needs its own capture: the modal
+        buffer is sampled one channel at a time, and the identification above used
+        the translational channel. A failed or absent gz capture is not an error —
+        a rig may have only pairs, only gz, or neither.
+        """
+        try:
+            index = {int(sid): i for i, sid in enumerate(sensor_ids)}
+
+            pair_series = {}
+            for floor, (sid_a, sid_b) in (layout.torsion_pairs or {}).items():
+                if sid_a in index and sid_b in index:
+                    pair_series[int(floor)] = (
+                        np.asarray(data[index[sid_a]], dtype=float),
+                        np.asarray(data[index[sid_b]], dtype=float),
+                        layout.cell_map.get(sid_a, torsion_id.COLS[1] + torsion_id.ROWS[1]),
+                        layout.cell_map.get(sid_b, torsion_id.COLS[1] + torsion_id.ROWS[1]),
+                        (int(sid_a), int(sid_b)))
+
+            gyro_series = {}
+            try:
+                gz = self._capture_fn(axis=slayout.TORSION_CHANNEL,
+                                      last_seconds=self._batch_s, target_fs=self._fs)
+                gz_data = getattr(gz, "data", None)
+                if gz_data is not None and gz_data.size:
+                    gz_index = {int(sid): i for i, sid in enumerate(gz.sensor_ids)}
+                    # One reading per floor; with two sensors on a floor the
+                    # lower id wins, since both measure the same rotation.
+                    for sid in sorted(layout.story_map):
+                        floor = int(layout.story_map[sid])
+                        if floor in gyro_series or sid not in gz_index:
+                            continue
+                        gyro_series[floor] = (
+                            np.asarray(gz_data[gz_index[sid]], dtype=float), int(sid))
+            except Exception:               # gz simply unavailable on this rig
+                gyro_series = {}
+
+            if not pair_series and not gyro_series:
+                return None
+
+            result = torsion_id.identify_torsion(
+                frequencies, channel=self._channel, fs=float(session.fs),
+                pair_series=pair_series or None, gyro_series=gyro_series or None)
+            return {
+                "frequencies": [float(f) for f in result.frequencies_hz],
+                "channel": result.channel,
+                "success": bool(result.success),
+                "message": result.message,
+                "floors": [
+                    {"floor": int(f.floor), "source": f.source,
+                     "sensors": [int(x) for x in f.sensors],
+                     "per_mode": [float(v) for v in f.per_mode],
+                     "lever_arm_cells": float(f.lever_arm_cells),
+                     "usable": bool(f.usable), "note": f.note}
+                    for f in result.floors],
+            }
+        except Exception as exc:            # never let torsion kill the batch
+            return {"success": False, "message": f"Torsion failed: {exc}",
+                    "floors": [], "frequencies": [], "channel": self._channel}
 
     @Slot()
     def run(self) -> None:
         try:
             session = self._capture_fn(
-                axis="ax", last_seconds=self._batch_s, target_fs=self._fs)
+                axis=self._channel, last_seconds=self._batch_s, target_fs=self._fs)
             data = getattr(session, "data", None)
             if data is None or data.size == 0 or data.shape[0] == 0:
                 self.collecting.emit(0.0)
                 return
-            if session.duration_s < modal_id.MIN_DURATION_S:
+            required = (transmiss.BASE_REF_MIN_DURATION_S
+                        if self._method == "base_ref" else modal_id.MIN_DURATION_S)
+            if session.duration_s < required:
                 # Not enough buffered yet — report progress, not an error.
                 self.collecting.emit(float(session.duration_s))
                 return
-            if self._method == "fdd" and data.shape[0] < 2:
-                self.failed.emit("FDD needs ≥ 2 sensors; switch to FFT")
-                return
-            res = modal_id.identify_modes(
-                data, session.fs, method=self._method, n_modes=self._n_modes,
-                f_min=self._f_min, f_max=self._f_max)
+
+            # Split the capture into responses and (if placed) the base row.
+            # The floor-0 sensor measures the shaker input; feeding it into an
+            # output-only identification as if it were a response biases the
+            # picked modes toward the excitation and puts a meaningless row in
+            # the mode shape. Base-referenced identification uses it as the
+            # reference instead.
+            layout = self._layout
+            all_ids = list(session.sensor_ids)
+            sensor_ids = all_ids
+            base_row = None
+            if layout is not None and layout.is_valid:
+                base_row = layout.base_row(all_ids)
+                rows = layout.response_rows(all_ids)
+                if not rows:
+                    self.failed.emit(
+                        "None of the streaming sensors is placed on a floor. "
+                        "Check Settings → Sensor placement map.")
+                    return
+                reference = (np.asarray(data[base_row], dtype=float)
+                             if base_row is not None else None)
+                if len(rows) < len(all_ids):
+                    data = data[rows, :]
+                    sensor_ids = [all_ids[i] for i in rows]
+            else:
+                reference = None
+
+            extra: dict = {}
+            if self._method == "base_ref":
+                if reference is None:
+                    self.failed.emit(
+                        "Base-referenced identification needs the floor-0 sensor "
+                        "to be streaming. It is placed in Settings but is not in "
+                        "the capture — switch to FDD or check the sensor.")
+                    return
+                br = transmiss.identify_modes_base_referenced(
+                    data, reference, session.fs, n_modes=self._n_modes,
+                    f_min=self._f_min, f_max=self._f_max)
+                res = br.modal
+                if not br.success:
+                    self.failed.emit(br.message or "Base-referenced identification failed")
+                    return
+                extra = {
+                    "coherence_f": np.asarray(br.freqs, dtype=float),
+                    "coherence": np.asarray(br.coherence, dtype=float),
+                    "mode_coherence": [float(c) for c in br.mode_coherence],
+                    "rejected": [(float(f), float(c)) for f, c in br.rejected],
+                    "n_segments": int(br.n_segments),
+                    "true_resolution_hz": float(br.true_resolution_hz),
+                    "detail": br.message,
+                }
+            else:
+                if self._method == "fdd" and data.shape[0] < 2:
+                    self.failed.emit("FDD needs ≥ 2 sensors; switch to FFT")
+                    return
+                res = modal_id.identify_modes(
+                    data, session.fs, method=self._method, n_modes=self._n_modes,
+                    f_min=self._f_min, f_max=self._f_max)
             if res.success:
                 payload = {
                     "freqs": [float(f) for f in res.frequencies_hz],
@@ -142,19 +270,38 @@ class _EigenFreqWorker(QObject):
                     "signed": True,
                     "method": self._method,
                     "duration_s": float(session.duration_s),
+                    "channel": self._channel,
+                    "sensor_ids": [int(s) for s in sensor_ids],
                 }
+                payload.update(extra)
                 # Map the per-sensor shapes onto floors when a placement + floor
                 # count are available (mode-shape view). map_to_stories is pure/cheap.
-                if self._placement and self._n_story > 0:
-                    story_map = [int(self._placement.get(int(sid), 0))
-                                 for sid in session.sensor_ids]
-                    story_data = modal_id.map_to_stories(res, story_map, self._n_story)
+                if layout is not None and layout.is_valid:
+                    # story_map_list() adapts the map to map_to_stories' positional
+                    # list convention — the shared engine is untouched (see
+                    # analysis/sensor_layout.py for why).
+                    story_map = layout.story_map_list(sensor_ids)
+                    story_data = modal_id.map_to_stories(
+                        res, story_map, layout.n_floors)
                     payload["mode_shapes_ux"] = dict(story_data.mode_shapes_ux)
                     payload["coverage_stories"] = list(story_data.coverage_stories)
-                    payload["n_story"] = self._n_story
+                    payload["n_story"] = int(layout.n_floors)
                     payload["full_coverage"] = bool(story_data.mode_shapes_available)
-                if res.frequencies_hz and self._damping_sensor_id in session.sensor_ids:
-                    sensor_index = list(session.sensor_ids).index(self._damping_sensor_id)
+                    payload["sensor_map"] = {
+                        "n_floors": int(layout.n_floors),
+                        "axis": layout.axis,
+                        "story_map": dict(layout.story_map),
+                        "cell_map": dict(layout.cell_map),
+                        "base_sensor_id": layout.base_sensor_id,
+                        "channel": self._channel,
+                    }
+                if layout is not None and layout.is_valid and res.frequencies_hz:
+                    tors = self._compute_torsion(
+                        layout, data, sensor_ids, session, res.frequencies_hz)
+                    if tors is not None:
+                        payload["torsion"] = tors
+                if res.frequencies_hz and self._damping_sensor_id in sensor_ids:
+                    sensor_index = sensor_ids.index(self._damping_sensor_id)
                     t = np.arange(data.shape[1], dtype=float) / float(session.fs)
                     try:
                         damping = modal_id.estimate_damping_first_mode_real_response(
@@ -181,7 +328,9 @@ class _EigenFreqWorker(QObject):
                     except Exception as exc:
                         payload["damping_error"] = str(exc)
                 elif res.frequencies_hz:
-                    payload["damping_error"] = f"Sensor S{self._damping_sensor_id} is not available in the current capture."
+                    payload["damping_error"] = (
+                        f"Sensor S{self._damping_sensor_id} is not among the "
+                        f"placed, streaming sensors ({', '.join('S%d' % s for s in sensor_ids) or 'none'}).")
                 self.result.emit(payload)
             else:
                 self.failed.emit(res.message or "Identification failed")
@@ -290,6 +439,20 @@ class FftTab(QWidget):
         self._shape_items: list = []
         self._last_shape_data: dict | None = None
 
+        # Window 2 (alt view): per-floor torsion indicators. Only floors that
+        # carry a differenceable pair, or a gyroscope reading, appear.
+        self._torsion_glw = pg.GraphicsLayoutWidget()
+        self._torsion_glw.setBackground("k")
+        self._torsion_plot = self._torsion_glw.addPlot()
+        self._torsion_plot.setLabel("bottom", "Torsion indicator (relative)")
+        self._torsion_plot.setLabel("left", "Floor")
+        self._torsion_plot.showGrid(x=True, y=True, alpha=0.3)
+        self._torsion_plot.addLine(x=0.0, pen=pg.mkPen("#888", width=1.0))
+        self._torsion_legend = self._torsion_plot.addLegend(offset=(10, 10))
+        self._style_legend_box(self._torsion_legend)
+        self._torsion_items: list = []
+        self._last_torsion_data: dict | None = None
+
         # Window 2 (alt view): damping ratio from one selected sensor response.
         self._damping_glw = pg.GraphicsLayoutWidget()
         self._damping_glw.setBackground("k")
@@ -307,8 +470,16 @@ class FftTab(QWidget):
         self._last_damping_data: dict | None = None
         self._last_damping_error: str = ""
 
-        # Sensor→floor placement (only meaningful for mode shapes). Fixed rig set.
-        self._shape_sensor_ids = (1, 2, 3, 4)
+        # The placement comes from Settings and is replaced wholesale by
+        # apply_sensor_map(). Until Settings emits its first map this is an empty
+        # layout, which every consumer detects via ``is_valid`` and reports.
+        self._sensor_mapping: dict | None = None
+        self._layout = slayout.layout_from_mapping(None)
+        # Which horizontal axis is being analysed. ``None`` = follow the map's
+        # excitation axis; the combo can override it for one session without
+        # touching Settings. One axis at a time: the rig is shaken along a single
+        # direction and the structure responds along it.
+        self._axis_override: str | None = None
         # Rolling/overlapping cadence for Window 2 (recompute every EIGEN_UPDATE_S
         # using the last EIGEN_BATCH_S of data from the 120 s modal buffer).
         self._eig_timer = QTimer(self)
@@ -336,11 +507,22 @@ class FftTab(QWidget):
 
         # Row 1 — method selector + eigen-identification params (Window 2).
         self.method_combo = QComboBox()
-        self.method_combo.addItems(["FDD", "FFT"])  # FDD default (M2)
+        self.method_combo.addItem("FDD", "fdd")     # FDD default (M2)
+        # DEBT-7: the FFT branch's mode shapes are known-wrong (MAC 0.002 vs
+        # truth). Its frequencies are fine, so it stays — labelled honestly, and
+        # the shape views blank themselves for it.
+        self.method_combo.addItem("FFT (frequencies only)", "fft")
+        # Enabled only when the map places a sensor on floor 0 — without the
+        # input there is nothing to reference against.
+        self.method_combo.addItem("Base-referenced (FRF)", "base_ref")
         self.method_combo.setToolTip(
             "FDD: SVD of the cross-spectral-density matrix — signed mode shapes.\n"
             "FFT: sensor-averaged Hann FFT peak-picking — phase-aligned signed mode shapes.\n"
-            "Both use the same frequency band + mode count; only the algorithm differs."
+            "Both are output-only: they assume the shaker's own spectrum is flat.\n\n"
+            "Base-referenced: divides the measured base motion out of every floor\n"
+            "(H1 transmissibility) and gates each peak on coherence, so a peak that\n"
+            "belongs to the drive rather than the structure is not reported as a\n"
+            "mode. Needs a sensor on floor 0."
         )
         self._eig_fmin = QDoubleSpinBox()
         self._eig_fmin.setRange(0.05, 500.0)
@@ -353,8 +535,26 @@ class FftTab(QWidget):
         self._eig_nmodes = QSpinBox()
         self._eig_nmodes.setRange(1, 12)
         self._eig_nmodes.setValue(3)
+        self._axis_combo = QComboBox()
+        self._axis_combo.addItem("Follow Settings", None)
+        self._axis_combo.addItem("X (ax)", "x")
+        self._axis_combo.addItem("Y (ay)", "y")
+        self._axis_combo.setToolTip(
+            "Horizontal axis the modal identification reads — one at a time.\n"
+            "'Follow Settings' uses the excitation axis from the sensor placement\n"
+            "map, which is the direction the structure is actually being shaken in.\n"
+            "az (vertical) is not offered: it carries no lateral mode-shape or\n"
+            "torsion information.")
+        self._axis_combo.currentIndexChanged.connect(self._on_analysis_axis_changed)
         self._method_hint = QLabel("")
         self._method_hint.setStyleSheet("color: #888;")
+        # A plain QLabel in a QHBoxLayout reports its full text width as a
+        # minimum, so a longer hint widened the whole tab — selecting the
+        # base-referenced method pushed the minimum from 1335 to 1659 px and the
+        # window visibly jumped. Ignored horizontal policy lets it use whatever
+        # space is left instead of demanding space; the full text is in the
+        # tooltip so nothing is lost when it is clipped.
+        self._method_hint.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
 
         row1 = QHBoxLayout()
         row1.addWidget(QLabel("Eigen method:"))
@@ -367,6 +567,9 @@ class FftTab(QWidget):
         row1.addSpacing(14)
         row1.addWidget(QLabel("Modes:"))
         row1.addWidget(self._eig_nmodes)
+        row1.addSpacing(14)
+        row1.addWidget(QLabel("Analysis axis:"))
+        row1.addWidget(self._axis_combo)
         row1.addSpacing(18)
         row1.addWidget(self._method_hint)
         row1.addStretch()
@@ -432,6 +635,7 @@ class FftTab(QWidget):
         self._right_view_combo.addItems([
             "Live natural frequencies",
             "Live mode shapes",
+            "Live torsion",
             "Live damping ratio",
             "Calculate final values",
         ])
@@ -440,28 +644,51 @@ class FftTab(QWidget):
         self._right_view_combo.currentTextChanged.connect(self._on_view_changed)
         self._damping_sensor_label = QLabel("Damping sensor:")
         self._damping_sensor_combo = QComboBox()
-        for sid in (1, 2, 3, 4):
-            self._damping_sensor_combo.addItem(f"S{sid}", sid)
-        self._damping_sensor_combo.setCurrentIndex(2)  # default top-story sensor S3
+        # Filled from the placement map (structural sensors only, highest floor
+        # first) by _refresh_damping_sensor_choices(). It used to list S1..S4
+        # unconditionally and default to S3, which named a sensor that might not
+        # exist, might not be streaming, or might be the base.
         self._damping_sensor_combo.currentIndexChanged.connect(self._on_damping_sensor_changed)
         view_row.addWidget(self._right_title)
         view_row.addStretch()
-        view_row.addWidget(QLabel("Show:"))
-        view_row.addWidget(self._right_view_combo)
-        view_row.addSpacing(10)
+        # The damping-sensor pair goes BEFORE "Show:", not after. Everything to
+        # the right of the stretch is right-aligned as a group, so a widget that
+        # appears and disappears must sit at the group's LEFT edge — put it on the
+        # right and the group grows rightward, shoving the "Show" combo sideways
+        # every time the view changes. With this order the "Show" combo is the
+        # rightmost item and never moves; the damping selector expands into the
+        # stretch instead.
         view_row.addWidget(self._damping_sensor_label)
         view_row.addWidget(self._damping_sensor_combo)
+        view_row.addSpacing(10)
+        view_row.addWidget(QLabel("Show:"))
+        view_row.addWidget(self._right_view_combo)
         right_v.addLayout(view_row)
-        # Sensor→floor placement (only shown/used in mode-shape view).
-        self._shape_placement_widget = self._build_shape_placement()
-        self._shape_placement_widget.setVisible(False)
-        right_v.addWidget(self._shape_placement_widget)
+        # Read-only reflection of the Settings placement map. Every view depends
+        # on it (it picks the channel, the response sensors and the mode cap), so
+        # it stays visible rather than appearing only for mode shapes.
+        self._placement_summary = QLabel("")
+        self._placement_summary.setWordWrap(True)
+        self._placement_summary.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        self._placement_summary.setStyleSheet(
+            "color:#8b93a1;font-size:11px;padding:2px 0;")
+        # Reserve the height instead of letting it follow the text. The summary
+        # gains a line when a warning applies (a capped mode count, or the
+        # base-referenced caveat), and every line it gained came straight out of
+        # the plot below — so switching method resized the plot and switching
+        # back resized it again. A fixed budget keeps the layout still.
+        self._placement_summary.setFixedHeight(
+            PLACEMENT_SUMMARY_LINES
+            * self._placement_summary.fontMetrics().lineSpacing() + 6)
+        right_v.addWidget(self._placement_summary)
         self._final_panel = self._build_final_values_panel()
         right_v.addWidget(self._eig_glw)          # frequencies view (default)
         right_v.addWidget(self._shape_glw)        # normalized mode-shape view
+        right_v.addWidget(self._torsion_glw)      # per-floor torsion view
         right_v.addWidget(self._damping_glw)      # damping-ratio view
         right_v.addWidget(self._final_panel)      # final values view
         self._shape_glw.setVisible(False)
+        self._torsion_glw.setVisible(False)
         self._damping_glw.setVisible(False)
         self._final_panel.setVisible(False)
         self._damping_sensor_label.setVisible(False)
@@ -512,7 +739,14 @@ class FftTab(QWidget):
         self.lowpass_cutoff.valueChanged.connect(self._on_controls_changed)
         # T11.7: method selector swaps the method-specific group (Window 2 only).
         self.method_combo.currentTextChanged.connect(self._on_method_changed)
+        # The requested mode count feeds the cap, so the summary follows it.
+        self._eig_nmodes.valueChanged.connect(self._on_mode_count_changed)
         self._on_method_changed()  # set initial method hint
+        # Placement is empty until MainWindow forwards the Settings map; this
+        # renders the "no placement" state rather than a blank panel.
+        self._refresh_damping_sensor_choices()
+        self._refresh_method_availability()
+        self._refresh_placement_summary()
         self._on_view_changed(self._right_view_combo.currentText())
         self._update_fft_timer_interval()
         self._draw_waiting()
@@ -526,12 +760,19 @@ class FftTab(QWidget):
         PSD grid (Window 1) is unaffected (U1) and picks up the method on its next
         10 s batch.
         """
-        if self.method_combo.currentText() == "FDD":
-            self._method_hint.setText(
-                "SVD of the cross-spectral-density matrix — signed mode shapes.")
-        else:
-            self._method_hint.setText(
-                "Sensor-averaged Hann FFT peak-picking — phase-aligned signed mode shapes.")
+        hints = {
+            "fdd": "SVD of the cross-spectral-density matrix — signed mode shapes.",
+            "fft": "Sensor-averaged Hann FFT peaks. Mode shapes NOT available (DEBT-7).",
+            "base_ref": "H1 transmissibility vs the floor-0 sensor, coherence-gated.",
+        }
+        text = hints.get(self._selected_method(), "")
+        self._method_hint.setText(text)
+        self._method_hint.setToolTip(text)
+        # The identification spectrum is a different quantity per method.
+        ylabel = {"fdd": "1st singular value", "fft": "Amplitude",
+                  "base_ref": "Σ|H|² (dimensionless)"}.get(self._selected_method(), "Response")
+        self._eig_plot.setLabel("left", ylabel)
+        self._refresh_placement_summary()
         # Recompute immediately so the spectrum curve + peaks reflect the new method
         # without waiting for the next rolling tick (the worker guards re-entrancy).
         self._launch_eigen_compute()
@@ -755,19 +996,23 @@ class FftTab(QWidget):
             return  # previous batch still running; skip this tick
         if self._is_record_only() or not self._stream_active:
             return
+        if not self._layout.is_valid:
+            self._eig_status.setText(
+                "No sensor placement — set it in Settings → Sensor placement map.")
+            return
         capture_fn = getattr(self._recorder_tab, "snapshot_modal_capture", None)
         if capture_fn is None:
             return
         fs = self._device_rate_hz or self._measured_rate_hz or None
-        method = "fdd" if self.method_combo.currentText() == "FDD" else "fft"
+        method = self._selected_method()
         worker = _EigenFreqWorker(
             capture_fn, fs, method,
             float(self._eig_fmin.value()),
             float(self._eig_fmax.value()),
-            int(self._eig_nmodes.value()),
-            EIGEN_BATCH_S,
-            placement=self._shape_sensor_story_map(),
-            n_story=int(self._shape_floors.value()),
+            self._effective_n_modes(),
+            BASE_REF_BATCH_S if method == "base_ref" else EIGEN_BATCH_S,
+            layout=self._layout,
+            channel=self._analysis_channel(),
             damping_sensor_id=self._selected_damping_sensor_id(),
         )
         thread = QThread(self)
@@ -790,6 +1035,8 @@ class FftTab(QWidget):
         self._render_grid_eigen_markers(flist)  # mirror onto the per-sensor grid
         if "mode_shapes_ux" in payload:
             self._last_shape_data = payload
+        if "torsion" in payload:
+            self._last_torsion_data = payload["torsion"]
         if "damping" in payload:
             self._last_damping_data = payload["damping"]
             self._last_damping_error = ""
@@ -800,18 +1047,38 @@ class FftTab(QWidget):
         view = self._current_right_view()
         if view == "shapes":
             self._render_mode_shapes(self._last_shape_data or payload)
+        elif view == "torsion":
+            self._render_torsion(self._last_torsion_data)
         elif view == "damping":
             self._render_damping_ratio(self._last_damping_data)
         elif view == "final":
             pass
         elif flist:
-            self._eig_status.setText(f"Live eigen-frequencies ({method})")
+            self._eig_status.setText(
+                f"Live eigen-frequencies ({method}){self._quality_suffix(payload)}")
         else:
             self._eig_status.setText(f"Live eigen-frequencies ({method}): none identified")
 
+    @staticmethod
+    def _quality_suffix(payload) -> str:
+        """Coherence and rejected peaks, when the method reports them.
+
+        A rejection is worth showing: without it, a peak the gate threw out looks
+        like the structure simply not having that mode.
+        """
+        coh = payload.get("mode_coherence") or []
+        if not coh:
+            return ""
+        bits = [" · γ² " + ", ".join(f"{c:.2f}" for c in coh)]
+        rejected = payload.get("rejected") or []
+        if rejected:
+            bits.append("rejected " + ", ".join(f"{f:.2f} Hz" for f, _ in rejected))
+        return " · ".join(bits)
+
     @Slot(float)
     def _on_eigen_collecting(self, available_s: float) -> None:
-        need = modal_id.MIN_DURATION_S
+        need = (transmiss.BASE_REF_MIN_DURATION_S
+                if self._selected_method() == "base_ref" else modal_id.MIN_DURATION_S)
         if self._current_right_view() == "final":
             return
         self._eig_status.setText(
@@ -882,10 +1149,14 @@ class FftTab(QWidget):
             except Exception:
                 pass
         self._grid_eig_lines.clear()
-        plots = list(getattr(self, "_psd_plots", {}).values())
-        if not plots:
+        entries = list(getattr(self, "_psd_plots", {}).items())
+        if not entries:
             return
-        for plot in plots:
+        base = self._layout.base_sensor_id
+        for key, plot in entries:
+            sid = key[0] if isinstance(key, tuple) else getattr(key, "sensor_id", None)
+            if base is not None and sid is not None and int(sid) == int(base):
+                continue                     # the shaker row shows the drive, not modes
             for i, f in enumerate(freqs):
                 color = _EIGEN_COLORS[i % len(_EIGEN_COLORS)]
                 line = pg.InfiniteLine(
@@ -894,47 +1165,167 @@ class FftTab(QWidget):
                 plot.addItem(line)
                 self._grid_eig_lines.append(line)
 
-    # ---------------------------------------------- mode shapes (optional view)
-    def _build_shape_placement(self) -> QWidget:
-        """Compact sensor→floor placement: a floor count + one combo per sensor.
+    # ------------------------------------------------- sensor placement (map)
+    def apply_sensor_map(self, mapping) -> None:
+        """Adopt the placement map from Settings. This tab owns no picker.
 
-        Mode shapes are spatial, so they need to know which floor each sensor sits
-        on (frequencies don't — see §7). Mirrors the Model Updating tab's mapping
-        but local + lightweight.
+        ``mapping`` is a ``SensorMap`` or the plain dict from its
+        ``to_mapping()``. Called on the GUI thread from MainWindow whenever
+        Settings emits a new map, and once at start-up with the stored one.
         """
-        w = QWidget()
-        row = QHBoxLayout(w)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.addWidget(QLabel("Floors:"))
-        self._shape_floors = QSpinBox()
-        self._shape_floors.setRange(1, 20)
-        self._shape_floors.setValue(len(self._shape_sensor_ids))
-        self._shape_floors.setToolTip(
-            "Number of stories in the model. Sensors may be placed on any of "
-            "them, in any combination."
-        )
-        self._shape_floors.valueChanged.connect(self._refresh_shape_floor_combos)
-        row.addWidget(self._shape_floors)
-        row.addSpacing(12)
-        self._shape_combos: dict[int, QComboBox] = {}
-        for sid in self._shape_sensor_ids:
-            row.addWidget(QLabel(f"S{sid}→"))
-            combo = QComboBox()
-            combo.setToolTip(
-                f"Story that sensor {sid} is mounted on. Several sensors may "
-                f"share a story (their values are averaged, and their spread is "
-                f"reported as a torsion indicator). Choose "
-                f"'{UNASSIGNED_FLOOR}' if sensor {sid} is not mounted on a "
-                f"story of the model — it is then excluded from the mode "
-                f"shapes rather than biasing a floor."
-            )
-            combo.currentTextChanged.connect(lambda *_: self._launch_eigen_compute())
-            self._shape_combos[sid] = combo
-            row.addWidget(combo)
-        row.addStretch()
-        self._refresh_shape_floor_combos()
-        return w
+        if hasattr(mapping, "to_mapping"):
+            mapping = mapping.to_mapping()
+        self._sensor_mapping = dict(mapping) if isinstance(mapping, dict) else None
+        self._layout = slayout.layout_from_mapping(
+            self._sensor_mapping, requested_modes=int(self._eig_nmodes.value()))
+        self._refresh_damping_sensor_choices()
+        self._refresh_method_availability()
+        self._refresh_placement_summary()
+        # Anything already on screen was computed under the previous placement.
+        self._last_shape_data = None
+        self._last_torsion_data = None
+        self._launch_eigen_compute()
 
+    def current_layout(self):
+        """The layout in force, with the mode count capped by the sensor count."""
+        return slayout.layout_from_mapping(
+            self._sensor_mapping, requested_modes=int(self._eig_nmodes.value()))
+
+    def _selected_method(self) -> str:
+        """``"fdd"`` | ``"fft"`` | ``"base_ref"`` from the method combo."""
+        data = self.method_combo.currentData()
+        if data:
+            return str(data)
+        return "fdd" if self.method_combo.currentText().upper() == "FDD" else "fft"
+
+    def _refresh_method_availability(self) -> None:
+        """Grey out base-referenced unless the map places a sensor on floor 0.
+
+        If it was selected and the base disappears, fall back to FDD rather than
+        leaving a method chosen that cannot run — otherwise every tick would fail
+        with the same message.
+        """
+        idx = self.method_combo.findData("base_ref")
+        if idx < 0:
+            return
+        available = self._layout.has_base
+        model = self.method_combo.model()
+        item = model.item(idx) if hasattr(model, "item") else None
+        if item is not None:
+            item.setEnabled(available)
+        self.method_combo.setItemData(
+            idx,
+            "Needs a sensor on floor 0 — set one in Settings → Sensor placement map."
+            if not available else
+            "Divides the measured base motion out of every floor and gates each "
+            "peak on coherence.",
+            Qt.ToolTipRole)
+        if not available and self.method_combo.currentIndex() == idx:
+            self.method_combo.setCurrentIndex(max(self.method_combo.findData("fdd"), 0))
+
+    def _analysis_axis(self) -> str:
+        """The axis actually analysed: the local override, else the map's."""
+        return self._axis_override or self._layout.axis
+
+    def _analysis_channel(self) -> str:
+        return slayout.AXIS_CHANNEL.get(self._analysis_axis(), "ax")
+
+    def _effective_n_modes(self) -> int:
+        """Requested modes, capped by what the placed sensors can resolve.
+
+        You cannot identify more modes than you have measurement points. A
+        5-storey frame has 5 modes, but 4 sensors resolve at most 4 — and their
+        shapes only over the floors those sensors cover.
+        """
+        return self._layout.max_modes(int(self._eig_nmodes.value()))
+
+    @Slot()
+    def _on_method_selection_refreshed(self, *_: object) -> None:
+        """Method choice changes the caveat shown under the placement line."""
+        self._refresh_placement_summary()
+
+    @Slot()
+    def _on_mode_count_changed(self, *_: object) -> None:
+        self._layout = self.current_layout()
+        self._refresh_placement_summary()
+
+    @Slot()
+    def _on_analysis_axis_changed(self, *_: object) -> None:
+        self._axis_override = self._axis_combo.currentData()
+        self._refresh_placement_summary()
+        self._last_shape_data = None
+        # The lever arm is perpendicular to the analysed axis, so a pair that saw
+        # torsion in ax may be blind in ay. Recompute rather than show a stale
+        # profile measured along the other direction.
+        self._last_torsion_data = None
+        self._launch_eigen_compute()
+
+    def _refresh_damping_sensor_choices(self) -> None:
+        """Offer only placed structural sensors; default to the topmost floor.
+
+        The top of the structure has the largest first-mode amplitude, so its
+        free-decay envelope is the cleanest to fit.
+        """
+        combo = getattr(self, "_damping_sensor_combo", None)
+        if combo is None:
+            return
+        layout = self._layout
+        previous = combo.currentData()
+        combo.blockSignals(True)
+        combo.clear()
+        # Highest floor first, so the default sits at the top of the list too.
+        for sid in sorted(layout.story_map,
+                          key=lambda s: (-layout.story_map[s], s)):
+            combo.addItem(f"S{sid} · floor {layout.story_map[sid]}", sid)
+        if combo.count() == 0:
+            combo.addItem("—", None)
+        idx = combo.findData(previous)
+        if idx < 0:
+            idx = combo.findData(slayout.default_damping_sensor(layout))
+        combo.setCurrentIndex(max(idx, 0))
+        combo.blockSignals(False)
+
+    def _refresh_placement_summary(self) -> None:
+        label = getattr(self, "_placement_summary", None)
+        if label is None:
+            return
+        layout = self._layout
+        if not layout.is_valid:
+            label.setText(
+                "<b style='color:#ffd93d'>No sensor placement.</b> "
+                "Set it in Settings \u2192 Sensor placement map \u2014 this tab "
+                "reads it and does not define its own.")
+            return
+        axis = self._analysis_axis()
+        following = self._axis_override is None
+        bits = [f"<b>Placement (from Settings):</b> {layout.describe()}"]
+        bits.append(
+            f"Analysing <b>{slayout.AXIS_CHANNEL.get(axis, 'ax')}</b> "
+            + ("(follows the excitation axis)" if following
+               else "<span style='color:#ffd93d'>(override \u2014 differs from the "
+                    "excitation axis)</span>" if axis != layout.axis
+               else "(override, same as the excitation axis)"))
+        # Warnings share ONE line: each extra line came out of the plot's height,
+        # which is what made switching method resize the window.
+        warnings: list = []
+        cap = self._effective_n_modes()
+        if cap < int(self._eig_nmodes.value()):
+            warnings.append(
+                f"mode count capped at {cap} ({len(layout.story_map)} sensor(s))")
+        if self._selected_method() == "base_ref":
+            # Coherence cannot catch this: any two sensors on the same driven
+            # structure are highly coherent, so a sensor mapped to floor 0 that
+            # actually sits on a floor still scores ~1 while producing a
+            # floor-to-floor ratio whose peaks are not the structure's modes.
+            warnings.append(
+                f"base-referenced assumes S{layout.base_sensor_id} is on the "
+                f"shaker — a mis-mapped base still reads high coherence")
+        if warnings:
+            bits.append("<span style='color:#ffd93d'>"
+                        + " · ".join(warnings) + "</span>")
+        label.setText("<br>".join(bits))
+        # The reserved height can clip a long warning; the tooltip never does.
+        label.setToolTip(re.sub(r"<[^>]+>", "", "\n".join(bits)))
 
     def _build_final_values_panel(self) -> QWidget:
         """Panel that freezes one 20 s modal-identification result for reporting."""
@@ -1053,15 +1444,15 @@ class FftTab(QWidget):
             self._on_final_finished()
             return
         fs = self._device_rate_hz or self._measured_rate_hz or None
-        method = "fdd" if self.method_combo.currentText() == "FDD" else "fft"
+        method = self._selected_method()
         worker = _EigenFreqWorker(
             capture_fn, fs, method,
             float(self._eig_fmin.value()),
             float(self._eig_fmax.value()),
-            int(self._eig_nmodes.value()),
-            FINAL_VALUES_BATCH_S,
-            placement=self._shape_sensor_story_map(),
-            n_story=int(self._shape_floors.value()),
+            self._effective_n_modes(),
+            BASE_REF_BATCH_S if method == "base_ref" else FINAL_VALUES_BATCH_S,
+            layout=self._layout,
+            channel=self._analysis_channel(),
             damping_sensor_id=self._selected_damping_sensor_id(),
         )
         thread = QThread(self)
@@ -1111,14 +1502,30 @@ class FftTab(QWidget):
         damping = payload.get("damping") or {}
         damping_ratio = damping.get("zeta")
 
+        coverage = [int(c) for c in payload.get("coverage_stories", [])]
+        method = str(payload.get("method") or self._selected_method()).upper()
         spectrum_payload = {
             "frequencies_hz": freqs,
             "mode_shapes_ux": shapes,
+            # The shape vectors span the MEASURED storeys only, in this order.
+            # Without it the receiver filled storey rows by list index, so a
+            # rig with sensors on storeys 1, 2, 4, 5 put storey 4's value on
+            # storey 3. Same convention the JSON and sensor paths already use.
+            "coverage_stories": coverage,
+            "measured_dof_indices": [c - 1 for c in coverage],
+            "n_story": int(payload.get("n_story") or 0),
+            "channel": str(payload.get("channel") or self._analysis_channel()),
+            "method": method,
+            "sensor_map": payload.get("sensor_map"),
             "source_file": "Spectrum final values",
-            "notes": "Sent from Spectrum final-values calculation",
+            "notes": (f"Sent from Spectrum final values ({method}, "
+                      f"{payload.get('channel') or self._analysis_channel()}, "
+                      f"storeys {coverage or 'all'})"),
         }
         if damping_ratio is not None:
             spectrum_payload["zeta"] = float(damping_ratio)
+            spectrum_payload["zeta_source"] = (
+                f"log-decrement, mode 1, sensor S{damping.get('sensor_id', '?')}")
 
         self.final_values_ready_for_model_updating.emit(spectrum_payload)
         self._set_final_status(
@@ -1161,12 +1568,13 @@ class FftTab(QWidget):
             self._final_start_btn.setText("Start calculating final values")
 
     def _render_final_values(self, payload: dict) -> None:
-        method = str(payload.get("method") or ("fdd" if self.method_combo.currentText() == "FDD" else "fft")).upper()
+        method = str(payload.get("method") or self._selected_method()).upper()
         duration = float(payload.get("duration_s", FINAL_VALUES_BATCH_S))
         freqs = [float(f) for f in payload.get("freqs", [])]
         shapes = payload.get("mode_shapes_ux") or {}
         coverage = [int(s) for s in payload.get("coverage_stories", [])]
-        n_story = int(payload.get("n_story") or max(coverage or [int(self._shape_floors.value())]))
+        n_story = int(payload.get("n_story")
+                      or max(coverage or [self._layout.n_floors]))
         damping = payload.get("damping") or None
 
         self._clear_final_shape_plot()
@@ -1230,56 +1638,38 @@ class FftTab(QWidget):
         else:
             damping_info = f"Damping\n{str(payload.get('damping_error') or 'No result available.')}"
         self._add_final_damping_box(damping_info, n_story)
+        self._append_final_torsion_note(payload)
 
-    def _refresh_shape_floor_combos(self) -> None:
-        n = int(self._shape_floors.value())
-        # Every sensor may sit on any story, several may share one, and any may
-        # be left unassigned -- so each combo offers the identical full set of
-        # options rather than a per-sensor restricted range.
-        options = [UNASSIGNED_FLOOR] + [str(s) for s in range(1, n + 1)]
-        for i, (sid, combo) in enumerate(self._shape_combos.items()):
-            prev = combo.currentText()
-            combo.blockSignals(True)
-            combo.clear()
-            combo.addItems(options)
-            if prev in options:
-                # Preserve an explicit choice across floor-count changes.
-                combo.setCurrentText(prev)
-            elif i < n:
-                # First-run fallback only: one sensor per story, bottom-up.
-                # This is a starting guess, not a claim about the real rig --
-                # the user is expected to set the actual placement.
-                combo.setCurrentText(str(i + 1))
-            else:
-                # More sensors than stories: leave the extras unassigned rather
-                # than silently piling them onto the top story.
-                combo.setCurrentText(UNASSIGNED_FLOOR)
-            combo.blockSignals(False)
+    def _append_final_torsion_note(self, payload) -> None:
+        """Add the frozen torsion reading to the final-values summary.
 
-    def _shape_sensor_story_map(self) -> dict[int, int]:
+        A line rather than a second plot: torsion here is a relative indicator
+        per floor per mode, which reads better as text next to the frozen
+        frequencies than as a chart the user must cross-reference.
         """
-        {sensor_id: 1-based floor} from the placement combos.
-
-        Sensors left on ``UNASSIGNED_FLOOR`` are omitted entirely, so
-        map_to_stories() never sees them and they contribute to no story.
-        """
-        out: dict[int, int] = {}
-        for sid, combo in getattr(self, "_shape_combos", {}).items():
-            if not combo.count():
+        label = getattr(self, "_final_countdown_label", None)
+        data = (payload or {}).get("torsion")
+        if label is None or not data:
+            return
+        if not data.get("success"):
+            label.setText(f"{label.text()}  ·  torsion: {data.get('message') or 'unavailable'}")
+            return
+        parts = []
+        for row in data.get("floors", []):
+            if not row.get("usable"):
                 continue
-            text = combo.currentText()
-            if text == UNASSIGNED_FLOOR:
-                continue
-            try:
-                out[sid] = int(text)
-            except ValueError:
-                continue
-        return out
+            vals = ", ".join("—" if not np.isfinite(v) else f"{v:.2f}"
+                             for v in row.get("per_mode", []))
+            parts.append(f"F{row['floor']} ({row['source']}): {vals}")
+        if parts:
+            label.setText(f"{label.text()}  ·  torsion per mode — " + "; ".join(parts))
 
     def _current_right_view(self) -> str:
         text = self._right_view_combo.currentText().lower()
         if "final" in text or "calculate" in text:
             return "final"
+        if "torsion" in text:
+            return "torsion"
         if "mode" in text:
             return "shapes"
         if "damping" in text:
@@ -1287,18 +1677,15 @@ class FftTab(QWidget):
         return "frequencies"
 
     def _selected_damping_sensor_id(self) -> int:
+        fallback = slayout.default_damping_sensor(self._layout)
         combo = getattr(self, "_damping_sensor_combo", None)
         if combo is None:
-            return 3
-        value = combo.currentData()
+            return fallback
         try:
-            return int(value)
+            return int(combo.currentData())
         except (TypeError, ValueError):
-            text = combo.currentText().strip().upper().lstrip("S")
-            try:
-                return int(text)
-            except ValueError:
-                return 3
+            # Empty combo (nothing placed) or the "—" placeholder.
+            return fallback
 
     @staticmethod
     def _style_legend_box(legend) -> None:
@@ -1346,10 +1733,11 @@ class FftTab(QWidget):
         """Swap the right Spectrum panel using the combo-box view selector."""
         view = self._current_right_view()
         show_shapes = view == "shapes"
+        show_torsion = view == "torsion"
         show_damping = view == "damping"
         show_final = view == "final"
-        self._shape_placement_widget.setVisible(show_shapes or show_final)
         self._shape_glw.setVisible(show_shapes)
+        self._torsion_glw.setVisible(show_torsion)
         self._damping_glw.setVisible(show_damping)
         self._eig_glw.setVisible(view == "frequencies")
         self._final_panel.setVisible(show_final)
@@ -1357,11 +1745,20 @@ class FftTab(QWidget):
         self._damping_sensor_combo.setVisible(show_damping or show_final)
         splitter = getattr(self, "_spectrum_splitter", None)
         if splitter is not None:
-            QTimer.singleShot(0, lambda: splitter.setSizes([1, 1]))
+            # Context-object form: if the splitter is destroyed before the
+            # event loop gets here, Qt drops the callback instead of calling
+            # into a deleted C++ object (seen as a libshiboken RuntimeError
+            # when a window is closed within the same turn).
+            QTimer.singleShot(0, splitter, lambda: splitter.setSizes([1, 1]))
         if show_shapes:
             self._right_title.setText("Live normalized mode shapes")
             if self._last_shape_data is not None:
                 self._render_mode_shapes(self._last_shape_data)
+        elif show_torsion:
+            self._right_title.setText("Live torsion")
+            self._render_torsion(self._last_torsion_data)
+            if self._last_torsion_data is None:
+                self._launch_eigen_compute()
         elif show_damping:
             self._right_title.setText("Live damping ratio")
             if self._last_damping_data is not None:
@@ -1395,6 +1792,80 @@ class FftTab(QWidget):
                 pass
         items.clear()
 
+    def _render_torsion(self, data) -> None:
+        """Per-floor torsion indicators, one profile per identified mode.
+
+        Two sources are drawn together and kept visually distinct: a differenced
+        sensor pair (solid) and the gyroscope (dashed). They measure the same
+        thing by different physics, so agreement between them is the useful
+        signal — and neither is a calibrated rotation, which the status line says
+        outright so the numbers are not read as rad/s.
+        """
+        self._clear_plot_items(self._torsion_plot, self._torsion_items)
+        try:
+            self._torsion_legend.clear()
+        except Exception:
+            pass
+
+        if not data:
+            self._eig_status.setText(
+                "Torsion: waiting for an identification with a torsion source. "
+                "A floor needs two sensors in different plan cells, or a gyroscope.")
+            return
+        if not data.get("success"):
+            self._eig_status.setText(f"Torsion: {data.get('message') or 'unavailable'}")
+            return
+
+        freqs = [float(f) for f in data.get("frequencies", [])]
+        floors = [f for f in data.get("floors", []) if f.get("usable")]
+        if not floors:
+            self._eig_status.setText(f"Torsion: {data.get('message') or 'no usable floor'}")
+            return
+
+        max_floor, max_val = 1, 0.0
+        for source, dash in (("pair", Qt.SolidLine), ("gyro", Qt.DashLine)):
+            rows = sorted((f for f in floors if f.get("source") == source),
+                          key=lambda f: int(f["floor"]))
+            if not rows:
+                continue
+            for mode_i in range(len(freqs)):
+                xs, ys = [], []
+                for row in rows:
+                    per = row.get("per_mode") or []
+                    if mode_i >= len(per):
+                        continue
+                    value = float(per[mode_i])
+                    if not np.isfinite(value):
+                        continue
+                    xs.append(value)
+                    ys.append(int(row["floor"]))
+                if not xs:
+                    continue
+                max_floor = max(max_floor, max(ys))
+                max_val = max(max_val, max(xs))
+                colour = _EIGEN_COLORS[mode_i % len(_EIGEN_COLORS)]
+                curve = self._torsion_plot.plot(
+                    xs, ys, pen=pg.mkPen(colour, width=2.0, style=dash),
+                    symbol="o" if source == "pair" else "t",
+                    symbolBrush=colour, symbolSize=8)
+                label = (f"Mode {mode_i + 1}"
+                         + (f", f={freqs[mode_i]:.2f} Hz" if mode_i < len(freqs) else "")
+                         + f" · {source}")
+                try:
+                    self._torsion_legend.addItem(curve, label)
+                except Exception:
+                    pass
+                self._torsion_items.append(curve)
+                for value, floor in zip(xs, ys):
+                    text = pg.TextItem(f"{value:.2f}", color=colour, anchor=(0.0, 0.5))
+                    text.setPos(float(value), float(floor))
+                    self._torsion_plot.addItem(text)
+                    self._torsion_items.append(text)
+
+        self._torsion_plot.setXRange(0.0, max(0.25, max_val * 1.25), padding=0.02)
+        self._torsion_plot.setYRange(0, max_floor, padding=0.35)
+        self._eig_status.setText(f"Live torsion — {data.get('message') or ''}")
+
     def _render_mode_shapes(self, shape_data: dict) -> None:
         """Draw normalized per-floor mode shapes with legend and value labels.
 
@@ -1407,6 +1878,11 @@ class FftTab(QWidget):
             self._shape_legend.clear()
         except Exception:
             pass
+        if str(shape_data.get("method", "")).lower() == "fft":
+            self._eig_status.setText(
+                "Mode shapes are not available for FFT (its shapes are known-wrong, "
+                "DEBT-7) — switch to FDD or base-referenced.")
+            return
         shapes = shape_data.get("mode_shapes_ux") or {}
         n_story = int(shape_data.get("n_story", 0))
         signed = bool(shape_data.get("signed", True))
@@ -2024,6 +2500,10 @@ class FftTab(QWidget):
                 plot.showGrid(x=True, y=True, alpha=0.3)
                 units = self._channel_units(ch)
                 title = f"S{sensor_id} {ch.upper()}"
+                if int(sensor_id) == self._layout.base_sensor_id:
+                    # Its spectrum is the DRIVE. Marking the structure's modes
+                    # on it invited reading drive peaks as modes.
+                    title = f"S{sensor_id} · shaker {ch.upper()}"
                 if units:
                     title = f"{title} [{units}]"
                 plot.setTitle(title)

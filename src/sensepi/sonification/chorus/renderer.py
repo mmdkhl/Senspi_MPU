@@ -97,16 +97,40 @@ class _Voice:
         n = max(1, int(round(_MAX_IND.get(entry.role, 5) * cfg.chorus_size)))
         self.n = n
         nat = cfg.naturalism
+
+        # WHERE each individual sits. Previously the whole species took one pan
+        # from the sign of the shape's top entry and the individuals scattered
+        # randomly around it — the mode shape barely reached the ears.
+        #
+        # Now each individual is assigned to a measurement row with probability
+        # proportional to |mode shape| there, so the population *is* the mode
+        # shape: a top-heavy first mode puts most of its animals at the top, and
+        # a second mode with a sign change splits into two clusters with a quiet
+        # band between them. That is the node, made audible.
         pan0 = 0.0
-        if shapes is not None and entry.mode >= 0 and shapes.ndim == 2 \
-                and shapes.shape[1] > entry.mode:
-            col = shapes[:, entry.mode]
-            denom = max(abs(col).max(), 1e-9)
-            pan0 = float(np.clip(np.sign(col[-1]) * 0.4 * abs(col[-1]) / denom, -0.7, 0.7))
+        if shapes is not None and getattr(shapes, "ndim", 0) == 2 \
+                and entry.mode >= 0 and shapes.shape[1] > entry.mode:
+            col = np.abs(np.asarray(shapes[:, entry.mode], dtype=float))
+            total = float(col.sum())
+            if np.isfinite(total) and total > 1e-12:
+                w = col / total
+                # A floor at a node still gets the occasional call; a shape that
+                # is exactly zero there would otherwise silence it absolutely,
+                # which sounds like a dead sensor rather than a node.
+                w = 0.85 * w + 0.15 / w.size
+                self.row_i = rng.choice(w.size, n, p=w / w.sum())
+            else:
+                self.row_i = rng.integers(0, max(col.size, 1), n)
+            top = int(np.argmax(col)) if col.size else 0
+            pan0 = float(np.clip((top / max(col.size - 1, 1)) * 1.2 - 0.6, -0.7, 0.7))
         else:
+            self.row_i = rng.integers(0, 4, n)
             pan0 = float(rng.uniform(-0.35, 0.35))
 
         self.rate_i = self.fm * (1 + rng.uniform(-0.05, 0.05, n) * nat)
+        # Jitter around whatever pan the placement gives at render time, so a
+        # cluster on one floor spreads a little instead of stacking on a point.
+        self.pan_jit = rng.uniform(-0.18, 0.18, n) * nat
         self.pan_i = np.clip(pan0 + rng.uniform(-0.6, 0.6, n), -0.95, 0.95)
         p = _TIER_P.get(entry.role, (0.25, 0.25, 0.25, 0.25))
         self.tier_i = rng.choice(len(DEPTH_TIERS), n, p=p)
@@ -127,6 +151,7 @@ class ChorusRenderer:
     """Schedules call units into ring buffers and mixes finished audio blocks."""
 
     def __init__(self, cfg: ChorusConfig, seed: int = 23) -> None:
+        self.cfg = None                     # set below; lets set_config diff safely
         self.cfg = cfg
         self.rng = np.random.default_rng(seed)
         self.ring_len = int(RING_SECONDS * SAMPLE_RATE)
@@ -203,11 +228,41 @@ class ChorusRenderer:
             self._voices = voices
 
     def set_config(self, cfg: ChorusConfig) -> None:
+        """Adopt new settings WITHOUT resetting the filter state.
+
+        This used to call ``_init_filters()``, which zeroes the reverb comb,
+        all-pass and tier low-pass state — on every option change, i.e. on
+        every pixel of a slider drag, under the audio lock. That was an audible
+        cut of the reverb tail and a possible click per pixel; the Expression
+        macro made it seven times worse. Only the coefficients that depend on
+        ``brightness`` / ``space`` are recomputed now, and the running state is
+        carried across.
+        """
         with self._lock:
+            old = self.cfg
             self.cfg = cfg
             for v in self._voices:
                 v.cfg = cfg
-            self._init_filters()
+            if old is None or (float(old.brightness) != float(cfg.brightness)
+                               or float(old.space) != float(cfg.space)):
+                self._refresh_filter_coefficients()
+
+    def _refresh_filter_coefficients(self) -> None:
+        """Replace coefficients; keep every state buffer exactly as it is."""
+        new_sos = []
+        for _, lp, _send in DEPTH_TIERS:
+            cut = float(np.clip(lp * self.cfg.brightness, 500.0, SAMPLE_RATE / 2 * 0.95))
+            new_sos.append(sg.butter(2, cut, "lowpass", fs=SAMPLE_RATE, output="sos"))
+        # Same order, same section count, so the existing zi arrays still fit.
+        self._tier_sos = new_sos
+        combs = []
+        for (b, a, state), (d_ms, g) in zip(
+                self._combs, ((29.7, 0.75), (37.1, 0.72), (41.1, 0.69), (43.7, 0.66))):
+            d = int(SAMPLE_RATE * d_ms / 1000)
+            a_new = np.zeros(d + 1)
+            a_new[0], a_new[d] = 1.0, -g * (0.55 + 0.45 * self.cfg.space)
+            combs.append((b, a_new, state))
+        self._combs = combs
 
     def update_frame(self, frame: ControlFrame) -> None:
         self._frame = frame
@@ -327,9 +382,17 @@ class ChorusRenderer:
             n_sing = v.n if live else 0
             loud = (0.8 + 0.6 * float(frame.impact)) * cfg.impact_voice if live else 0.0
         elif role == "torsion":
-            drive = float(frame.torsion)
+            # Driven by the floor that is actually twisting, not by an average
+            # over every gyro — averaging turned "the top floor is twisting
+            # hard" into "a little twist everywhere" and the voice never rose.
+            tf = frame.torsion_floor
+            drive = float(np.max(tf)) if np.size(tf) else float(frame.torsion)
             n_sing = int(round(v.n * max(0.0, (drive - 0.4) / 0.6)))
             loud = max(0.0, (drive - 0.4) / 0.6) * cfg.torsion_voice
+            # ...and it sings from that floor, so a twisting top floor is heard
+            # at the top rather than across the whole structure.
+            if np.size(tf):
+                v.row_i = np.full(v.n, int(np.argmax(tf)))
         elif role == "ambient":
             n_sing = v.n
             loud = (0.5 + 0.5 * float(np.clip(frame.env_global * 4, 0, 1))) * cfg.ambient_bed
@@ -373,7 +436,15 @@ class ChorusRenderer:
             if role in ("lead", "chorus") and 0 <= m < np.size(frame.approach):
                 rate *= 1.0 + 0.5 * float(frame.approach[m]) * cfg.approach_voice
             period = 1.0 / max(rate * max(cfg.density, 0.05), 0.15)
-            pan = v.pan_i[k]
+            # Place this individual where its sensor actually is: the plan
+            # column becomes the stereo position, so four sensors give an image
+            # of the rig rather than four voices in arbitrary places.
+            row = int(v.row_i[k]) if k < np.size(v.row_i) else 0
+            pans = frame.pan_of
+            if pans and row < len(pans):
+                pan = float(np.clip(pans[row] + v.pan_jit[k], -0.95, 0.95))
+            else:
+                pan = v.pan_i[k]
             if role == "torsion":
                 pan = float(np.clip(0.75 * frame.torsion_pan + 0.25 * pan, -0.95, 0.95))
             elif role == "drift" and np.size(frame.drift):
@@ -383,7 +454,21 @@ class ChorusRenderer:
                 pan = float(np.clip(spread + 0.25 * pan, -0.95, 0.95))
             gl = float(np.sqrt(1 - (pan + 1) / 2))
             gr = float(np.sqrt((pan + 1) / 2))
-            buf = self._tiers[int(v.tier_i[k])]
+            # Height becomes distance: the higher the floor, the nearer and
+            # brighter the animal sounds. Tier 0 is dry and close, so a high
+            # floor maps to a low tier index. Without this the four sensors were
+            # spread in stereo but flat in depth, and a first mode swaying the
+            # top of the building sounded no closer than the ground floor.
+            tier = int(v.tier_i[k])
+            floors = frame.floor_of
+            if floors and row < len(floors):
+                top = max(max(floors), 1)
+                near = 1.0 - (float(floors[row]) / top)
+                tier = int(np.clip(round(near * (len(self._tiers) - 1)), 0,
+                                   len(self._tiers) - 1))
+                if cfg.depth < 1.0 and self.rng.random() < (1.0 - cfg.depth):
+                    tier = 0
+            buf = self._tiers[tier]
 
             burst = self._burst_at.get(m)
             if burst is not None and role in ("lead", "chorus") and t0 <= burst < t1:

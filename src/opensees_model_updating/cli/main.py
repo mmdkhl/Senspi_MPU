@@ -5,6 +5,7 @@ CLI entry point for the OpenSees Model Updating package.
 This mirrors the main() function from DigitalTwin_V8.py.
 """
 
+from ..paths import output_dir as _out_dir, output_path as _out_path
 import os
 import copy
 
@@ -27,7 +28,7 @@ def main():
     params = launch_input_window()
 
     os.makedirs("input", exist_ok=True)
-    os.makedirs("output", exist_ok=True)
+    _out_dir()
 
     show_info = params["show_info"]
 
@@ -45,12 +46,12 @@ def main():
     run_params.pop("precalibrated_params", None)
     run_params.pop("overlay_uncalibrated_response", None)
 
-    write_json("output/current_run_inputs.json", run_params)
+    write_json(_out_path("current_run_inputs.json"), run_params)
 
     if use_precalibrated:
         print("\nUsing calibrated parameters stored by the Calibrate button.")
         final_params = copy.deepcopy(params["precalibrated_params"])
-        write_json("output/calibrated_inputs_used_for_run.json", final_params)
+        write_json(_out_path("calibrated_inputs_used_for_run.json"), final_params)
     else:
         print("\nNo stored calibration was selected. Running the current input model.")
         final_params = run_params
