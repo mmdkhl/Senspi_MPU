@@ -202,7 +202,9 @@ class PlotPerformanceConfig:
     signal_update_hz: float = 50.0
     time_window_seconds: float = 3.0
     fft_update_hz: float = 10.0
-    max_signal_subplots: int = 18
+    # 4 sensors x 6 channels. At 18 the all-channels preset was silently cut
+    # to four channels per sensor — dropping gz, the torsion channel.
+    max_signal_subplots: int = 24
     max_lines_per_subplot: int = 1
     signal_max_points_per_line: int = 2000
 
@@ -228,7 +230,7 @@ class PlotPerformanceConfig:
         try:
             value = int(self.max_signal_subplots)
         except (TypeError, ValueError):
-            value = 18
+            value = 24
         return max(1, value)
 
     def normalized_max_lines(self) -> int:
@@ -271,6 +273,13 @@ class SensorDefaults:
     """
 
     sensors_file: Path = AppPaths().config_dir / "sensors.yaml"
+    # Same pattern as hosts: the tracked file is a template, the ignored local
+    # file holds this machine's state (placement map, sensor count). Without it
+    # the placement autosave dirtied the tracked sensors.yaml on every launch.
+    local_file: Path = AppPaths().config_dir / "sensors.local.yaml"
+
+    def _source_file(self) -> Path:
+        return self.local_file if self.local_file.exists() else self.sensors_file
 
     def _normalize(
         self,
@@ -299,7 +308,7 @@ class SensorDefaults:
 
     def load(self) -> Dict[str, Any]:
         """Load and return the full sensors.yaml mapping (or ``{}`` if missing)."""
-        raw, sampling = load_sensor_defaults(self.sensors_file)
+        raw, sampling = load_sensor_defaults(self._source_file())
         return self._normalize(raw, sampling)
 
     def load_sampling_config(self, data: Dict[str, Any] | None = None) -> SamplingConfig:
@@ -317,7 +326,7 @@ class SensorDefaults:
         """
         sampling_cfg = SamplingConfig.from_mapping(data)
         normalized = self._normalize(data, sampling_cfg)
-        save_sensor_defaults(self.sensors_file, normalized, sampling_cfg)
+        save_sensor_defaults(self.local_file, normalized, sampling_cfg)
 
     # ------------------------------------------------------------------
     # Convenience helpers for RecorderTab / other callers

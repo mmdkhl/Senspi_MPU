@@ -24,6 +24,7 @@ from ..config.app_config import (
     normalize_remote_path,
 )
 from ..dataio.smart_recorder import SmartRecorder
+from ..dataio.file_paths import _sanitize_session_name
 from ..config.pi_logger_config import PiLoggerConfig
 from ..config.sampling import GuiSamplingDisplay, SamplingConfig
 from ..core.live_stream import select_parser
@@ -549,10 +550,18 @@ class RecorderController(QObject):
         self.rate_warning.emit(msg)
 
         host = ctx["host"]
-        out_dir = AppPaths().sensor_recordings / host.name / "mpu"
+        # One folder per recording. The session name used to be only a filename
+        # label inside a shared <host>/mpu/ folder, so the loader globbed every
+        # recording under a host into one session and averaged them together.
+        start_dt = datetime.now()
+        folder = start_dt.strftime("%Y-%m-%d_%H-%M-%S")
+        session_label = str(ctx.get("session") or "").strip()
+        if session_label:
+            folder += "_" + _sanitize_session_name(session_label)
+        out_dir = AppPaths().sensor_recordings / host.name / "mpu" / folder
         self._smart_recorder = SmartRecorder(
             out_dir=out_dir, session_name=ctx["session"], sensor_ids=sensor_ids,
-            start_dt=datetime.now(), requested_hz=requested, actual_hz=measured,
+            start_dt=start_dt, requested_hz=requested, actual_hz=measured,
             decimate=decimate, host_name=host.name, probe_seconds=self._probe_seconds,
             probe_combined_hz=combined,
             sensor_map=getattr(self, "_sensor_map", None))

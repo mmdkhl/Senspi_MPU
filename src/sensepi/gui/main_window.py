@@ -230,10 +230,9 @@ class MainWindow(QMainWindow):
                 sensor_selection=sensor_selection,
             )
 
-        gui_cfg.record_only = bool(
-            getattr(self.signals_tab, "record_only_check", None)
-            and self.signals_tab.record_only_check.isChecked()
-        )
+        # Pipeline kept by request; the checkbox is hidden. Ask the tab's own
+        # accessor rather than an attribute that no longer exists.
+        gui_cfg.record_only = bool(self.signals_tab._get_record_only_checked())
         gui_cfg.limit_duration = self.signals_tab.duration_limit_enabled()
         gui_cfg.duration_s = float(self.signals_tab.duration_limit_seconds())
 

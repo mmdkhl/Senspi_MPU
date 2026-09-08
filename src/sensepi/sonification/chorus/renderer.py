@@ -151,6 +151,7 @@ class ChorusRenderer:
     """Schedules call units into ring buffers and mixes finished audio blocks."""
 
     def __init__(self, cfg: ChorusConfig, seed: int = 23) -> None:
+        self.cfg = None                     # set below; lets set_config diff safely
         self.cfg = cfg
         self.rng = np.random.default_rng(seed)
         self.ring_len = int(RING_SECONDS * SAMPLE_RATE)
@@ -227,11 +228,41 @@ class ChorusRenderer:
             self._voices = voices
 
     def set_config(self, cfg: ChorusConfig) -> None:
+        """Adopt new settings WITHOUT resetting the filter state.
+
+        This used to call ``_init_filters()``, which zeroes the reverb comb,
+        all-pass and tier low-pass state — on every option change, i.e. on
+        every pixel of a slider drag, under the audio lock. That was an audible
+        cut of the reverb tail and a possible click per pixel; the Expression
+        macro made it seven times worse. Only the coefficients that depend on
+        ``brightness`` / ``space`` are recomputed now, and the running state is
+        carried across.
+        """
         with self._lock:
+            old = self.cfg
             self.cfg = cfg
             for v in self._voices:
                 v.cfg = cfg
-            self._init_filters()
+            if old is None or (float(old.brightness) != float(cfg.brightness)
+                               or float(old.space) != float(cfg.space)):
+                self._refresh_filter_coefficients()
+
+    def _refresh_filter_coefficients(self) -> None:
+        """Replace coefficients; keep every state buffer exactly as it is."""
+        new_sos = []
+        for _, lp, _send in DEPTH_TIERS:
+            cut = float(np.clip(lp * self.cfg.brightness, 500.0, SAMPLE_RATE / 2 * 0.95))
+            new_sos.append(sg.butter(2, cut, "lowpass", fs=SAMPLE_RATE, output="sos"))
+        # Same order, same section count, so the existing zi arrays still fit.
+        self._tier_sos = new_sos
+        combs = []
+        for (b, a, state), (d_ms, g) in zip(
+                self._combs, ((29.7, 0.75), (37.1, 0.72), (41.1, 0.69), (43.7, 0.66))):
+            d = int(SAMPLE_RATE * d_ms / 1000)
+            a_new = np.zeros(d + 1)
+            a_new[0], a_new[d] = 1.0, -g * (0.55 + 0.45 * self.cfg.space)
+            combs.append((b, a_new, state))
+        self._combs = combs
 
     def update_frame(self, frame: ControlFrame) -> None:
         self._frame = frame

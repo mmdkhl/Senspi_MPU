@@ -41,30 +41,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ...dataio import modal_session_loader as msl
 from ...analysis import sensor_layout as slayout
 from ...digital_twin import decisions as twin_decisions
-from ...digital_twin import motion as twin_motion
+from ..widgets.decision_panel import DecisionPanel
+from ..widgets.wireframe import LiveStructureView
 from ...digital_twin.comparison import compute_comparison_metrics, fft_amplitude
-
-
-class _SlicedSession:
-    """A ModalSession restricted to some of its sensor rows.
-
-    Used to drop the floor-0 row before identification. A thin view rather than a
-    copy of the data, and it keeps ``sensor_ids`` aligned with the rows so the
-    story mapping downstream still refers to the right sensors.
-    """
-
-    __slots__ = ("data", "fs", "sensor_ids", "duration_s", "success", "message")
-
-    def __init__(self, session, rows) -> None:
-        ids = list(session.sensor_ids)
-        self.data = np.asarray(session.data, dtype=float)[list(rows), :]
-        self.fs = float(session.fs)
-        self.sensor_ids = [ids[i] for i in rows]
-        self.duration_s = float(getattr(session, "duration_s", 0.0))
-        self.success = bool(getattr(session, "success", True))
-        self.message = str(getattr(session, "message", ""))
 
 
 class _Twin3DCanvas(FigureCanvas):
@@ -388,122 +370,6 @@ class _CalibrationWorker(QObject):
             self.error.emit(f"{exc}\n\n{traceback.format_exc()}")
 
 
-class _WireframeCanvas(FigureCanvas):
-    """The PHYSICAL structure, live, built from the Settings placement map.
-
-    Every other view in this tab shows the *numerical* model. This one shows the
-    real one: nodes placed where the sensors actually are — floor for height,
-    plan cell for position — moving with the measured signal.
-
-    What is drawn is filtered, doubly-integrated acceleration, **not** measured
-    displacement, and the caption says so. Accelerometers cannot measure
-    displacement; integrating twice in open loop drifts without bound. Over a
-    short rolling window, band-passed first and detrended between the two
-    integrations, it is stable — which is exactly what the couple of seconds of
-    accepted latency buys. ``gz`` is an angular *rate*, so it needs one
-    integration to give the yaw angle, and that is what makes the floors visibly
-    twist rather than only sway.
-
-    Floors with no sensor are drawn dashed and dim. They are never interpolated:
-    the same rule the story mapping follows everywhere else in this application.
-    """
-
-    _MEASURED = "#123B6D"
-    _UNMEASURED = "#B9C2CC"
-    _SENSOR = "#E4572E"
-    _BACKGROUND = "#F7F9FC"
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        self.fig = Figure(figsize=(5.0, 5.0))
-        super().__init__(self.fig)
-        self.setParent(parent)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.ax = self.fig.add_subplot(1, 1, 1, projection="3d")
-        self.fig.patch.set_facecolor(self._BACKGROUND)
-        self._layout = slayout.layout_from_mapping(None)
-        self._scale = 1.0
-        self._empty()
-
-    def _empty(self) -> None:
-        self.ax.clear()
-        self.ax.set_facecolor(self._BACKGROUND)
-        self.ax.text2D(0.5, 0.5, "Physical structure\nwaiting for the sensor map",
-                       transform=self.ax.transAxes, ha="center", va="center",
-                       color="#7A8794", fontsize=9)
-        self.ax.set_axis_off()
-        self.draw_idle()
-
-    def set_layout(self, layout) -> None:
-        self._layout = layout
-        if not layout.is_valid:
-            self._empty()
-
-    # -- geometry ---------------------------------------------------------
-    def _floor_nodes(self):
-        """``{floor: (x, y)}`` for the plan corners, plus the sensor positions."""
-        return [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
-
-    def update_state(self, state: dict) -> None:
-        """Draw one frame.
-
-        ``state`` maps floor -> ``{"u": (ux, uy, uz), "yaw": radians,
-        "measured": bool, "sensors": [(sid, cell_x, cell_y)]}``.
-        """
-        layout = self._layout
-        if not layout.is_valid or not state:
-            return
-        self.ax.clear()
-        self.ax.set_facecolor(self._BACKGROUND)
-        corners = self._floor_nodes()
-        n_floors = max(int(layout.n_floors), 1)
-
-        prev_xy = None
-        for floor in range(0, n_floors + 1):
-            info = state.get(floor, {})
-            ux, uy, uz = info.get("u", (0.0, 0.0, 0.0))
-            yaw = float(info.get("yaw", 0.0))
-            measured = bool(info.get("measured", False))
-            colour = self._MEASURED if measured else self._UNMEASURED
-            style = "-" if measured else "--"
-            width = 1.6 if measured else 0.9
-
-            c, s = np.cos(yaw), np.sin(yaw)
-            xs, ys = [], []
-            for (px, py) in corners + [corners[0]]:
-                xs.append(px * c - py * s + ux)
-                ys.append(px * s + py * c + uy)
-            z = float(floor) + uz
-            self.ax.plot(xs, ys, [z] * len(xs), style, color=colour, linewidth=width)
-
-            if prev_xy is not None:
-                for k in range(len(corners)):
-                    self.ax.plot([prev_xy[0][k], xs[k]], [prev_xy[1][k], ys[k]],
-                                 [float(floor) - 1 + prev_xy[2], z],
-                                 style, color=colour, linewidth=width * 0.8)
-            prev_xy = (xs, ys, info.get("u", (0, 0, 0))[2])
-
-            for (sid, cx, cy) in info.get("sensors", ()):
-                sx = cx * c - cy * s + ux
-                sy = cx * s + cy * c + uy
-                self.ax.scatter([sx], [sy], [z], color=self._SENSOR, s=26,
-                                depthshade=False)
-                self.ax.text(sx, sy, z, f" S{sid}", color=self._SENSOR, fontsize=7)
-
-        self.ax.set_xlim(-2.2, 2.2)
-        self.ax.set_ylim(-2.2, 2.2)
-        self.ax.set_zlim(0, n_floors + 0.5)
-        self.ax.set_box_aspect((1, 1, 1.35))
-        self.ax.set_xticks([]); self.ax.set_yticks([])
-        self.ax.set_zticks(list(range(0, n_floors + 1)))
-        self.ax.tick_params(labelsize=7)
-        self.ax.set_title("Physical structure — live", fontsize=9)
-        self.ax.text2D(0.02, 0.02,
-                       "band-passed, doubly-integrated acceleration (not measured "
-                       "displacement)\ndashed = no sensor on that floor",
-                       transform=self.ax.transAxes, fontsize=6, color="#7A8794")
-        self.draw_idle()
-
-
 class _DigitalTwinWorker(QObject):
     """Build the calibrated model, wait armed, then run in wall-clock time."""
 
@@ -616,6 +482,7 @@ class DigitalTwinExperimentTab(QWidget):
         self._model_snapshot: dict[str, Any] | None = None
         self._onset_source = ""
         self._calibrated_params: dict[str, Any] | None = None
+        self._calibration_source = ""
         self._decisions = None
         self._sensor_mapping: dict | None = None
         self._calib_thread: QThread | None = None
@@ -629,13 +496,7 @@ class DigitalTwinExperimentTab(QWidget):
         self._render_timer.setInterval(50)  # about 20 frames/s
         self._render_timer.timeout.connect(self._render_latest_frame)
         self._render_timer.start()
-        # The physical wireframe redraws slowly and independently: its window is
-        # seconds long, so a faster rate would redraw the same pose.
-        self._wire_peak = 0.0
-        self._wire_timer = QTimer(self)
-        self._wire_timer.setInterval(400)
-        self._wire_timer.timeout.connect(self._refresh_wireframe)
-        self._wire_timer.start()
+        self._live_view.start()
         self._update_controls()
 
     def _build_ui(self) -> None:
@@ -699,7 +560,8 @@ class DigitalTwinExperimentTab(QWidget):
         splitter = QSplitter(Qt.Horizontal)
         self._plots = _TwinPlotsCanvas()
         self._model_3d = _Twin3DCanvas()
-        self._wireframe = _WireframeCanvas()
+        self._live_view = LiveStructureView(self)
+        self._live_view.set_controller(self._controller)
 
         right = QSplitter(Qt.Vertical)
         right.addWidget(self._model_3d)
@@ -707,8 +569,9 @@ class DigitalTwinExperimentTab(QWidget):
         lower = QWidget()
         lower_row = QHBoxLayout(lower)
         lower_row.setContentsMargins(0, 0, 0, 0)
-        lower_row.addWidget(self._wireframe, stretch=3)
-        lower_row.addWidget(self._build_decision_panel(), stretch=2)
+        lower_row.addWidget(self._live_view, stretch=3)
+        self._decision_panel = DecisionPanel(parent=self)
+        lower_row.addWidget(self._decision_panel, stretch=2)
         right.addWidget(lower)
         right.setSizes([420, 420])
 
@@ -753,84 +616,6 @@ class DigitalTwinExperimentTab(QWidget):
         self._auto_align.toggled.connect(self._on_auto_align_changed)
         self._lag_spin.valueChanged.connect(self._refresh_plot)
 
-    def _build_decision_panel(self) -> QWidget:
-        """What to change on the PHYSICAL structure so it matches its design.
-
-        Everything else in this tab moves information from the structure to the
-        model. This panel is the return leg: the calibration says what the model
-        needed in order to agree with reality, and that difference is an
-        instruction about reality.
-        """
-        box = QGroupBox("Decisions — change the structure to match the design")
-        col = QVBoxLayout(box)
-        col.setContentsMargins(6, 6, 6, 6)
-        col.setSpacing(3)
-
-        self._decision_rows: list = []
-        self._decision_body = QWidget()
-        self._decision_body_layout = QVBoxLayout(self._decision_body)
-        self._decision_body_layout.setContentsMargins(0, 0, 0, 0)
-        self._decision_body_layout.setSpacing(2)
-        col.addWidget(self._decision_body)
-
-        self._decision_summary = QLabel("Calibrate to see what the structure needs.")
-        self._decision_summary.setWordWrap(True)
-        self._decision_summary.setStyleSheet("color:#3A4A5C;font-size:11px;")
-        col.addWidget(self._decision_summary)
-
-        self._decision_notes = QLabel("")
-        self._decision_notes.setWordWrap(True)
-        self._decision_notes.setStyleSheet("color:#7A8794;font-size:9px;")
-        col.addWidget(self._decision_notes)
-        col.addStretch(1)
-        return box
-
-    _LIGHT = {
-        twin_decisions.NOTHING: ("#2E7D32", "\u25cf"),
-        twin_decisions.ADD: ("#E4572E", "\u25cf"),
-        twin_decisions.REMOVE: ("#E4572E", "\u25cf"),
-        twin_decisions.STIFFEN: ("#1565C0", "\u25cf"),
-        twin_decisions.SOFTEN: ("#1565C0", "\u25cf"),
-    }
-
-    def _refresh_decisions(self) -> None:
-        layout = self._decision_body_layout
-        while layout.count():
-            item = layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        decisions = self._decisions
-        if decisions is None or not decisions.ok:
-            self._decision_summary.setText(
-                (decisions.message if decisions else "")
-                or "Calibrate to see what the structure needs.")
-            self._decision_notes.setText("")
-            return
-
-        # Top storey first, so the panel reads the way the building stands.
-        rows = list(reversed(decisions.masses))
-        if decisions.stiffness is not None:
-            rows.append(decisions.stiffness)
-        for d in rows:
-            colour, glyph = self._LIGHT.get(d.action, ("#7A8794", "\u25cb"))
-            name = "E" if d.target == "stiffness" else f"F{d.story}"
-            label = QLabel(
-                f"<span style='color:{colour};font-size:14px'>{glyph}</span> "
-                f"<b>{name}</b>&nbsp;&nbsp;{d.headline()}")
-            label.setToolTip(d.detail())
-            label.setStyleSheet("font-size:11px;")
-            layout.addWidget(label)
-
-        self._decision_summary.setText(decisions.summary())
-        bits = list(decisions.notes)
-        plan = decisions.rebalance
-        if plan:
-            moves = ", ".join(
-                f"F{k} {v:+.3f}" for k, v in sorted(plan.items()) if k)
-            net = plan.get(0, 0.0)
-            bits.insert(0, f"Rebalance instead: {moves} (net {net:+.3f}).")
-        self._decision_notes.setText("  ".join(bits))
-
     def _snapshot_axis_series(self, axis: str) -> dict[int, list[tuple[float, float]]]:
         """Read the existing thread-safe modal buffer without changing RecorderController."""
         modal_buffer = getattr(self._controller, "_modal_buffer", None)
@@ -840,26 +625,30 @@ class DigitalTwinExperimentTab(QWidget):
         return snapshot(axis)
 
     def _build_setup(self) -> dict[str, Any]:
-        """Read the last calibrated model snapshot without modifying Model Updating."""
-        if getattr(self._model_tab, "_thread", None) is not None or getattr(
-            self._model_tab, "_continuous_thread", None
-        ) is not None:
-            raise ValueError(
-                "Model Updating is currently busy. Finish or stop it before arming the Digital Twin experiment."
-            )
+        """Assemble the experiment from the model this tab calibrated.
 
-        state = getattr(self._model_tab, "_calibration_state", None)
-        if state is None or not bool(getattr(state, "available", False)):
+        Order of preference is the whole point of the three-step workflow:
+        the calibration made HERE (step 1) drives the experiment; Model
+        Updating's last calibration is only a fallback for a user who chose to
+        calibrate there instead. Before this fix the in-tab result fed only the
+        decision lights and Arm silently required a Model Updating calibration,
+        which made step 1 decorative.
+        """
+        if self._model_tab.is_busy():
             raise ValueError(
-                "No calibrated model is available. Run Calibrate, or send a completed "
-                "Continuous Update to Model, in the Model Updating tab first."
-            )
-        calibrated = getattr(state, "calibrated_params", None)
+                "Model Updating is currently busy. Finish or stop it before arming "
+                "the Digital Twin experiment.")
+
+        if self._calibrated_params:
+            calibrated = self._calibrated_params
+            self._calibration_source = "this tab"
+        else:
+            calibrated = self._model_tab.calibration_snapshot()
+            self._calibration_source = "Model Updating"
         if not calibrated:
             raise ValueError(
-                "The last calibration does not contain calibrated parameters. Run Calibrate "
-                "again, or send a completed Continuous Update to Model."
-            )
+                "No calibrated model is available. Press 1. Calibrate here, or run "
+                "Calibrate in the Model Updating tab first.")
 
         current = self._model_definition()
         params = copy.deepcopy(calibrated)
@@ -893,6 +682,7 @@ class DigitalTwinExperimentTab(QWidget):
             "nStory": n_story,
             "calibrated_E": float(params["E"]),
             "calibrated_floor_masses": [float(v) for v in params["floor_masses"]],
+            "calibration_source": self._calibration_source,
         }
 
     def _model_definition(self) -> dict[str, Any]:
@@ -946,6 +736,10 @@ class DigitalTwinExperimentTab(QWidget):
         measured = set()
         if self._setup:
             measured = {int(v) for v in self._setup["sensor_story_map"].values()}
+        else:
+            # Before Arm, the selector follows the Settings map so it is usable
+            # alongside Calibrate and the live wireframe.
+            measured = set(slayout.layout_from_mapping(self._sensor_mapping).story_map.values())
         current = self._story_combo.currentData()
         self._story_combo.blockSignals(True)
         self._story_combo.clear()
@@ -1004,7 +798,7 @@ class DigitalTwinExperimentTab(QWidget):
                 raise ValueError(
                     "None of the streaming sensors is placed on a floor.")
             if len(rows) < len(ids):
-                session = _SlicedSession(session, rows)
+                session = msl.sliced_session(session, rows)
             params["sensor_n_modes"] = layout.max_modes(
                 int(params.get("sensor_n_modes", 3)))
         except Exception as exc:
@@ -1036,11 +830,11 @@ class DigitalTwinExperimentTab(QWidget):
         self._calibrated_params = payload.get("calibrated")
         designed = payload.get("designed") or {}
         self._decisions = twin_decisions.decide(designed, self._calibrated_params)
-        self._refresh_decisions()
+        self._decision_panel.set_decisions(self._decisions, source="this calibration")
         note = "" if payload.get("success") else " (did not converge)"
         self._status.setText(
             f"Calibrated{note}. {self._decisions.summary()} "
-            f"Now Arm the numerical model.")
+            f"This calibration will drive the experiment — now Arm the numerical model.")
         self._clear_calibration_worker()
 
     @Slot(str)
@@ -1068,105 +862,12 @@ class DigitalTwinExperimentTab(QWidget):
             mapping = mapping.to_mapping()
         self._sensor_mapping = dict(mapping) if isinstance(mapping, dict) else None
         layout = slayout.layout_from_mapping(self._sensor_mapping)
-        if hasattr(self, "_wireframe"):
-            self._wireframe.set_layout(layout)
+        if hasattr(self, "_live_view"):
+            self._live_view.apply_sensor_map(self._sensor_mapping)
+        if hasattr(self, "_story_combo") and not self._setup and layout.is_valid:
+            self._populate_stories(layout.n_floors)
 
     # ------------------------------------------------- live physical wireframe
-    def _refresh_wireframe(self) -> None:
-        """Rebuild the physical structure's pose from the last few seconds.
-
-        Runs on its own slow timer rather than with the numerical animation: the
-        reconstruction needs a multi-second window and reads a sample set back
-        from the edge, so there is nothing to gain from redrawing it at 20 fps,
-        and three matplotlib 3D redraws per tick would cost more than they show.
-        """
-        layout = slayout.layout_from_mapping(self._sensor_mapping)
-        if not layout.is_valid:
-            return
-        capture = getattr(self._controller, "snapshot_modal_capture", None)
-        if capture is None:
-            return
-        try:
-            axis = layout.channel
-            other = "ay" if axis == "ax" else "ax"
-            window = twin_motion.WINDOW_S
-            main = capture(axis=axis, last_seconds=window)
-            if main is None or getattr(main, "data", None) is None or main.data.size == 0:
-                return
-            fs = float(main.fs)
-            if not np.isfinite(fs) or fs <= 2.0:
-                return
-            ids = list(main.sensor_ids)
-            cross = capture(axis=other, last_seconds=window)
-            vert = capture(axis="az", last_seconds=window)
-            spin = capture(axis="gz", last_seconds=window)
-
-            def row_of(session, sid):
-                if session is None or getattr(session, "data", None) is None:
-                    return None
-                try:
-                    return np.asarray(session.data[list(session.sensor_ids).index(sid)],
-                                      dtype=float)
-                except (ValueError, IndexError):
-                    return None
-
-            per_floor: dict = {}
-            for sid in ids:
-                floor = layout.story_map.get(int(sid))
-                if floor is None:
-                    floor = 0 if int(sid) == layout.base_sensor_id else None
-                if floor is None:
-                    continue
-                main_row = row_of(main, sid)
-                if main_row is None:
-                    continue
-                u_main = twin_motion.displacement_at(main_row, fs)
-                cross_row = row_of(cross, sid)
-                u_cross = twin_motion.displacement_at(cross_row, fs) \
-                    if cross_row is not None else 0.0
-                vert_row = row_of(vert, sid)
-                u_vert = twin_motion.displacement_at(vert_row, fs) \
-                    if vert_row is not None else 0.0
-                spin_row = row_of(spin, sid)
-                yaw = twin_motion.angle_at(spin_row, fs) if spin_row is not None else 0.0
-                ux, uy = ((u_main, u_cross) if axis == "ax" else (u_cross, u_main))
-                cell = str(layout.cell_map.get(int(sid), "B2"))
-                cx = ("ABC".find(cell[:1].upper()) - 1) * 0.8
-                cy = (int(cell[1:2] or 2) - 2) * 0.8
-                entry = per_floor.setdefault(
-                    int(floor), {"u": [], "yaw": [], "sensors": []})
-                entry["u"].append((ux, uy, u_vert))
-                entry["yaw"].append(yaw)
-                entry["sensors"].append((int(sid), cx, cy))
-
-            if not per_floor:
-                return
-            # One display scale, held between frames, so the picture does not
-            # breathe with the excitation level.
-            peak = max((abs(v) for e in per_floor.values() for u in e["u"] for v in u),
-                       default=0.0)
-            self._wire_peak = max(peak, 0.85 * getattr(self, "_wire_peak", 0.0))
-            scale = twin_motion.normalising_scale([self._wire_peak], target=0.8)
-
-            state: dict = {}
-            for floor in range(0, int(layout.n_floors) + 1):
-                e = per_floor.get(floor)
-                if e is None:
-                    state[floor] = {"u": (0.0, 0.0, 0.0), "yaw": 0.0,
-                                    "measured": False, "sensors": ()}
-                    continue
-                us = np.asarray(e["u"], dtype=float)
-                state[floor] = {
-                    "u": tuple(float(v) * scale for v in us.mean(axis=0)),
-                    "yaw": float(np.mean(e["yaw"])) * 6.0,
-                    "measured": True,
-                    "sensors": tuple(e["sensors"]),
-                }
-            self._wireframe.update_state(state)
-        except Exception:
-            # A display panel must never take the experiment down with it.
-            pass
-
     @Slot()
     def _arm(self) -> None:
         if self._thread is not None:
@@ -1582,7 +1283,11 @@ class DigitalTwinExperimentTab(QWidget):
     def _save_experiment(self, result: dict[str, Any]) -> Path:
         if not self._setup:
             raise RuntimeError("Missing setup")
-        root = Path(self._setup["project_dir"]) / "output" / "digital_twin"
+        # Results of THIS tab go to the twin category of the output root, not
+        # under the model workspace (which is where OpenSees' own recorders
+        # write). AppPaths.twin_output existed and nothing wrote to it.
+        from ...config.app_config import AppPaths
+        root = AppPaths().twin_output
         run_dir = root / datetime.now().strftime("%Y%m%d_%H%M%S")
         run_dir.mkdir(parents=True, exist_ok=True)
         np.savez(
@@ -1737,10 +1442,11 @@ class DigitalTwinExperimentTab(QWidget):
         # Stop the display timers first: they poll the controller, and polling a
         # controller that is being torn down is how a clean exit turns into a
         # traceback on the way out.
-        for name in ("_wire_timer", "_render_timer"):
-            timer = getattr(self, name, None)
-            if timer is not None and timer.isActive():
-                timer.stop()
+        if getattr(self, "_live_view", None) is not None:
+            self._live_view.stop()
+        timer = getattr(self, "_render_timer", None)
+        if timer is not None and timer.isActive():
+            timer.stop()
         calib = getattr(self, "_calib_thread", None)
         if calib is not None and calib.isRunning():
             calib.quit()

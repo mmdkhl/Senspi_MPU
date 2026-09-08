@@ -48,6 +48,7 @@ python-*.msi
 
 # Local secrets / machine-specific overrides
 src/sensepi/config/hosts.local.yaml
+src/sensepi/config/sensors.local.yaml
 deploy_pi.local.bat
 .env
 .env.*

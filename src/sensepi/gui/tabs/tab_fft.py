@@ -287,7 +287,6 @@ class _EigenFreqWorker(QObject):
                     payload["coverage_stories"] = list(story_data.coverage_stories)
                     payload["n_story"] = int(layout.n_floors)
                     payload["full_coverage"] = bool(story_data.mode_shapes_available)
-                    payload["torsion_indicator"] = dict(story_data.torsion_indicator)
                     payload["sensor_map"] = {
                         "n_floors": int(layout.n_floors),
                         "axis": layout.axis,
@@ -509,7 +508,10 @@ class FftTab(QWidget):
         # Row 1 — method selector + eigen-identification params (Window 2).
         self.method_combo = QComboBox()
         self.method_combo.addItem("FDD", "fdd")     # FDD default (M2)
-        self.method_combo.addItem("FFT", "fft")
+        # DEBT-7: the FFT branch's mode shapes are known-wrong (MAC 0.002 vs
+        # truth). Its frequencies are fine, so it stays — labelled honestly, and
+        # the shape views blank themselves for it.
+        self.method_combo.addItem("FFT (frequencies only)", "fft")
         # Enabled only when the map places a sensor on floor 0 — without the
         # input there is nothing to reference against.
         self.method_combo.addItem("Base-referenced (FRF)", "base_ref")
@@ -760,12 +762,16 @@ class FftTab(QWidget):
         """
         hints = {
             "fdd": "SVD of the cross-spectral-density matrix — signed mode shapes.",
-            "fft": "Sensor-averaged Hann FFT peaks — phase-aligned signed shapes.",
+            "fft": "Sensor-averaged Hann FFT peaks. Mode shapes NOT available (DEBT-7).",
             "base_ref": "H1 transmissibility vs the floor-0 sensor, coherence-gated.",
         }
         text = hints.get(self._selected_method(), "")
         self._method_hint.setText(text)
         self._method_hint.setToolTip(text)
+        # The identification spectrum is a different quantity per method.
+        ylabel = {"fdd": "1st singular value", "fft": "Amplitude",
+                  "base_ref": "Σ|H|² (dimensionless)"}.get(self._selected_method(), "Response")
+        self._eig_plot.setLabel("left", ylabel)
         self._refresh_placement_summary()
         # Recompute immediately so the spectrum curve + peaks reflect the new method
         # without waiting for the next rolling tick (the worker guards re-entrancy).
@@ -1143,10 +1149,14 @@ class FftTab(QWidget):
             except Exception:
                 pass
         self._grid_eig_lines.clear()
-        plots = list(getattr(self, "_psd_plots", {}).values())
-        if not plots:
+        entries = list(getattr(self, "_psd_plots", {}).items())
+        if not entries:
             return
-        for plot in plots:
+        base = self._layout.base_sensor_id
+        for key, plot in entries:
+            sid = key[0] if isinstance(key, tuple) else getattr(key, "sensor_id", None)
+            if base is not None and sid is not None and int(sid) == int(base):
+                continue                     # the shaker row shows the drive, not modes
             for i, f in enumerate(freqs):
                 color = _EIGEN_COLORS[i % len(_EIGEN_COLORS)]
                 line = pg.InfiniteLine(
@@ -1492,14 +1502,30 @@ class FftTab(QWidget):
         damping = payload.get("damping") or {}
         damping_ratio = damping.get("zeta")
 
+        coverage = [int(c) for c in payload.get("coverage_stories", [])]
+        method = str(payload.get("method") or self._selected_method()).upper()
         spectrum_payload = {
             "frequencies_hz": freqs,
             "mode_shapes_ux": shapes,
+            # The shape vectors span the MEASURED storeys only, in this order.
+            # Without it the receiver filled storey rows by list index, so a
+            # rig with sensors on storeys 1, 2, 4, 5 put storey 4's value on
+            # storey 3. Same convention the JSON and sensor paths already use.
+            "coverage_stories": coverage,
+            "measured_dof_indices": [c - 1 for c in coverage],
+            "n_story": int(payload.get("n_story") or 0),
+            "channel": str(payload.get("channel") or self._analysis_channel()),
+            "method": method,
+            "sensor_map": payload.get("sensor_map"),
             "source_file": "Spectrum final values",
-            "notes": "Sent from Spectrum final-values calculation",
+            "notes": (f"Sent from Spectrum final values ({method}, "
+                      f"{payload.get('channel') or self._analysis_channel()}, "
+                      f"storeys {coverage or 'all'})"),
         }
         if damping_ratio is not None:
             spectrum_payload["zeta"] = float(damping_ratio)
+            spectrum_payload["zeta_source"] = (
+                f"log-decrement, mode 1, sensor S{damping.get('sensor_id', '?')}")
 
         self.final_values_ready_for_model_updating.emit(spectrum_payload)
         self._set_final_status(
@@ -1719,7 +1745,11 @@ class FftTab(QWidget):
         self._damping_sensor_combo.setVisible(show_damping or show_final)
         splitter = getattr(self, "_spectrum_splitter", None)
         if splitter is not None:
-            QTimer.singleShot(0, lambda: splitter.setSizes([1, 1]))
+            # Context-object form: if the splitter is destroyed before the
+            # event loop gets here, Qt drops the callback instead of calling
+            # into a deleted C++ object (seen as a libshiboken RuntimeError
+            # when a window is closed within the same turn).
+            QTimer.singleShot(0, splitter, lambda: splitter.setSizes([1, 1]))
         if show_shapes:
             self._right_title.setText("Live normalized mode shapes")
             if self._last_shape_data is not None:
@@ -1848,6 +1878,11 @@ class FftTab(QWidget):
             self._shape_legend.clear()
         except Exception:
             pass
+        if str(shape_data.get("method", "")).lower() == "fft":
+            self._eig_status.setText(
+                "Mode shapes are not available for FFT (its shapes are known-wrong, "
+                "DEBT-7) — switch to FDD or base-referenced.")
+            return
         shapes = shape_data.get("mode_shapes_ux") or {}
         n_story = int(shape_data.get("n_story", 0))
         signed = bool(shape_data.get("signed", True))
@@ -2465,6 +2500,10 @@ class FftTab(QWidget):
                 plot.showGrid(x=True, y=True, alpha=0.3)
                 units = self._channel_units(ch)
                 title = f"S{sensor_id} {ch.upper()}"
+                if int(sensor_id) == self._layout.base_sensor_id:
+                    # Its spectrum is the DRIVE. Marking the structure's modes
+                    # on it invited reading drive peaks as modes.
+                    title = f"S{sensor_id} · shaker {ch.upper()}"
                 if units:
                     title = f"{title} [{units}]"
                 plot.setTitle(title)

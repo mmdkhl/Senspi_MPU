@@ -408,7 +408,10 @@ class ModalTracker:
             return self._state
 
         freqs = np.asarray(res.frequencies_hz, dtype=float).ravel()
-        damp = np.asarray(res.damping_ratios, dtype=float).ravel()
+        # Half-power ζ can be NaN (the base-referenced path reports it so, and
+        # the DEBT-8 fix will make FDD/FFT do the same). The ring-down is an
+        # aesthetic control, so a typical structural value stands in.
+        damp = np.nan_to_num(np.asarray(res.damping_ratios, dtype=float).ravel(), nan=0.02)
         shapes = np.asarray(res.mode_shapes_sensor, dtype=float)
         if shapes.ndim == 2 and shapes.shape[0] != data.shape[0]:
             shapes = shapes.T

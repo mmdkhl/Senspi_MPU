@@ -32,9 +32,11 @@ Example usage in RecorderTab (pseudo-code)::
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from typing import Any, Dict, List, Optional
 
-from PySide6.QtCore import QSignalBlocker, Qt, Signal, Slot
+from PySide6.QtCore import QThread, QSignalBlocker, Qt, Signal, Slot
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -63,12 +65,16 @@ from ...config.app_config import (
     normalize_remote_path,
 )
 from ...config.sampling import RECORDING_MODES, SamplingConfig
-from ...remote.ssh_client import SSHClient
+from ...remote.pi_config_sync_worker import PiConfigSyncWorker
 from ..config.acquisition_state import SensorSelectionConfig
 from ..widgets.sensor_map import SensorMapWidget
 
 # Fixed device sampling rate used by recording and streaming.
-FIXED_DEVICE_RATE_HZ = 100.0
+# The one device rate (G3). Editable HERE and nowhere else; Live Signals
+# mirrors it read-only. 100 Hz is the rate validated on the rig.
+DEFAULT_DEVICE_RATE_HZ = 100.0
+MIN_DEVICE_RATE_HZ = 10
+MAX_DEVICE_RATE_HZ = 200
 
 
 class SettingsTab(QWidget):
@@ -116,9 +122,17 @@ class SettingsTab(QWidget):
 
         # Last sampling config loaded from sensors.yaml (used to preserve rate)
         self._sampling_config: SamplingConfig | None = None
+        self._sync_thread: QThread | None = None
+        self._sync_worker = None
 
+        self._loading_from_disk = False
         self._build_ui()
-        self._load_from_disk()
+        self._loading_from_disk = True
+        try:
+            self._load_from_disk()
+        finally:
+            self._loading_from_disk = False
+        self._refresh_map_consistency()
 
     # ------------------------------------------------------------------
     # UI construction
@@ -229,13 +243,21 @@ class SettingsTab(QWidget):
         sampling_group = QGroupBox("Sampling (single source of truth)", sensors_group)
         sampling_form = QFormLayout(sampling_group)
 
-        self.device_rate_label = QLabel(f"{FIXED_DEVICE_RATE_HZ:.0f} Hz", sampling_group)
+        self.device_rate_spin = QSpinBox(sampling_group)
+        self.device_rate_spin.setRange(MIN_DEVICE_RATE_HZ, MAX_DEVICE_RATE_HZ)
+        self.device_rate_spin.setSingleStep(10)
+        self.device_rate_spin.setSuffix(" Hz")
+        self.device_rate_spin.setValue(int(DEFAULT_DEVICE_RATE_HZ))
+        self.device_rate_spin.setToolTip(
+            "The single device rate every tab and the Pi use (G3). 100 Hz is the "
+            "validated rate on this rig; higher rates are not verified. Live "
+            "Signals shows this value read-only.")
 
         self.mode_combo = QComboBox(sampling_group)
         for key, mode in RECORDING_MODES.items():
             self.mode_combo.addItem(mode.label, userData=key)
 
-        sampling_form.addRow("Sampling (device) rate:", self.device_rate_label)
+        sampling_form.addRow("Sampling (device) rate:", self.device_rate_spin)
         sampling_form.addRow("Mode:", self.mode_combo)
 
         # MPU6050 defaults (unchanged)
@@ -284,8 +306,9 @@ class SettingsTab(QWidget):
 
         root.addWidget(sensors_group)
 
-        # Sensor placement map. PREVIEW: visible and interactive, but nothing
-        # downstream consumes it yet -- wiring is a separate step.
+        # Sensor placement map: the one source of "which sensor is where".
+        # MainWindow fans every change out to Spectrum, Model Updating,
+        # Sonification, Digital Twin and the recorder.
         self.sensor_map = SensorMapWidget(self)
         self.sensor_map.set_sensor_count(
             self.mpu_sensor_count_combo.currentData() or 4)
@@ -298,6 +321,20 @@ class SettingsTab(QWidget):
         # so it is inserted at index 1 rather than appended.
         root.insertWidget(1, self.sensor_map)
         self.sensor_map.mapChanged.connect(self.sensorMapChanged)
+        # The map used to persist only on "Save sensors.yaml", a button in a
+        # different group with no cue that the map was unsaved — every restart
+        # silently reset a hand-made placement. It now writes itself on every
+        # change and says so.
+        self.sensor_map.mapChanged.connect(self._autosave_sensor_map)
+        self._map_saved_label = QLabel("", self)
+        self._map_saved_label.setStyleSheet("color:#7ee787;font-size:11px;")
+        root.insertWidget(2, self._map_saved_label)
+        self._map_consistency_label = QLabel("", self)
+        self._map_consistency_label.setWordWrap(True)
+        self._map_consistency_label.setStyleSheet("color:#ffd93d;font-size:11px;")
+        root.insertWidget(3, self._map_consistency_label)
+        self.mpu_channels.currentIndexChanged.connect(self._refresh_map_consistency)
+        self.sensor_map.mapChanged.connect(lambda _m: self._refresh_map_consistency())
 
         # keep groups at their natural height; the scroll area supplies the rest
         root.addStretch(1)
@@ -339,6 +376,7 @@ class SettingsTab(QWidget):
         # Populate initial fixed sampling display.
         self._refresh_sampling_rate_choices()
 
+        self.device_rate_spin.valueChanged.connect(self._on_device_rate_changed)
         self.mpu_dlpf.valueChanged.connect(self._update_mpu_dlpf_info)
         self.mpu_dlpf.valueChanged.connect(self._on_sensor_ui_changed)
 
@@ -590,6 +628,16 @@ class SettingsTab(QWidget):
 
     @Slot()
     def _on_sync_to_pi(self) -> None:
+        """Upload pi_config.yaml to the selected host — in a worker (G2/G4).
+
+        Only pure work happens here: building the YAML and normalising the
+        remote paths. The SSH session lives in ``PiConfigSyncWorker``; this used
+        to run inline and froze the application for the SSH timeout whenever the
+        Pi was unreachable.
+        """
+        if self._sync_thread is not None:
+            QMessageBox.information(self, "Busy", "A sync is already running.")
+            return
         host_dict = self.current_host_config()
         if host_dict is None:
             QMessageBox.information(self, "No host", "Select a host to sync.")
@@ -597,62 +645,49 @@ class SettingsTab(QWidget):
 
         host_cfg = self._host_inventory.to_host_config(host_dict)
         sensor_defaults, sampling_cfg = self._build_sensor_defaults_payload()
-        app_cfg = AppConfig(
-            sensor_defaults=sensor_defaults,
-            sampling_config=sampling_cfg,
-        )
+        app_cfg = AppConfig(sensor_defaults=sensor_defaults, sampling_config=sampling_cfg)
         pi_cfg = build_pi_config_for_host(host_cfg, app_cfg)
         contents = pi_cfg.render_pi_config_yaml()
-
         remote_host = self._host_inventory.to_remote_host(host_dict)
-        client = SSHClient(remote_host)
-        try:
-            client.connect()
-        except Exception as exc:
-            QMessageBox.critical(self, "SSH error", f"Could not connect: {exc}")
-            return
 
-        try:
-            # Normalize remote paths to POSIX-style, independent of Windows host
-            remote_data_dir = normalize_remote_path(host_cfg.data_dir, host_cfg.user)
-            remote_scripts_dir = normalize_remote_path(host_cfg.base_path, host_cfg.user)
-            remote_pi_config_path = normalize_remote_path(
-                host_cfg.pi_config_path, host_cfg.user
-            )
-
-            if not client.path_exists(remote_data_dir):
-                QMessageBox.critical(
-                    self,
-                    "Validation failed",
-                    f"Remote data directory does not exist: {remote_data_dir}",
-                )
-                return
-            if not client.path_exists(remote_scripts_dir):
-                QMessageBox.critical(
-                    self,
-                    "Validation failed",
-                    f"Remote scripts directory does not exist: {remote_scripts_dir}",
-                )
-                return
-
-            with client.sftp() as sftp:
-                with sftp.open(remote_pi_config_path, "w") as fh:
-                    fh.write(contents)
-        except Exception as exc:
-            QMessageBox.critical(
-                self,
-                "Sync error",
-                f"Failed to upload config to {host_cfg.name}:\n{exc}",
-            )
-            return
-        finally:
-            client.close()
-
-        QMessageBox.information(
-            self,
-            "Config synced",
-            f"Uploaded configuration to {remote_pi_config_path}.",
+        worker = PiConfigSyncWorker(
+            remote_host,
+            data_dir=normalize_remote_path(host_cfg.data_dir, host_cfg.user),
+            scripts_dir=normalize_remote_path(host_cfg.base_path, host_cfg.user),
+            pi_config_path=normalize_remote_path(host_cfg.pi_config_path, host_cfg.user),
+            contents=contents,
         )
+        thread = QThread(self)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.progress.connect(lambda msg: self.btn_sync_pi.setText(f"Sync: {msg}"))
+        worker.finished.connect(self._on_sync_finished)
+        worker.error.connect(self._on_sync_error)
+        worker.finished.connect(thread.quit)
+        worker.error.connect(thread.quit)
+        thread.finished.connect(self._on_sync_thread_done)
+        self._sync_worker, self._sync_thread = worker, thread
+        self.btn_sync_pi.setEnabled(False)
+        thread.start()
+
+    @Slot(str)
+    def _on_sync_finished(self, remote_path: str) -> None:
+        QMessageBox.information(self, "Config synced", f"Uploaded configuration to {remote_path}.")
+
+    @Slot(str)
+    def _on_sync_error(self, message: str) -> None:
+        QMessageBox.critical(self, "Sync error", message)
+
+    @Slot()
+    def _on_sync_thread_done(self) -> None:
+        thread, self._sync_thread = self._sync_thread, None
+        worker, self._sync_worker = self._sync_worker, None
+        if worker is not None:
+            worker.deleteLater()
+        if thread is not None:
+            thread.deleteLater()
+        self.btn_sync_pi.setEnabled(True)
+        self.btn_sync_pi.setText("Sync Pi defaults (pi_config.yaml)")
 
     # ------------------------------------------------------------------
     # Sensor defaults helpers
@@ -672,6 +707,15 @@ class SettingsTab(QWidget):
         """
         Populate sampling + MPU6050 widgets from the in-memory sensors.yaml mapping.
         """
+        # Restore the sensor count BEFORE the map, so the map's rows match it.
+        try:
+            count = int((self._sensors or {}).get("sensor_count") or 0)
+        except (TypeError, ValueError):
+            count = 0
+        if count and hasattr(self, "mpu_sensor_count_combo"):
+            idx = self.mpu_sensor_count_combo.findData(count)
+            if idx >= 0:
+                self.mpu_sensor_count_combo.setCurrentIndex(idx)
         # Restore a previously saved placement map, if there is one.
         stored = (self._sensors or {}).get("sensor_map")
         if stored and hasattr(self, "sensor_map"):
@@ -721,7 +765,7 @@ class SettingsTab(QWidget):
         mode_key = self.mode_combo.currentData()
 
         return SamplingConfig(
-            device_rate_hz=FIXED_DEVICE_RATE_HZ,
+            device_rate_hz=float(self.device_rate_spin.value()),
             mode_key=str(mode_key or "high_fidelity"),
         )
 
@@ -729,13 +773,19 @@ class SettingsTab(QWidget):
         """
         Update the fixed device-rate display and cached sampling config.
         """
-        self.device_rate_label.setText(f"{FIXED_DEVICE_RATE_HZ:.0f} Hz")
+        # Reflect the loaded rate in the spinbox once; afterwards the spinbox
+        # IS the value (the label this replaced forced 100 Hz regardless of
+        # what sensors.yaml said, so the saved rate was dead).
         if isinstance(self._sampling_config, SamplingConfig):
+            rate = float(self._sampling_config.device_rate_hz or DEFAULT_DEVICE_RATE_HZ)
             mode_key = self._sampling_config.mode_key
+            with QSignalBlocker(self.device_rate_spin):
+                self.device_rate_spin.setValue(
+                    int(min(MAX_DEVICE_RATE_HZ, max(MIN_DEVICE_RATE_HZ, round(rate)))))
         else:
             mode_key = "high_fidelity"
         self._sampling_config = SamplingConfig(
-            device_rate_hz=FIXED_DEVICE_RATE_HZ,
+            device_rate_hz=float(self.device_rate_spin.value()),
             mode_key=mode_key,
         )
 
@@ -763,6 +813,9 @@ class SettingsTab(QWidget):
         # placement map travels with sensors.yaml so it survives restarts and is
         # the one authoritative answer to "which sensor is where"
         sensors_model["sensor_map"] = self.sensor_map.current_map().to_mapping()
+        # The count used to be the one thing here that did not survive a
+        # restart: saved with 3 sensors, the tab came back showing 4.
+        sensors_model["sensor_count"] = int(self.mpu_sensor_count_combo.currentData() or 4)
         sensors_model["sampling"] = sampling_cfg.to_mapping()["sampling"]
         sensors_model["sensors"] = sensors_block
         sensors_model.pop("mpu6050", None)
@@ -781,9 +834,9 @@ class SettingsTab(QWidget):
         - Chooses active_channels based on the channels combo.
         """
         try:
-            count = int(self.mpu_sensor_count_combo.currentData() or 3)
+            count = int(self.mpu_sensor_count_combo.currentData() or 4)
         except (TypeError, ValueError):
-            count = 3
+            count = 4
 
         if count < 1:
             count = 1
@@ -808,6 +861,67 @@ class SettingsTab(QWidget):
             active_sensors=active_sensors,
             active_channels=active_channels,
         )
+
+    @Slot(object)
+    def _autosave_sensor_map(self, _smap) -> None:
+        """Persist the placement on every change, quietly."""
+        if getattr(self, "_loading_from_disk", False):
+            return
+        try:
+            sensors, _ = self._build_sensor_defaults_payload()
+            # No-op when nothing changed. The coalesced start-up emission lands
+            # after the load guard has cleared, and without this every launch
+            # rewrote sensors.yaml (same content, reformatted).
+            current = self._sensors if isinstance(self._sensors, dict) else {}
+            if (current.get("sensor_map") == sensors.get("sensor_map")
+                    and current.get("sensor_count") == sensors.get("sensor_count")
+                    and current.get("sampling") == sensors.get("sampling")):
+                return
+            self._sensor_defaults.save(sensors)
+            self._sensors = sensors
+            self._map_saved_label.setText(
+                f"Placement saved to sensors.yaml ({datetime.now():%H:%M:%S}).")
+        except Exception as exc:
+            self._map_saved_label.setStyleSheet("color:#e05c5c;font-size:11px;")
+            self._map_saved_label.setText(f"Placement NOT saved: {exc}")
+
+    @Slot(int)
+    def _on_device_rate_changed(self, hz: int) -> None:
+        """Rate edited here: cache, persist locally, and push to every tab."""
+        mode_key = (self._sampling_config.mode_key
+                    if isinstance(self._sampling_config, SamplingConfig) else "high_fidelity")
+        self._sampling_config = SamplingConfig(device_rate_hz=float(hz), mode_key=mode_key)
+        self._autosave_sensor_map(None)
+        self.sensorsUpdated.emit(dict(self._sensors))
+
+    def _refresh_map_consistency(self) -> None:
+        """Warn when the channel preset does not stream the excitation axis.
+
+        Under 'gyro only' the map still claimed 'shaking along X → ax' while
+        ax was never sent: the parser stores NaN, every consumer zeroes it, and
+        every analysis proceeds on zeros without a word.
+        """
+        label = getattr(self, "_map_consistency_label", None)
+        if label is None:
+            return
+        try:
+            sel = self.current_sensor_selection()
+            smap = self.sensor_map.current_map()
+        except Exception:
+            return
+        needed = "ax" if str(smap.axis).lower() == "x" else "ay"
+        missing = [c for c in (needed, "gz") if c not in (sel.active_channels or [])]
+        if not missing:
+            label.setText("")
+            return
+        bits = []
+        if needed in missing:
+            bits.append(f"the map says shaking along {smap.axis.upper()} → {needed}, "
+                        f"but the channel preset does not stream {needed} — every "
+                        f"analysis would run on zeros")
+        if "gz" in missing:
+            bits.append("gz is not streamed, so no torsion reading is possible")
+        label.setText("⚠ " + "; ".join(bits) + ".")
 
     @Slot()
     def _on_save_sensors_clicked(self) -> None:

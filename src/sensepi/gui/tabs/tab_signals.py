@@ -104,6 +104,12 @@ class SignalPlotWidgetBase(QWidget):
         self._max_points_per_trace: int = 2000
 
         self._base_correction_enabled: bool = False
+        # "Normalise": centre each trace on zero (running mean of the visible
+        # window removed) and hold a SYMMETRIC y-range that follows the peak.
+        # Plain autorange follows min/max, so any DC offset parked the trace
+        # off-centre and let the zero line wander.
+        self._normalise_enabled: bool = True
+        self._norm_envelope: Dict[SampleKey, float] = {}
         self._baseline_offsets: Dict[SampleKey, float] = {}
         self._display_slack_ns: int = 0
         self._latest_timestamp_ns: Optional[int] = None
@@ -497,6 +503,14 @@ class SignalPlotWidgetBase(QWidget):
 
                 times = time_axis[finite_mask]
                 values = window_values[finite_mask]
+                if self._normalise_enabled:
+                    values = values - float(np.mean(values))
+                    peak = float(np.max(np.abs(values))) if values.size else 0.0
+                    # slow release so the range shrinks smoothly; a floor so a
+                    # quiet trace does not zoom into its own noise
+                    env = max(peak, 0.9 * self._norm_envelope.get(key, 0.0), 1e-3)
+                    self._norm_envelope[key] = env
+                    self._backend_set_symmetric_range(key, env)
 
                 times_decimated, values_decimated = self._decimate_for_plot(
                     times,
@@ -718,6 +732,18 @@ class SignalPlotWidgetBase(QWidget):
         self._apply_visibility_to_all_lines()
 
     # --------------------------------------------------------------- base correction API
+    def enable_normalise(self, enabled: bool) -> None:
+        self._normalise_enabled = bool(enabled)
+        self._norm_envelope.clear()
+        if not self._normalise_enabled:
+            self._backend_restore_autorange()
+
+    def _backend_set_symmetric_range(self, key: SampleKey, amp: float) -> None:
+        """Backend hook: y-range ±amp for one trace's plot."""
+
+    def _backend_restore_autorange(self) -> None:
+        """Backend hook: hand the y-axis back to plain autorange."""
+
     def enable_base_correction(self, enabled: bool) -> None:
         """Enable or disable baseline subtraction."""
         self._base_correction_enabled = bool(enabled)
@@ -898,6 +924,16 @@ class SignalPlotWidgetPyQtGraph(SignalPlotWidgetBase):
         for plot in self._plots.values():
             plot.setXRange(xmin, xmax, padding=0.0)
 
+    def _backend_set_symmetric_range(self, key: SampleKey, amp: float) -> None:
+        plot = self._plots.get(key)
+        if plot is not None:
+            plot.enableAutoRange(x=False, y=False)
+            plot.setYRange(-amp, amp, padding=0.05)
+
+    def _backend_restore_autorange(self) -> None:
+        for plot in self._plots.values():
+            plot.enableAutoRange(x=False, y=True)
+
     def _backend_rebuild_layout(self, sensor_ids: list[int], visible_channels: list[str]) -> None:
         self._glw.clear()
         self._plots.clear()
@@ -1015,13 +1051,22 @@ class SignalsTab(QWidget):
         self._baseline_timer.setSingleShot(True)
         self._baseline_timer.timeout.connect(self._finish_baseline)
         self._base_correction_enabled: bool = False
+        # "Normalise": centre each trace on zero (running mean of the visible
+        # window removed) and hold a SYMMETRIC y-range that follows the peak.
+        # Plain autorange follows min/max, so any DC offset parked the trace
+        # off-centre and let the zero line wander.
+        self._normalise_enabled: bool = True
+        self._norm_envelope: Dict[SampleKey, float] = {}
         self._data_buffer: StreamingDataBuffer | None = None
         self._buffer_cursors: Dict[int | str, float] = {}
         self._synthetic_active = False
         # Provide a sensible default before SettingsTab sends anything.
+        # Same default Settings ships (AX/AY/GZ). Seeding all six built a
+        # 24-subplot layout that was trimmed, warned about, and rebuilt the
+        # moment Settings pushed the real selection — on every launch.
         self._current_sensor_selection = SensorSelectionConfig(
             active_sensors=[1, 2, 3, 4],
-            active_channels=["ax", "ay", "az", "gx", "gy", "gz"],
+            active_channels=["ax", "ay", "gz"],
         )
         self._current_gui_acquisition_config: GuiAcquisitionConfig | None = None
         self._active_sensors: list[int] = list(
@@ -1158,6 +1203,13 @@ class SignalsTab(QWidget):
             self._on_refresh_profile_changed
         )
         top_row.addWidget(self.refresh_profile_combo)
+        self.normalise_check = QCheckBox("Normalise (centre on zero)", top_row_group)
+        self.normalise_check.setChecked(True)
+        self.normalise_check.setToolTip(
+            "Centre every trace on zero and scale the vertical axis symmetrically to "
+            "the signal as it grows and shrinks. Off = plain autorange.")
+        self.normalise_check.toggled.connect(lambda on: self._plot.enable_normalise(bool(on)))
+        top_row.addWidget(self.normalise_check)
 
         # "Record only (no live streaming)" was removed from the UI: Live Signals
         # now has ONE recording method, Smart Record. The pipeline behind it is
@@ -1205,10 +1257,15 @@ class SignalsTab(QWidget):
             _init_rate = 100
         self.record_rate_spin.setValue(max(1, _init_rate))
         self.record_rate_spin.setSuffix(" Hz")
+        # Read-only mirror. There is one device rate (G3) and it is edited in
+        # Settings; this box used to be a second editor for the same value,
+        # whose change Settings never saved.
+        self.record_rate_spin.setReadOnly(True)
+        self.record_rate_spin.setEnabled(False)
+        self.record_rate_spin.setButtonSymbols(QSpinBox.NoButtons)
         self.record_rate_spin.setToolTip(
-            "Requested sampling rate sent to the Pi for recording (the single device "
-            "rate). Smart Record probes the actual delivered rate.")
-        self.record_rate_spin.valueChanged.connect(self._on_record_rate_changed)
+            "The device rate, set in Settings → Sensor defaults. Smart Record asks "
+            "the Pi for this rate and probes the rate actually delivered.")
         self.record_button = QPushButton("Smart Record", top_row_group)
         self.record_button.setToolTip(
             "Smart Record: probe the real rate (~5 s) -> record for the Rec length "
@@ -1439,6 +1496,10 @@ class SignalsTab(QWidget):
         """Update the acquisition widget with a new sampling configuration."""
 
         self._acquisition_widget.set_sampling_config(sampling_config)
+        spin = getattr(self, "record_rate_spin", None)
+        if spin is not None:
+            with QSignalBlocker(spin):
+                spin.setValue(int(round(float(sampling_config.device_rate_hz))))
 
     def set_sensor_selection(self, selection: SensorSelectionConfig) -> None:
         """

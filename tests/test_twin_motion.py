@@ -92,6 +92,15 @@ class TestYaw(unittest.TestCase):
         got = float(np.sqrt(2) * np.sqrt(np.mean(ang[mid] ** 2)))
         self.assertAlmostEqual(got, expected, delta=0.25 * expected)
 
+    def test_gyro_rate_is_degrees_per_second(self):
+        """The MPU6050 reports deg/s; the angle must come back in radians."""
+        rate_dps = 2.5 * np.sin(2 * np.pi * 1.6 * T)          # like the rig
+        as_deg = motion.angle_at(rate_dps, FS, degrees_per_second=False)
+        as_rad = motion.angle_at(rate_dps, FS)
+        self.assertAlmostEqual(as_rad, np.deg2rad(as_deg), places=12)
+        # 2.5 deg/s at 1.6 Hz is ~0.25 degrees of angle: milliradians, not radians
+        self.assertLess(abs(as_rad), 0.02)
+
     def test_a_still_gyro_gives_no_rotation(self):
         self.assertAlmostEqual(motion.angle_at(np.zeros(1200), FS), 0.0, places=9)
 

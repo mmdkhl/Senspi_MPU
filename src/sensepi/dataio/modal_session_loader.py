@@ -72,21 +72,92 @@ class ModalSession:
     message: str = ""
 
 
+def sliced_session(session: "ModalSession", rows) -> "ModalSession":
+    """A ModalSession restricted to some of its sensor rows.
+
+    Used to drop the floor-0 (shaker) row before an output-only identification:
+    it measures the input, and feeding it in as a response biases the picked
+    modes toward the excitation. Keeps ``sensor_ids`` aligned with the rows so
+    the story mapping downstream still refers to the right sensors.
+    """
+    rows = [int(r) for r in rows]
+    ids = list(session.sensor_ids)
+    return ModalSession(
+        source=session.source, fs=float(session.fs),
+        data=np.asarray(session.data, dtype=float)[rows, :],
+        sensor_ids=[ids[i] for i in rows],
+        duration_s=float(session.duration_s),
+        nan_fraction=float(getattr(session, "nan_fraction", 0.0)),
+        success=bool(session.success), message=str(session.message),
+    )
+
+
+def _is_audit_path(path: Path) -> bool:
+    """Smart Record's per-recording audit copy (``audit_<stamp>/raw_S<n>_….csv``).
+
+    It holds the same samples as the main files, before decimation. Loading it
+    alongside them doubled every sensor's series — harmless only while
+    decimation was 1, which is why it went unnoticed.
+    """
+    return any(part.startswith("audit_") for part in path.parts) \
+        or path.name.startswith("raw_S")
+
+
+def _has_log_files(directory: Path) -> bool:
+    try:
+        return any(p.is_file() and p.suffix.lower() in _LOG_SUFFIXES
+                   and not _is_audit_path(p) for p in directory.iterdir())
+    except OSError:
+        return False
+
+
 def list_sessions(base: Path | None = None) -> list[Path]:
-    """Return recorded-session directories under the recordings root, newest first."""
+    """Recording folders under the recordings root, newest first.
+
+    A *session* is a directory that directly contains log files. Smart Record
+    writes one such folder per recording (``<host>/mpu/<stamp>[_<name>]/``), and
+    the log-sync path writes ``<name>/`` or ``<host>/<prefix>/``; both are found
+    by the same rule. This used to list only the root's immediate children — the
+    host folders — so every recording under a host was globbed into one session
+    and two tests were silently averaged together.
+    """
     root = base or AppPaths().sensor_recordings
     if not root.is_dir():
         return []
-    sessions = [p for p in root.iterdir() if p.is_dir()]
-    sessions.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    sessions: list[Path] = []
+    for directory in [root, *sorted(p for p in root.rglob("*") if p.is_dir())]:
+        if any(part.startswith("audit_") for part in directory.relative_to(root).parts):
+            continue
+        if _has_log_files(directory):
+            sessions.append(directory)
+
+    def newest(directory: Path) -> float:
+        try:
+            return max((p.stat().st_mtime for p in directory.iterdir() if p.is_file()),
+                       default=directory.stat().st_mtime)
+        except OSError:
+            return 0.0
+
+    sessions.sort(key=newest, reverse=True)
     return sessions
 
 
 def find_session_files(session_dir: Path) -> list[Path]:
-    """Find candidate log files within a session directory (recursively)."""
+    """The log files of ONE recording.
+
+    Files directly inside the folder when there are any; only then does it look
+    deeper (a legacy host folder with recordings loose underneath). The audit
+    copy is excluded either way — see :func:`_is_audit_path`.
+    """
     if session_dir.is_file():
         return [session_dir]
-    files = [p for p in session_dir.rglob("*") if p.is_file() and p.suffix.lower() in _LOG_SUFFIXES]
+
+    def wanted(p: Path) -> bool:
+        return p.is_file() and p.suffix.lower() in _LOG_SUFFIXES and not _is_audit_path(p)
+
+    files = [p for p in session_dir.iterdir() if wanted(p)] if session_dir.is_dir() else []
+    if not files and session_dir.is_dir():
+        files = [p for p in session_dir.rglob("*") if wanted(p)]
     files.sort()
     return files
 

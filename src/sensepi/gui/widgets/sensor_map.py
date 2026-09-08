@@ -1,8 +1,5 @@
 """Sensor placement map — where each sensor physically sits on the structure.
 
-PREVIEW BUILD: the widget is complete and interactive, but nothing downstream
-consumes it yet. Wiring happens in a later step.
-
 The map is the one authoritative answer to "which sensor is where", so that
 every consumer (Spectrum, Model Updating, Sonification) stops guessing. Each
 sensor gets:
@@ -21,13 +18,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (QComboBox, QFormLayout, QGridLayout, QGroupBox,
                                QHBoxLayout, QLabel, QSizePolicy, QSpinBox,
                                QVBoxLayout, QWidget)
 
-MAX_FLOORS = 6
+# Matches the storey range Model Updating allows (1-20). At 6 a 7-storey model
+# could never be fully instrumented and the coverage warning fired forever.
+MAX_FLOORS = 20
 MAX_SENSORS = 4
 COLS = ("A", "B", "C")
 ROWS = ("1", "2", "3")
@@ -115,18 +114,22 @@ class SensorMap:
 PRESETS: dict = {
     "3 storeys — base + one per floor (centre)": (
         3, {1: (0, CENTRE), 2: (1, CENTRE), 3: (2, CENTRE), 4: (3, CENTRE)}),
+    # Torsion pairs sit on the A3 / C1 diagonal — the corners the rig actually
+    # uses. Any two different cells work for the maths (the lever arm is the
+    # perpendicular separation, 2 cells on either axis here); the preset must
+    # simply say where the sensors really are.
     "3 storeys — one per floor + torsion pair on top": (
-        3, {1: (1, CENTRE), 2: (2, CENTRE), 3: (3, "A1"), 4: (3, "C3")}),
+        3, {1: (1, CENTRE), 2: (2, CENTRE), 3: (3, "A3"), 4: (3, "C1")}),
     "4 storeys — one per floor (centre)": (
         4, {1: (1, CENTRE), 2: (2, CENTRE), 3: (3, CENTRE), 4: (4, CENTRE)}),
     "4 storeys — two floors + torsion pair on top": (
-        4, {1: (1, CENTRE), 2: (2, CENTRE), 3: (4, "A1"), 4: (4, "C3")}),
+        4, {1: (1, CENTRE), 2: (2, CENTRE), 3: (4, "A3"), 4: (4, "C1")}),
     "5 storeys — floors 1, 2, 4, 5 (centre)": (
         5, {1: (1, CENTRE), 2: (2, CENTRE), 3: (4, CENTRE), 4: (5, CENTRE)}),
     "5 storeys — floors 1, 3 (centre) + torsion pair on top": (
-        5, {1: (1, CENTRE), 2: (3, CENTRE), 3: (5, "A1"), 4: (5, "C3")}),
+        5, {1: (1, CENTRE), 2: (3, CENTRE), 3: (5, "A3"), 4: (5, "C1")}),
     "2 storeys — base + 2 floors + torsion pair on top": (
-        2, {1: (0, CENTRE), 2: (1, CENTRE), 3: (2, "A1"), 4: (2, "C3")}),
+        2, {1: (0, CENTRE), 2: (1, CENTRE), 3: (2, "A3"), 4: (2, "C1")}),
     "6 storeys — base + floors 1, 3, 6 (centre)": (
         6, {1: (0, CENTRE), 2: (1, CENTRE), 3: (3, CENTRE), 4: (6, CENTRE)}),
     "Custom": (0, {}),
@@ -290,11 +293,12 @@ class _MapFigure(QWidget):
 class SensorMapWidget(QGroupBox):
     """Settings panel: number of floors, preset, axis, and per-sensor placement."""
 
-    mapChanged = Signal(object)          # emits SensorMap; nothing consumes it yet
+    mapChanged = Signal(object)          # emits SensorMap; MainWindow fans it out
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("Sensor placement map", parent)
         self._loading = False
+        self._emit_pending = False
         self._n_sensors = MAX_SENSORS
         self._build()
         self._apply_preset(next(iter(PRESETS)))
@@ -357,8 +361,8 @@ class SensorMapWidget(QGroupBox):
         self.lbl_summary.setStyleSheet("color:#8b93a1;font-size:11px;")
         left.addWidget(self.lbl_summary)
 
-        note = QLabel("Used by Smart Recording and Spectrum. "
-                      "Model Updating and Sonification still have their own.")
+        note = QLabel("Used by every tab: Smart Recording, Spectrum, Model Updating, "
+                      "Sonification and the Digital Twin all read this map.")
         note.setStyleSheet("color:#ffd93d;font-size:11px;font-style:italic;")
         left.addWidget(note)
         left.addStretch(1)
@@ -377,10 +381,20 @@ class SensorMapWidget(QGroupBox):
             self._floor_combos[sid].setEnabled(on)
             self._cell_combos[sid].setEnabled(on)
             self._role_labels[sid].setEnabled(on)
+        # Fewer sensors can turn a "torsion pair" preset into a single sensor
+        # on one floor; the label must say what is actually placed.
+        self._loading = True
+        self.combo_preset.setCurrentText(self._match_preset(self.current_map()))
+        self._loading = False
         self._emit()
 
     def _rebuild_floor_choices(self) -> None:
         n = self.spin_floors.value()
+        # Save and RESTORE the flag. This used to set it True and then False,
+        # clobbering an outer _apply_preset() that had set it True — so the
+        # per-sensor edits that followed counted as manual edits and one preset
+        # change emitted seven maps.
+        was_loading = self._loading
         self._loading = True
         for sid, fc in self._floor_combos.items():
             keep = fc.currentData()
@@ -391,7 +405,7 @@ class SensorMapWidget(QGroupBox):
                 fc.addItem(f"{f}", f)
             idx = fc.findData(keep)
             fc.setCurrentIndex(idx if idx >= 0 else 0)
-        self._loading = False
+        self._loading = was_loading
 
     def apply_map(self, smap: SensorMap) -> None:
         """Load a stored placement back into the widgets."""
@@ -474,8 +488,18 @@ class SensorMapWidget(QGroupBox):
         self._emit()
 
     def _emit(self, *_a) -> None:
-        if self._loading:
+        """Coalesce: one map per user action, delivered on the next event-loop turn.
+
+        Five consumers hang off this signal and Spectrum launches a worker on
+        each delivery; a preset change used to deliver seven.
+        """
+        if self._loading or self._emit_pending:
             return
+        self._emit_pending = True
+        QTimer.singleShot(0, self._emit_now)
+
+    def _emit_now(self) -> None:
+        self._emit_pending = False
         smap = self.current_map()
         for sid in range(1, MAX_SENSORS + 1):
             pl = next((p for p in smap.placements if p.sensor_id == sid), None)
