@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Modal (eigenvalue) analysis for the OpenSees frame model."""
 
+from ..paths import output_path as _out_path
 import math
 import numpy as np
 import openseespy.opensees as ops
@@ -269,7 +270,7 @@ def render_mode_shapes_individually_to_png(modal_data):
     return pngs
 
 
-def export_modal_files(modal_data, output_prefix):
+def export_modal_files(modal_data, output_prefix, output_base=None):
     """
     Export modal results to text files in the output/ directory.
 
@@ -287,14 +288,16 @@ def export_modal_files(modal_data, output_prefix):
     ctx = modal_data["ctx"]
     master_nodes = ctx["master_nodes"]
 
-    with open(f"output/{output_prefix}_periods.out", "w", encoding="utf-8") as f:
+    with open(_out_path(f"{output_prefix}_periods.out", output_base),
+              "w", encoding="utf-8") as f:
         f.write("Mode  Lambda(rad^2/s^2)  Omega(rad/s)  Frequency(Hz)  Period(s)\n")
         for i in range(len(freqs)):
             f.write(
                 f"{i+1}  {r3(lam[i])}  {r3(omegas[i])}  {r3(freqs[i])}  {r3(periods[i])}\n"
             )
 
-    with open(f"output/{output_prefix}_mode_shapes_normalized.out", "w", encoding="utf-8") as f:
+    with open(_out_path(f"{output_prefix}_mode_shapes_normalized.out", output_base),
+              "w", encoding="utf-8") as f:
         f.write("Mode  StoryMasterNode  UX_normalized\n")
         for mode in range(1, len(freqs) + 1):
             phi = modal_data["mode_shapes_ux_master"][mode - 1]

@@ -9,6 +9,7 @@ import os
 import time
 import traceback
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +49,10 @@ from PySide6.QtWidgets import (
 
 
 from ...analysis import modal as modal_id
+from ...analysis import sensor_layout as slayout
+from ...digital_twin import decisions as twin_decisions
+from ..widgets.decision_panel import DecisionPanel
+from ..widgets.wireframe import LiveStructureView
 from ...analysis import modal_tracker as modal_trk
 from ...dataio import modal_session_loader as msl
 
@@ -60,6 +65,7 @@ REQUIRED_MODULES = ("openseespy", "opsvis")
 # rather than forced onto a story, where it would be averaged into that story's
 # value and bias the shape. map_to_stories() ignores any sensor missing from the
 # map, so an unassigned sensor never enters the calculation.
+# Retained: the manual mode-shape table still offers "not measured" cells.
 UNASSIGNED_STORY = "—"
 
 # Input files bundled with the opensees_model_updating package
@@ -86,7 +92,19 @@ _DEFAULT_CALIB_MODES_CAP: int = 3
 
 
 def _default_workspace_dir() -> Path:
-    return Path(__file__).resolve().parents[4]  # repo root
+    """Where model runs write when the user has not chosen a workspace.
+
+    This used to return the **repo root**. Combined with the tool's convention of
+    creating ``input/`` and ``output/`` inside the workspace, that is what grew a
+    stray ``output/`` at the top of the repository — not stale debris, as it was
+    once recorded, but a folder recreated by every calibration run with default
+    settings.
+
+    The workspace convention itself is the OpenSees tool's and is left alone; only
+    its default location moves, under the one root the application writes to.
+    """
+    from ...config.app_config import AppPaths
+    return AppPaths().model_output
 
 
 @dataclass
@@ -505,7 +523,7 @@ class _ModelUpdatingWorker(QObject):
     def _run_impl(self) -> dict[str, Any]:
         project_dir = self._request.project_dir
         params = copy.deepcopy(self._request.params)
-        previous_cwd = Path.cwd()
+        # No previous_cwd: this worker no longer changes the process directory.
 
         from opensees_model_updating.analysis.modal import (  # type: ignore
             export_modal_files,
@@ -531,15 +549,19 @@ class _ModelUpdatingWorker(QObject):
         )
 
         try:
-            os.chdir(project_dir)
+            # No os.chdir. It is process-global: it moves the working directory
+            # for every thread, so while a calibration ran, the live acquisition
+            # thread and the chorus worker resolved relative paths somewhere
+            # else. Every writer below now takes an explicit absolute directory.
+            out_base = Path(project_dir) / "output"
+            out_base.mkdir(parents=True, exist_ok=True)
             self.log.emit(f"Output workspace: {project_dir}\n")
 
-            os.makedirs("input", exist_ok=True)
-            os.makedirs("output", exist_ok=True)
+            (Path(project_dir) / "input").mkdir(parents=True, exist_ok=True)
 
             if self._request.action == "calibrate":
                 original_params = copy.deepcopy(params)
-                write_json("output/original_inputs.json", original_params)
+                write_json(out_base / "original_inputs.json", original_params)
 
                 if params.get("experimental_data_source") == "manual":
                     self.log.emit("\nUsing manually entered experimental modal data.\n")
@@ -551,12 +573,12 @@ class _ModelUpdatingWorker(QObject):
                         exp_data = _load_exp_data_from_json_path(json_path, params)
                     else:
                         exp_data = prepare_experimental_modal_data(params)
-                write_json("output/experimental_modal_data_loaded.json", exp_data["raw_data"])
+                write_json(out_base / "experimental_modal_data_loaded.json", exp_data["raw_data"])
 
                 modal_before = extract_modal_results(
                     original_params, normalize_modes=True, show_info=params["show_info"]
                 )
-                export_modal_files(modal_before, "original")
+                export_modal_files(modal_before, "original", output_base=out_base)
 
                 _sep = "─" * 60
                 n_show = params["numModes"]
@@ -636,7 +658,7 @@ class _ModelUpdatingWorker(QObject):
                         normalize_modes=True,
                         show_info=params["show_info"],
                     )
-                    export_modal_files(modal_after, "calibrated")
+                    export_modal_files(modal_after, "calibrated", output_base=out_base)
 
                     e_orig_val = float(original_params["E"])
                     e_cal_val = float(calibrated_params["E"])
@@ -668,7 +690,7 @@ class _ModelUpdatingWorker(QObject):
                     calibrated_params = original_params
                     modal_after = modal_before
 
-                write_json("output/calibrated_inputs.json", calibrated_params)
+                write_json(out_base / "calibrated_inputs.json", calibrated_params)
 
                 report = make_modal_comparison_report(
                     exp_data,
@@ -679,15 +701,15 @@ class _ModelUpdatingWorker(QObject):
                     calib_result,
                 )
                 report_text = report_to_text(report)
-                write_json("output/modal_comparison_report.json", report)
-                write_text("output/modal_comparison_report.txt", report_text)
+                write_json(out_base / "modal_comparison_report.json", report)
+                write_text(out_base / "modal_comparison_report.txt", report_text)
                 save_calibration_summary_figure(
                     exp_data,
                     modal_before,
                     modal_after,
                     original_params,
                     calibrated_params,
-                    save_path="output/calibration_summary.png",
+                    save_path=out_base / "calibration_summary.png",
                 )
                 calib_summary_png = generate_calibration_summary_png(
                     exp_data, modal_before, modal_after, original_params, calibrated_params
@@ -706,9 +728,10 @@ class _ModelUpdatingWorker(QObject):
                         modal_original_dynamic,
                         show_info=params["show_info"],
                         recorder_prefix="original_",
+                        output_base=out_base,
                     )
                     np.savez(
-                        "output/original_transient_response_overlay.npz",
+                        out_base / "original_transient_response_overlay.npz",
                         t_hist=uncalibrated_response["t_hist"],
                         u_hist=uncalibrated_response["u_hist"],
                         a_hist=uncalibrated_response["a_hist"],
@@ -744,7 +767,7 @@ class _ModelUpdatingWorker(QObject):
             else:
                 final_params = run_params
 
-            write_json("output/current_run_inputs.json", run_params)
+            write_json(out_base / "current_run_inputs.json", run_params)
 
             _sep = "─" * 60
 
@@ -765,7 +788,7 @@ class _ModelUpdatingWorker(QObject):
                             self.log.emit(f"    Story {sk}: " + "  ".join(f"{float(v):.4f}" for v in vals) + "\n")
 
             if use_precalibrated:
-                write_json("output/calibrated_inputs_used_for_run.json", final_params)
+                write_json(out_base / "calibrated_inputs_used_for_run.json", final_params)
                 prior_heights = run_params.get("story_heights", [])
                 _log_model_params(run_params, prior_heights, "PRIOR MODEL (uncalibrated)")
                 if state.prior_freqs:
@@ -786,7 +809,7 @@ class _ModelUpdatingWorker(QObject):
             final_modal = extract_modal_results(
                 final_params, normalize_modes=True, show_info=run_params["show_info"]
             )
-            export_modal_files(final_modal, "run_model")
+            export_modal_files(final_modal, "run_model", output_base=out_base)
             modal_summary = _modal_summary(final_modal, run_params["numModes"])
 
             self.log.emit("\nModal frequencies:\n")
@@ -819,6 +842,7 @@ class _ModelUpdatingWorker(QObject):
                     final_modal,
                     show_info=run_params["show_info"],
                     recorder_prefix="run_",
+                    output_base=out_base,
                     frame_callback=self.frame.emit,
                     plot_every=10,
                     anim_every=10,
@@ -826,7 +850,7 @@ class _ModelUpdatingWorker(QObject):
                     sfac_anim=20.0,
                 )
                 np.savez(
-                    "output/run_transient_response.npz",
+                    out_base / "run_transient_response.npz",
                     t_hist=transient_response["t_hist"],
                     u_hist=transient_response["u_hist"],
                     a_hist=transient_response["a_hist"],
@@ -872,7 +896,7 @@ class _ModelUpdatingWorker(QObject):
                 "fig_mode_pngs": mode_shapes_pngs,
             }
         finally:
-            os.chdir(previous_cwd)
+            pass
 
 
 def _build_exp_data_from_gui_values(params: dict[str, Any]) -> dict[str, Any]:
@@ -1040,6 +1064,11 @@ def _make_calibration_signature(params: dict[str, Any]) -> str:
         "story_column_layout",
         "column_orientation_layout",
         "additional_masses",
+        # Placement now arrives from Settings, so a change there must age a
+        # calibration made under the old placement (it used to stay "available").
+        "sensor_story_map",
+        "sensor_axis",
+        "sensor_n_modes",
     ]
     return json.dumps(
         {key: _round_for_signature(params.get(key)) for key in keys},
@@ -1245,6 +1274,13 @@ def _build_sensor_exp_dict(session: "msl.ModalSession", params: dict[str, Any]):
     Pure: no OpenSees, no Qt.
     """
     method = params.get("sensor_method", "fdd")
+    # Structural rows only. The floor-0 sensor measures the shaker INPUT; as a
+    # response it biased mode 2 by ~2 % on the real rig. Spectrum and Digital
+    # Twin already slice it; this tab was the last to feed it in.
+    story_map = {int(k): int(v) for k, v in dict(params.get("sensor_story_map") or {}).items()}
+    keep = [i for i, sid in enumerate(session.sensor_ids) if int(sid) in story_map]
+    if keep and len(keep) < len(list(session.sensor_ids)):
+        session = msl.sliced_session(session, keep)
     result = modal_id.identify_modes(
         session.data, session.fs,
         f_min=params["sensor_f_min"], f_max=params["sensor_f_max"],
@@ -1301,9 +1337,15 @@ class _IdentifyWorker(QObject):
             self.log.emit(f"  Frequency band:   {p['sensor_f_min']:.2f} – {p['sensor_f_max']:.2f} Hz\n")
             self.log.emit(f"  Modes requested:  {p['sensor_n_modes']}\n")
             self.log.emit(f"  Model stories:    {p['nStory']}\n")
-            self.log.emit("  Sensor → story mapping:\n")
+            self.log.emit("  Sensor → story mapping (from Settings):\n")
             for sid in sorted(p["sensor_story_map"]):
                 self.log.emit(f"    Sensor {sid} → Story {p['sensor_story_map'][sid]}\n")
+            warning = p.get("sensor_coverage_warning") or ""
+            if warning:
+                # Soft on purpose: matching the numerical model to the physical
+                # rig is the user's call, so this is stated and then the run
+                # continues on the measured storeys.
+                self.log.emit("\n" + warning)
 
             session = msl.load_session(
                 Path(self._session_path),
@@ -1340,9 +1382,10 @@ class _IdentifyWorker(QObject):
             self.log.emit(f"  {result.message}\n")
             for m, f in enumerate(result.frequencies_hz):
                 period = 1.0 / f if f > 0 else float("nan")
-                zeta = result.damping_ratios[m] if m < len(result.damping_ratios) else float("nan")
-                zeta_str = f"{zeta * 100:.1f} %" if zeta == zeta else "n/a"  # nan check
-                self.log.emit(f"    Mode {m + 1}:  f = {f:6.3f} Hz   T = {period:6.3f} s   ζ = {zeta_str}\n")
+                # Half-power ζ measured 17-186 % wrong against known damping
+                # (DEBT-8); printing it as a figure invites trusting it.
+                self.log.emit(f"    Mode {m + 1}:  f = {f:6.3f} Hz   T = {period:6.3f} s   "
+                              f"ζ = n/a (use Spectrum → damping ratio)\n")
 
             shape_kind = "magnitude" if result.method == "fft" else "signed"
             self.log.emit(f"\n  Per-sensor mode shapes ({shape_kind}, |max| = 1):\n")
@@ -1505,6 +1548,16 @@ class _ContinuousUpdateWorker(QObject):
             f"Continuous update started ({method}, Stage-1 tracker λ={trk_lambda:g}, "
             f"c={trk_c:g}). Each cycle records {duration:g}s, identifies, then updates; "
             f"the loop runs until you press Stop.\n")
+        # The placement is read ONCE, here. Say so: a user who edits Settings
+        # mid-run would otherwise have no way to know this run did not follow.
+        frozen = ", ".join(f"S{sid}→{st}" for sid, st in
+                           sorted(dict(self._params.get("sensor_story_map") or {}).items()))
+        self.log.emit(f"  Placement frozen at {time.strftime('%H:%M:%S')}: {frozen} "
+                      f"(axis {self._params.get('sensor_axis', '?')}). Changes in Settings "
+                      f"apply to the next run.\n")
+        warning = self._params.get("sensor_coverage_warning") or ""
+        if warning:
+            self.log.emit("  " + warning)
         while self._running:
             cycle += 1
             cycle_start = time.monotonic()
@@ -1640,6 +1693,23 @@ class _ContinuousUpdateWorker(QObject):
             })
             self._history = self._history[-40:]  # keep last 40 cycles for the plots
 
+            # Digital-twin decisions for THIS cycle and for the rolling average of
+            # the last N cycles' calibrated E and masses — computed here, in the
+            # worker, against the frozen design (initial_params). Pure functions;
+            # only plain dataclasses cross to the GUI.
+            roll_n = max(1, int(self._settings.get("twin_rolling_cycles", 5)))
+            recent = self._history[-roll_n:]
+            rolled = {
+                "E": float(np.mean([h["E"] for h in recent])),
+                "floor_masses": [float(v) for v in np.mean(
+                    [h["masses"] for h in recent], axis=0)],
+            }
+            decisions_cycle = twin_decisions.decide(initial_params, calib)
+            decisions_roll = twin_decisions.decide(initial_params, rolled)
+            self.log.emit(
+                f"  twin · this cycle: {decisions_cycle.summary()}  ·  rolling {len(recent)}: "
+                f"{decisions_roll.summary()}\n")
+
             # Render BOTH right-panel views every cycle; the GUI checkbox picks which
             # to show, so toggling is instant and needs no recompute (G1/G4: both are
             # rendered here in the worker thread, only PNG bytes cross to the GUI).
@@ -1654,6 +1724,9 @@ class _ContinuousUpdateWorker(QObject):
                 "success": bool(success),
                 "calibrated_params": copy.deepcopy(calib),
                 "signature": _make_calibration_signature(initial_params),
+                "twin_decisions_cycle": decisions_cycle,
+                "twin_decisions_rolling": decisions_roll,
+                "twin_rolling_n": len(recent),
             })
 
             if max_cycles and cycle >= max_cycles:
@@ -2232,33 +2305,24 @@ class ModelUpdatingTab(QWidget):
         vbox = QVBoxLayout(panel)
         vbox.setContentsMargins(0, 4, 0, 0)
 
-        # Preset + per-sensor story mapping.
-        map_group = QGroupBox("Sensor → Story mapping", self)
-        map_form = QFormLayout(map_group)
-
-        self._sensor_preset = QComboBox(self)
-        self._sensor_preset.addItems([
-            "1 bottom + 2 top",
-            "Fully instrumented (1 per floor)",
-            "Bottom + top only",
-            "2 bottom + 2 top",
-            "Custom",
-        ])
-        map_form.addRow("Preset:", self._sensor_preset)
-
-        self._sensor_axis = QComboBox(self)
-        self._sensor_axis.addItems(["ax", "ay"])
-        map_form.addRow("Axis (shaker = X → ax):", self._sensor_axis)
-
-        self._sensor_story_combos: dict[int, QComboBox] = {}
-        for sid in self._SENSOR_IDS:
-            combo = QComboBox(self)
-            self._sensor_story_combos[sid] = combo
-            map_form.addRow(f"Sensor {sid} → Story:", combo)
-        self._sensor_guidance = QLabel("", self)
-        self._sensor_guidance.setWordWrap(True)
-        self._sensor_guidance.setStyleSheet("color: #555;")
-        map_form.addRow(self._sensor_guidance)
+        # Where the sensors are is NOT decided here any more. This panel used to
+        # carry its own preset combo, axis combo and one story combo per sensor —
+        # a second, independent answer to a question the Settings placement map
+        # already answers, which could silently disagree with it. It is now a
+        # read-only reflection of that map; only the identification knobs below
+        # are still this tab's to choose.
+        map_group = QGroupBox("Sensor placement (from Settings)", self)
+        map_v = QVBoxLayout(map_group)
+        self._sensor_map_summary = QLabel("", self)
+        self._sensor_map_summary.setWordWrap(True)
+        self._sensor_map_summary.setStyleSheet("color: #555;")
+        map_v.addWidget(self._sensor_map_summary)
+        hint = QLabel(
+            "Change the number of floors, the sensor placement or the excitation "
+            "axis in <b>Settings → Sensor placement map</b>.", self)
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #777; font-style: italic;")
+        map_v.addWidget(hint)
         vbox.addWidget(map_group)
 
         # Identification parameters.
@@ -2277,7 +2341,9 @@ class ModelUpdatingTab(QWidget):
         # CU-9 / D2: default upper band 12 Hz (was 20) so the picker ignores the
         # 13–20 Hz noise region that out-prominenced the real ~8 Hz mode. The band is
         # independent of the Spectrum tab's band — both are user-adjustable.
-        self._sensor_fmax = self._double_spin(0.10, 1000.0, 12.0, 3)
+        # 0.5-20 Hz, the same band Spectrum uses: both tabs now identify from
+        # the same buffer and placement, and should find the same mode set.
+        self._sensor_fmax = self._double_spin(0.10, 1000.0, 20.0, 3)
         self._sensor_nmodes = QSpinBox(self)
         self._sensor_nmodes.setRange(1, 12)
         self._sensor_nmodes.setValue(3)
@@ -2310,7 +2376,8 @@ class ModelUpdatingTab(QWidget):
         sess_v = QVBoxLayout(sess_group)
         sess_row = QHBoxLayout()
         self._sensor_session_edit = QLineEdit(self)
-        self._sensor_session_edit.setPlaceholderText("Latest session in data/raw (or browse)")
+        self._sensor_session_edit.setPlaceholderText(
+            "Latest session in output/sensor_recordings (or browse)")
         sess_row.addWidget(self._sensor_session_edit, stretch=1)
         self._sensor_latest_btn = QPushButton("Use latest", self)
         self._sensor_browse_btn = QPushButton("Browse…", self)
@@ -2320,88 +2387,81 @@ class ModelUpdatingTab(QWidget):
         vbox.addWidget(sess_group)
 
         # Wire sensor-panel controls.
-        self._sensor_preset.currentIndexChanged.connect(self._apply_sensor_preset)
         self._sensor_latest_btn.clicked.connect(self._use_latest_session)
         self._sensor_browse_btn.clicked.connect(self._browse_session)
         return panel
 
-    def _refresh_sensor_story_combos(self) -> None:
-        """Rebuild story options to match the Model tab's story count."""
-        if not hasattr(self, "_sensor_story_combos"):
-            return
-        n_story = int(self._story_count.value())
-        # Any sensor may sit on any story, several may share one, and any may be
-        # left unassigned (not mounted on a model story) -- see UNASSIGNED_STORY.
-        options = [UNASSIGNED_STORY] + [str(s) for s in range(1, n_story + 1)]
-        for sid, combo in self._sensor_story_combos.items():
-            prev = combo.currentText()
-            combo.blockSignals(True)
-            combo.clear()
-            combo.addItems(options)
-            if prev and prev in options:
-                combo.setCurrentText(prev)
-            combo.blockSignals(False)
-        self._apply_sensor_preset()
+    # ---------------------------------------------- placement (from Settings)
+    def apply_sensor_map(self, mapping) -> None:
+        """Adopt the placement map from Settings. This tab owns no picker.
 
-    @Slot()
-    def _apply_sensor_preset(self, *_: object) -> None:
-        if not hasattr(self, "_sensor_story_combos"):
+        Called on the GUI thread from MainWindow whenever Settings emits a new
+        map, and once at start-up with the stored one. ``mapping`` is a
+        ``SensorMap`` or the plain dict from its ``to_mapping()``.
+        """
+        if hasattr(mapping, "to_mapping"):
+            mapping = mapping.to_mapping()
+        self._sensor_mapping = dict(mapping) if isinstance(mapping, dict) else None
+        self._refresh_sensor_map_summary()
+        if hasattr(self, "_twin_live_view"):
+            self._twin_live_view.apply_sensor_map(self._sensor_mapping)
+
+    def current_sensor_layout(self):
+        """The placement as analysis inputs. Never None; check ``is_valid``."""
+        return slayout.layout_from_mapping(
+            getattr(self, "_sensor_mapping", None),
+            requested_modes=int(self._sensor_nmodes.value())
+            if hasattr(self, "_sensor_nmodes") else slayout.DEFAULT_MODES)
+
+    def _story_coverage_warning(self, layout, n_story: int) -> str:
+        """Soft warning when the numerical model is taller than the instrumented rig.
+
+        Matching the numerical model to the physical one is the user's call, so
+        this never blocks: calibration proceeds on the floors that *are*
+        measured (partial coverage, B1). It exists so that a mode shape compared
+        against storeys nobody measured is visible in the log rather than
+        silently accepted as agreement.
+        """
+        if not layout.is_valid:
+            return ""
+        missing = [f for f in range(1, int(n_story) + 1)
+                   if f not in set(layout.story_map.values())]
+        if not missing:
+            return ""
+        return (
+            f"WARNING: the numerical model has {n_story} storey(s) but the sensor "
+            f"placement covers only {sorted(set(layout.story_map.values()))}. "
+            f"Storey(s) {', '.join(map(str, missing))} are unmeasured; calibration "
+            f"proceeds on the measured storeys only (partial coverage). Check that "
+            f"the numerical model matches the physical rig — the placement is set "
+            f"in Settings, the storey count on the Model tab.\n")
+
+    def _refresh_sensor_map_summary(self) -> None:
+        label = getattr(self, "_sensor_map_summary", None)
+        if label is None:
             return
-        preset = self._sensor_preset.currentText()
-        n_story = int(self._story_count.value())
-        if preset == "Custom":
-            self._sensor_guidance.setText("Custom: set each sensor's story manually.")
+        layout = self.current_sensor_layout()
+        if not layout.is_valid:
+            label.setText(
+                "<b style='color:#b58900'>No sensor placement.</b> Set it in "
+                "Settings → Sensor placement map; identification from sensors "
+                "cannot run without it.")
             return
-        if preset == "Fully instrumented (1 per floor)":
-            # Only as many sensors as there are stories can each get their own
-            # story; any extras are left unassigned rather than doubled up.
-            mapping = {
-                sid: i + 1
-                for i, sid in enumerate(self._SENSOR_IDS)
-                if i < n_story
-            }
-            placed = ", ".join(str(s) for s in range(1, min(len(self._SENSOR_IDS), n_story) + 1))
-            guide = f"One sensor on each of stories {placed} (full mode shapes)."
-        elif preset == "Bottom + top only":
-            mapping = {1: 1, 2: n_story, 3: n_story}
-            guide = (
-                f"Sensor 1 on story 1; sensors 2 & 3 on the top story ({n_story}). "
-                "Sensor 4 left unassigned — set it manually or use "
-                "\"2 bottom + 2 top\"."
-            )
-        elif preset == "2 bottom + 2 top":
-            mapping = {1: 1, 2: 1, 3: n_story, 4: n_story}
-            guide = (
-                f"Sensors 1 & 2 on story 1 (bottom); sensors 3 & 4 on the top "
-                f"story ({n_story})."
-            )
-        else:  # "1 bottom + 2 top"
-            mapping = {1: 1, 2: n_story, 3: n_story}
-            guide = (
-                f"Sensor 1 on story 1 (bottom); sensors 2 & 3 on the top story "
-                f"({n_story}) corners. Sensor 4 left unassigned — set it "
-                "manually or use \"2 bottom + 2 top\"."
-            )
-        # Apply to every sensor, not just those in `mapping`: a sensor a preset
-        # doesn't place must be explicitly unassigned, otherwise it keeps a
-        # stale story from a previously selected preset and quietly biases that
-        # story's averaged mode-shape value.
-        for sid, combo in self._sensor_story_combos.items():
-            if combo is None:
-                continue
-            story = mapping.get(sid)
-            if story is None:
-                combo.setCurrentText(UNASSIGNED_STORY)
-            else:
-                combo.setCurrentText(str(min(story, n_story)))
-        self._sensor_guidance.setText(guide)
+        bits = [f"<b>{layout.describe()}</b>"]
+        n_story = (int(self._story_count.value())
+                   if hasattr(self, "_story_count") else layout.n_floors)
+        warning = self._story_coverage_warning(layout, n_story)
+        if warning:
+            bits.append("<span style='color:#b58900'>"
+                        + warning.replace("WARNING: ", "").strip() + "</span>")
+        label.setText("<br>".join(bits))
 
     @Slot()
     def _use_latest_session(self) -> None:
         sessions = msl.list_sessions()
         if not sessions:
             QMessageBox.information(self, "No recordings",
-                                    "No recorded sessions found in data/raw.")
+                                    "No recorded sessions found in output/sensor_recordings.")
             return
         self._sensor_session_edit.setText(str(sessions[0]))
 
@@ -2409,7 +2469,8 @@ class ModelUpdatingTab(QWidget):
     def _browse_session(self) -> None:
         path = QFileDialog.getExistingDirectory(
             self, "Choose recorded session folder",
-            self._sensor_session_edit.text().strip() or str(msl.AppPaths().raw_data),
+            self._sensor_session_edit.text().strip()
+            or str(msl.AppPaths().sensor_recordings),
         )
         if path:
             self._sensor_session_edit.setText(path)
@@ -2593,16 +2654,35 @@ class ModelUpdatingTab(QWidget):
         self._cont_fig2_fdd: bytes | None = None      # per-iteration FDD spectrum
         self._cont_fig2_track: bytes | None = None     # consolidated frequency tracking
         self._cont_view_active = False                 # True while Mode-B results are shown
+        # Continuous Update — right panel is a SELECTION now, not a toggle:
+        # per-cycle spectrum, frequency tracking, or the digital twin (the same
+        # live structure + decision lights the experiment tab shows, here fed by
+        # every cycle or by the rolling average of the last N cycles).
         header = QHBoxLayout()
         header.addStretch(1)
-        self._cont_track_view = QCheckBox("Show frequency tracking (Continuous Update right panel)", self)
-        self._cont_track_view.setToolTip(
-            "Continuous Update — right panel view:\n"
-            "  unchecked = per-cycle FDD spectrum (this window's identified modes)\n"
-            "  checked   = consolidated f̂ ±1σ tracks + raw per-cycle identifications")
-        self._cont_track_view.toggled.connect(self._on_cont_view_toggled)
-        header.addWidget(self._cont_track_view)
+        header.addWidget(QLabel("Continuous Update view:", self))
+        self._cont_view_combo = QComboBox(self)
+        self._cont_view_combo.addItem("Per-cycle spectrum", "fdd")
+        self._cont_view_combo.addItem("Frequency tracking (f̂ per cycle)", "track")
+        self._cont_view_combo.addItem("Digital twin (live structure + decisions)", "twin")
+        self._cont_view_combo.currentIndexChanged.connect(self._on_cont_view_toggled)
+        header.addWidget(self._cont_view_combo)
+        header.addSpacing(12)
+        header.addWidget(QLabel("Decide on:", self))
+        self._twin_react_combo = QComboBox(self)
+        self._twin_react_combo.addItem("each cycle", "cycle")
+        self._twin_react_combo.addItem("rolling average", "rolling")
+        self._twin_react_combo.currentIndexChanged.connect(self._on_cont_view_toggled)
+        header.addWidget(self._twin_react_combo)
+        self._twin_roll_spin = QSpinBox(self)
+        self._twin_roll_spin.setRange(2, 40)
+        self._twin_roll_spin.setValue(5)
+        self._twin_roll_spin.setPrefix("N = ")
+        self._twin_roll_spin.setToolTip(
+            "Cycles averaged for the rolling decision (calibrated E and masses).")
+        header.addWidget(self._twin_roll_spin)
         outer.addLayout(header)
+        self._cont_view_combo.setCurrentIndex(2)
 
         # Left side: static PNG (calibrate) or live roof response curves (run).
         self._fig1_label = _ScaledImageLabel(
@@ -2646,11 +2726,24 @@ class ModelUpdatingTab(QWidget):
         run_grid.setRowStretch(1, 1)
         self._run_right_widget.hide()
 
+        # Digital twin view: the shared live structure + decision lights.
+        self._twin_widget = QWidget(self)
+        twin_row = QHBoxLayout(self._twin_widget)
+        twin_row.setContentsMargins(0, 0, 0, 0)
+        self._twin_live_view = LiveStructureView(self._twin_widget)
+        self._twin_live_view.set_controller(self._recorder_controller)
+        self._twin_panel = DecisionPanel(parent=self._twin_widget)
+        twin_row.addWidget(self._twin_live_view, stretch=3)
+        twin_row.addWidget(self._twin_panel, stretch=2)
+        self._twin_widget.hide()
+        self._last_twin_payload: dict | None = None
+
         right_col = QWidget(self)
         right_layout = QVBoxLayout(right_col)
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.addWidget(self._fig2_label, stretch=1)
         right_layout.addWidget(self._run_right_widget, stretch=1)
+        right_layout.addWidget(self._twin_widget, stretch=1)
 
         fig_row = QWidget(self)
         fig_layout = QHBoxLayout(fig_row)
@@ -2739,7 +2832,9 @@ class ModelUpdatingTab(QWidget):
 
         self._rebuild_mass_table(existing_masses)
         self._sync_mode_counts_to_story_count()
-        self._refresh_sensor_story_combos()
+        # The storey count feeds the coverage warning, so the placement summary
+        # follows it even though the placement itself comes from Settings.
+        self._refresh_sensor_map_summary()
         self._refresh_previews()
 
     def _rebuild_mass_table(self, existing: dict[int, list[float]] | None = None) -> None:
@@ -3290,20 +3385,67 @@ class ModelUpdatingTab(QWidget):
         except Exception:
             pass
 
+    # ------------------------------------------------------------------
+    # Public seam for the Digital Twin tab.
+    #
+    # That tab used to reach into THREE private members of this one —
+    # ``_collect_params``, ``_collect_sensor_params`` and the
+    # ``_project_dir_edit`` *widget*. Renaming any of them broke it silently:
+    # no import error, just a failure at run time when someone pressed a button.
+    # One documented method, returning a deep copy, replaces all three.
+    # ------------------------------------------------------------------
+    def is_busy(self) -> bool:
+        """True while a calibration, run or continuous update is in progress."""
+        return self._thread is not None or self._continuous_thread is not None
+
+    def calibration_snapshot(self) -> dict[str, Any] | None:
+        """A deep copy of the last calibrated parameters, or ``None``.
+
+        The Digital Twin tab falls back to this when it has not calibrated on
+        its own. It used to read ``_calibration_state`` directly.
+        """
+        state = self._calibration_state
+        if state is None or not state.available or not state.calibrated_params:
+            return None
+        return copy.deepcopy(state.calibrated_params)
+
+    def model_definition_snapshot(self) -> dict[str, Any]:
+        """A self-contained copy of the model as currently defined here.
+
+        Everything a caller needs to run its own calibration without holding a
+        reference to this tab afterwards: the structural parameters, the sensor
+        identification settings, the placement-derived story map, and the project
+        directory. A deep copy on purpose — the caller keeps a *snapshot*, so
+        later edits on this tab cannot silently change an experiment that has
+        already started.
+
+        Raises ``ValueError`` with a readable message if the model is not in a
+        usable state, exactly as the tab's own actions do.
+        """
+        params = copy.deepcopy(self._collect_params())
+        params.update(copy.deepcopy(self._collect_sensor_params()))
+        params["project_dir"] = str(Path(self._project_dir_edit.text().strip()))
+        params["snapshot_taken_at"] = datetime.now().isoformat(timespec="seconds")
+        return params
+
     def _collect_sensor_params(self) -> dict[str, Any]:
-        # Sensors left unassigned are omitted, so map_to_stories() never sees
-        # them and they contribute to no story's mode-shape value.
-        story_map: dict[int, int] = {}
-        for sid, combo in self._sensor_story_combos.items():
-            if not combo.count():
-                continue
-            text = combo.currentText()
-            if text == UNASSIGNED_STORY:
-                continue
-            try:
-                story_map[sid] = int(text)
-            except ValueError:
-                continue
+        """Identification inputs. **Return shape is a contract** — the Digital
+        Twin tab reads ``sensor_axis``, ``sensor_story_map`` and ``nStory`` from
+        it directly, so the keys and their types must not change.
+
+        What changed underneath is only the *source*: placement and axis now come
+        from the Settings map instead of this tab's own combos. Sensors that are
+        unplaced, or on floor 0 (the shaker, an input rather than a response),
+        are absent from the map, so ``map_to_stories`` never sees them and they
+        contribute to no storey's mode-shape value — the same guarantee the
+        "unassigned" combo entry used to give.
+        """
+        layout = self.current_sensor_layout()
+        if not layout.is_valid:
+            raise ValueError(
+                "No sensor placement is set. Open Settings → Sensor placement map "
+                "and place at least one sensor on a floor.")
+        story_map: dict[int, int] = dict(layout.story_map)
         fmin = float(self._sensor_fmin.value())
         fmax = float(self._sensor_fmax.value())
         if fmax <= fmin:
@@ -3313,15 +3455,20 @@ class ModelUpdatingTab(QWidget):
             else float(self._sensor_fs_manual.value())
         )
         return {
-            "sensor_axis": self._sensor_axis.currentText(),
+            "sensor_axis": layout.channel,
             "sensor_method": self._sensor_method.currentText().lower(),
             "sensor_window_s": float(self._sensor_window.value()),
             "sensor_f_min": fmin,
             "sensor_f_max": fmax,
-            "sensor_n_modes": int(self._sensor_nmodes.value()),
+            "sensor_n_modes": layout.max_modes(int(self._sensor_nmodes.value())),
             "sensor_story_map": story_map,
             "sensor_target_fs": target_fs,
             "nStory": int(self._story_count.value()),
+            # Additive key: carried into the worker so the Output log can state
+            # the mismatch. Digital Twin reads only the three keys above and
+            # ignores extras, so its contract is unaffected.
+            "sensor_coverage_warning": self._story_coverage_warning(
+                layout, int(self._story_count.value())),
         }
 
     # ---- Mode A: Load & Identify -------------------------------------
@@ -3349,7 +3496,8 @@ class ModelUpdatingTab(QWidget):
             if not sessions:
                 QMessageBox.warning(
                     self, "No recording",
-                    "No recorded session found in data/raw. Record one in the Live "
+                    "No recorded session found in output/sensor_recordings. Record one in "
+                    "the Live "
                     "Signals tab (and sync it from the Pi) first.",
                 )
                 return
@@ -3436,6 +3584,8 @@ class ModelUpdatingTab(QWidget):
             {
                 "frequencies_hz": freqs,
                 "mode_shapes_ux": shapes,
+                "coverage_stories": list(exp_dict.get("coverage_stories") or []),
+                "measured_dof_indices": list(exp_dict.get("measured_dof_indices") or []),
                 "source_file": "Spectrum final values",
                 "notes": "Loaded from Spectrum final-values calculation",
             },
@@ -3463,14 +3613,25 @@ class ModelUpdatingTab(QWidget):
         shapes = exp_dict.get("mode_shapes_ux", {})
         self._analysis_scope.setCurrentIndex(1 if (shapes_available and shapes) else 0)
         if shapes_available and shapes:
+            # Shape vectors span the MEASURED storeys, in coverage order. Map
+            # each value to its storey's row rather than to the list index —
+            # under partial coverage those differ, and the old code wrote
+            # storey 4's value into storey 3's row.
+            rows_for = exp_dict.get("measured_dof_indices")
+            if not rows_for and exp_dict.get("coverage_stories"):
+                rows_for = [int(c) - 1 for c in exp_dict["coverage_stories"]]
             for c in range(self._exp_mode_table.columnCount()):
                 key = str(c + 1)
-                if key in shapes:
-                    for r, val in enumerate(shapes[key]):
-                        if r < self._exp_mode_table.rowCount():
-                            w = self._exp_mode_table.cellWidget(r, c)
-                            if isinstance(w, QDoubleSpinBox):
-                                w.setValue(float(val))
+                if key not in shapes:
+                    continue
+                vals = shapes[key]
+                targets = (list(rows_for) if rows_for and len(rows_for) == len(vals)
+                           else list(range(len(vals))))
+                for r, val in zip(targets, vals):
+                    if 0 <= int(r) < self._exp_mode_table.rowCount():
+                        w = self._exp_mode_table.cellWidget(int(r), c)
+                        if isinstance(w, QDoubleSpinBox):
+                            w.setValue(float(val))
         # Switch to Manual input so the user can review/edit before calibrating.
         self._exp_source.setCurrentText("Manual input")
 
@@ -3504,6 +3665,8 @@ class ModelUpdatingTab(QWidget):
             return
 
         settings = self._continuous_settings()
+        if settings is not None:
+            settings["twin_rolling_cycles"] = int(self._twin_roll_spin.value())
         if settings is None:
             return
         self._latest_continuous_calibration = None
@@ -3517,6 +3680,9 @@ class ModelUpdatingTab(QWidget):
         ctrl.set_modal_window_seconds(max(120.0, float(settings["duration_s"]) + 15.0))
 
         worker = _ContinuousUpdateWorker(params, settings, ctrl.snapshot_modal_capture)
+        self._twin_live_view.set_controller(ctrl)
+        self._twin_live_view.apply_sensor_map(self._sensor_mapping)
+        self._twin_live_view.start()
         thread = QThread(self)
         worker.moveToThread(thread)
         worker.log.connect(self._append_log)
@@ -3599,6 +3765,7 @@ class ModelUpdatingTab(QWidget):
         # Cache both right-panel renders; show whichever the checkbox selects.
         self._cont_fig2_fdd = payload.get("fig2_fdd_png") or payload.get("fig2_png")
         self._cont_fig2_track = payload.get("fig2_track_png")
+        self._last_twin_payload = payload
         if not self._continuous_handoff_selected and bool(payload.get("success", False)):
             calibrated = payload.get("calibrated_params")
             signature = payload.get("signature")
@@ -3649,15 +3816,35 @@ class ModelUpdatingTab(QWidget):
             )
 
     def _show_cont_fig2(self) -> None:
-        """Display the right-panel view the checkbox selects (cached PNG, no recompute)."""
-        show_track = self._cont_track_view.isChecked()
-        png = self._cont_fig2_track if show_track else self._cont_fig2_fdd
-        # Graceful fallback if one view is missing (e.g. very first cycle).
+        """Display the selected right-panel view (cached data, no recompute)."""
+        view = str(self._cont_view_combo.currentData() or "fdd")
+        if view == "twin":
+            self._fig2_label.hide()
+            self._twin_widget.show()
+            self._refresh_twin_panel()
+            return
+        self._twin_widget.hide()
+        self._fig2_label.show()
+        png = self._cont_fig2_track if view == "track" else self._cont_fig2_fdd
         self._display_png(self._fig2_label, png or self._cont_fig2_fdd or self._cont_fig2_track)
 
-    @Slot(bool)
-    def _on_cont_view_toggled(self, _checked: bool) -> None:
-        """Swap the Continuous-Update right panel (pure GUI, G1 — just re-shows a cached PNG)."""
+    def _refresh_twin_panel(self) -> None:
+        payload = self._last_twin_payload
+        if not payload:
+            self._twin_panel.set_decisions(None)
+            return
+        react = str(self._twin_react_combo.currentData() or "cycle")
+        if react == "rolling":
+            decisions = payload.get("twin_decisions_rolling")
+            source = f"rolling average of {payload.get('twin_rolling_n', '?')} cycle(s)"
+        else:
+            decisions = payload.get("twin_decisions_cycle")
+            source = f"cycle {payload.get('cycle', '?')}"
+        self._twin_panel.set_decisions(decisions, source=source)
+
+    @Slot()
+    def _on_cont_view_toggled(self, *_: object) -> None:
+        """Swap the Continuous-Update right panel (pure GUI, G1 — cached data only)."""
         if self._cont_view_active:
             self._show_cont_fig2()
 
@@ -3670,6 +3857,7 @@ class ModelUpdatingTab(QWidget):
     def _on_continuous_finished(self) -> None:
         self._continuous_worker = None
         self._continuous_thread = None
+        self._twin_live_view.stop()
         self._continuous_btn.setText("Start Continuous Update")
         if self._continuous_handoff_selected:
             self._set_busy(

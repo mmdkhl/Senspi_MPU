@@ -109,6 +109,20 @@ class SonificationTab(QWidget):
     def models(self) -> tuple:
         return (self.chorus_tab, self.team_tab)
 
+    def apply_sensor_map(self, mapping) -> None:
+        """Forward the Settings placement map to every model that wants it.
+
+        The team's model may never want it, so this asks rather than requires.
+        """
+        for model in self.models:
+            fn = getattr(model, "apply_sensor_map", None)
+            if fn is None:
+                continue
+            try:
+                fn(mapping)
+            except Exception:                      # pragma: no cover - defensive
+                logger.debug("sonification: apply_sensor_map failed", exc_info=True)
+
     # --- forwarded so MainWindow keeps a single connection per signal -----
     @Slot()
     def on_stream_started(self) -> None:

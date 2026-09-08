@@ -65,6 +65,10 @@ class MainWindow(QMainWindow):
         self._auto_stop_timer = QTimer(self)
         self._auto_stop_timer.setSingleShot(True)
 
+        # Authoritative sensor placement, owned by Settings. Consumers read it
+        # from here rather than each keeping their own picker.
+        self.sensor_map = None
+
         self._build_tabs()
         self._wire_signals()
 
@@ -170,6 +174,14 @@ class MainWindow(QMainWindow):
             self._on_sensor_selection_changed
         )
         self.settings_tab.sensorsUpdated.connect(self._on_sensors_updated)
+        # Settings owns the placement map; keep the app-wide copy in step.
+        self.settings_tab.sensorMapChanged.connect(self._on_sensor_map_changed)
+        self.sensor_map = self.settings_tab.current_sensor_map()
+        self.recorder_tab.apply_sensor_map(self.sensor_map)
+        self.fft_tab.apply_sensor_map(self.sensor_map)
+        self.model_updating_tab.apply_sensor_map(self.sensor_map)
+        self.sonification_tab.apply_sensor_map(self.sensor_map)
+        self.digital_twin_tab.apply_sensor_map(self.sensor_map)
         # Keep the recorder controller in sync with the canonical selection.
         self.settings_tab.sensorSelectionChanged.connect(
             self.recorder_tab.apply_sensor_selection
@@ -218,10 +230,9 @@ class MainWindow(QMainWindow):
                 sensor_selection=sensor_selection,
             )
 
-        gui_cfg.record_only = bool(
-            getattr(self.signals_tab, "record_only_check", None)
-            and self.signals_tab.record_only_check.isChecked()
-        )
+        # Pipeline kept by request; the checkbox is hidden. Ask the tab's own
+        # accessor rather than an attribute that no longer exists.
+        gui_cfg.record_only = bool(self.signals_tab._get_record_only_checked())
         gui_cfg.limit_duration = self.signals_tab.duration_limit_enabled()
         gui_cfg.duration_s = float(self.signals_tab.duration_limit_seconds())
 
@@ -436,6 +447,28 @@ class MainWindow(QMainWindow):
         self.fft_tab.set_calibration_offsets(offsets)
 
     @Slot(dict)
+    @Slot(object)
+    def _on_sensor_map_changed(self, smap) -> None:
+        """Fan the placement map out. Settings is its only source.
+
+        Every tab that consumes placement now reads it from here. Digital Twin
+        inherits it through Model Updating's calibrated snapshot.
+        """
+        self.sensor_map = smap
+        # recordings embed the placement, so a session is self-describing
+        self.recorder_tab.apply_sensor_map(smap)
+        # Spectrum: decides the channel, the response sensors and the mode cap.
+        self.fft_tab.apply_sensor_map(smap)
+        # Model Updating: same placement feeds identification and, through the
+        # calibrated snapshot, the Digital Twin.
+        self.model_updating_tab.apply_sensor_map(smap)
+        # Sonification: the shaker is excluded, and the chorus is laid out in
+        # stereo and depth the way the sensors are laid out on the rig.
+        self.sonification_tab.apply_sensor_map(smap)
+        # Digital Twin: calibrates from the same placement, and excludes the
+        # shaker row from identification the way every other tab now does.
+        self.digital_twin_tab.apply_sensor_map(smap)
+
     def _on_sensors_updated(self, data: dict) -> None:
         """Apply updated sampling settings emitted from the Settings tab."""
 

@@ -9,6 +9,7 @@ from .ssh_client import Host, SSHClient, SSHConfig
 from .pi_recorder import PiRecorder
 from .log_sync import SyncReport, sync_logs_from_pi
 from .log_sync_worker import LogSyncWorker
+from .pi_config_sync_worker import PiConfigSyncWorker
 
 __all__ = [
     "Host",
@@ -16,6 +17,7 @@ __all__ = [
     "SSHConfig",
     "PiRecorder",
     "LogSyncWorker",
+    "PiConfigSyncWorker",
     "SyncReport",
     "sync_logs_from_pi",
 ]

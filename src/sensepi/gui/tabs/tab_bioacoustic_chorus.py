@@ -29,6 +29,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog
                                QMessageBox, QPushButton, QScrollArea, QSlider,
                                QSpinBox, QSplitter, QVBoxLayout, QWidget)
 
+from ...analysis import sensor_layout as slayout
 from ...sonification.chorus.types import (CASE_MEANING, FAMILY_LABEL, ROLE_COLORS,
                                           ROLE_MEANING, ChorusConfig, VizFrame)
 
@@ -47,13 +48,32 @@ WATERFALL_SLICES = 26
 SCORE_SECONDS = 60.0
 
 # knob spec: (attribute, label, min, max, decimals)
-_KNOBS = {
-    "Sound": [
-        ("naturalism", "Naturalism", 0.0, 1.0, 2),
+# The panel used to present 23 sliders at once, which is 23 decisions before the
+# first sound. These six cover everything an ordinary listening session needs;
+# the rest still exist, one click away under "Advanced".
+_KNOBS_MAIN = {
+    "Listen": [
+        ("master", "Master", 0.0, 1.0, 2),
         ("chorus_size", "Chorus size", 0.1, 2.0, 2),
         ("density", "Density", 0.1, 3.0, 2),
+        ("naturalism", "Naturalism", 0.0, 1.0, 2),
+        ("space", "Reverb / space", 0.0, 1.0, 2),
+    ],
+}
+
+#: The seven case voices and their defaults. The "Structure expression" macro
+#: scales all of them together, relative to these — one slider for "how strongly
+#: should the structure's behaviour colour the sound", with the individual voices
+#: still available under Advanced for anyone who wants to isolate one.
+_CASE_VOICES = {
+    "resonance_voice": 1.0, "approach_voice": 1.0, "beating_voice": 1.0,
+    "torsion_voice": 1.0, "drift_voice": 1.0, "impact_voice": 1.0,
+    "dropout_voice": 1.0,
+}
+
+_KNOBS_ADVANCED = {
+    "Sound": [
         ("brightness", "Brightness", 0.3, 1.6, 2),
-        ("master", "Master", 0.0, 1.0, 2),
     ],
     "Structure → sound": [
         ("sync_strength", "Sync strength", 0.0, 1.5, 2),
@@ -71,7 +91,6 @@ _KNOBS = {
         ("dropout_voice", "Data dropout", 0.0, 1.5, 2),
     ],
     "Space": [
-        ("space", "Reverb / space", 0.0, 1.0, 2),
         ("depth", "Depth", 0.0, 1.0, 2),
         ("ambient_bed", "Ambient bed", 0.0, 1.0, 2),
     ],
@@ -82,6 +101,9 @@ _KNOBS = {
         ("c_hi", "carrier high (Hz)", 3000.0, 16000.0, 0),
     ],
 }
+
+#: Kept so anything still importing the old flat table keeps working.
+_KNOBS = {**_KNOBS_MAIN, **_KNOBS_ADVANCED}
 
 
 def _style_plot(widget: pg.PlotWidget, xlabel: str = "", ylabel: str = "") -> None:
@@ -577,6 +599,7 @@ class BioacousticChorusTab(QWidget):
         self._stopping = False
         self._status_extra: dict = {}
         self._rows: dict[str, _SliderRow] = {}
+        self._sensor_mapping: dict | None = None
         self._build_ui()
         self._drain = QTimer(self)
         self._drain.setInterval(DRAIN_MS)
@@ -608,7 +631,10 @@ class BioacousticChorusTab(QWidget):
         self._btn_snapshot.clicked.connect(self._on_snapshot)
         # SOLO: the fastest way to learn which animal belongs to which mode
         self._solo_buttons = []
-        for i, label in enumerate(("All", "1", "2", "3")):
+        # One button per mode the identification can return (the spinbox allows
+        # up to 4, and four sensors support four); mode 4 could be heard but
+        # never soloed.
+        for i, label in enumerate(("All", "1", "2", "3", "4")):
             b = QPushButton(label)
             b.setCheckable(True)
             b.setMaximumWidth(46)
@@ -647,20 +673,80 @@ class BioacousticChorusTab(QWidget):
         lay = QVBoxLayout(inner)
         lay.setContentsMargins(6, 6, 6, 6)
         lay.setSpacing(8)
-        for group, knobs in _KNOBS.items():
-            box = QGroupBox(group)
-            box.setStyleSheet(
-                f"QGroupBox{{color:#5ac8fa;font-weight:bold;font-size:10px;"
-                f"border:1px solid {EDGE};border-radius:4px;margin-top:7px;padding:6px}}"
+
+        # Where the sensors are — read-only, like every other tab.
+        self._map_summary = QLabel("")
+        self._map_summary.setWordWrap(True)
+        self._map_summary.setStyleSheet(f"color:{DIM};font-size:10px;")
+        map_box = QGroupBox("Sensor placement (from Settings)")
+        map_box.setStyleSheet(self._group_css())
+        mbl = QVBoxLayout(map_box)
+        mbl.setContentsMargins(4, 4, 4, 4)
+        mbl.addWidget(self._map_summary)
+        lay.addWidget(map_box)
+
+        for group, knobs in _KNOBS_MAIN.items():
+            lay.addWidget(self._knob_box(group, knobs))
+
+        # One macro for "how strongly the structure colours the sound", instead
+        # of seven separate case voices in the main view.
+        exp_box = QGroupBox("Structure expression")
+        exp_box.setStyleSheet(self._group_css())
+        ebl = QVBoxLayout(exp_box)
+        ebl.setContentsMargins(4, 4, 4, 4)
+        self._row_expression = _SliderRow(
+            "_expression", "Expression", 0.0, 2.0, 2, 1.0)
+        self._row_expression.changed.connect(self._on_expression)
+        self._row_expression.setToolTip(
+            "Scales resonance, approach, beating, torsion, drift, impact and "
+            "dropout together. Set each one on its own under Advanced.")
+        ebl.addWidget(self._row_expression)
+        lay.addWidget(exp_box)
+
+        # --- Advanced: everything else, collapsed ---------------------------
+        self._btn_advanced = QPushButton("▸  Advanced")
+        self._btn_advanced.setCheckable(True)
+        self._btn_advanced.setStyleSheet(
+            f"QPushButton{{text-align:left;color:#5ac8fa;background:{PANEL};"
+            f"border:1px solid {EDGE};border-radius:4px;padding:5px;font-size:10px}}")
+        self._advanced = QWidget()
+        adv = QVBoxLayout(self._advanced)
+        adv.setContentsMargins(0, 0, 0, 0)
+        adv.setSpacing(8)
+        self._advanced.setVisible(False)
+        self._btn_advanced.toggled.connect(self._on_advanced_toggled)
+        lay.addWidget(self._btn_advanced)
+        lay.addWidget(self._advanced)
+
+        for group, knobs in _KNOBS_ADVANCED.items():
+            adv.addWidget(self._knob_box(group, knobs))
+
+        ident = self._build_identification_box()
+        adv.addWidget(ident)
+        lay.addStretch(1)
+        scroll.setWidget(inner)
+        self._refresh_map_summary()
+        return scroll
+
+    @staticmethod
+    def _group_css() -> str:
+        return (f"QGroupBox{{color:#5ac8fa;font-weight:bold;font-size:10px;"
+                f"border:1px solid {EDGE};border-radius:4px;margin-top:7px;"
+                f"padding:6px}}"
                 f"QGroupBox::title{{subcontrol-origin:margin;left:7px}}")
-            bl = QVBoxLayout(box)
-            bl.setContentsMargins(4, 4, 4, 4)
-            bl.setSpacing(2)
-            for attr, label, lo, hi, dec in knobs:
-                row = _SliderRow(attr, label, lo, hi, dec, getattr(self._cfg, attr))
-                row.changed.connect(self._on_knob)
-                self._rows[attr] = row
-                bl.addWidget(row)
+
+    def _knob_box(self, group: str, knobs) -> QGroupBox:
+        box = QGroupBox(group)
+        box.setStyleSheet(self._group_css())
+        bl = QVBoxLayout(box)
+        bl.setContentsMargins(4, 4, 4, 4)
+        bl.setSpacing(2)
+        for attr, label, lo, hi, dec in knobs:
+            row = _SliderRow(attr, label, lo, hi, dec, getattr(self._cfg, attr))
+            row.changed.connect(self._on_knob)
+            self._rows[attr] = row
+            bl.addWidget(row)
+        if True:
             if group == "Casting map":
                 self._chk_autofit = QCheckBox("auto-fit to this structure")
                 self._chk_autofit.setChecked(self._cfg.autofit)
@@ -677,13 +763,11 @@ class BioacousticChorusTab(QWidget):
                 self._btn_refit = QPushButton("Re-fit now")
                 self._btn_refit.clicked.connect(self._on_refit)
                 bl.addWidget(self._btn_refit)
-            lay.addWidget(box)
+        return box
 
+    def _build_identification_box(self) -> QGroupBox:
         ident = QGroupBox("Identification")
-        ident.setStyleSheet(
-            f"QGroupBox{{color:#5ac8fa;font-weight:bold;font-size:10px;"
-            f"border:1px solid {EDGE};border-radius:4px;margin-top:7px;padding:6px}}"
-            f"QGroupBox::title{{subcontrol-origin:margin;left:7px}}")
+        ident.setStyleSheet(self._group_css())
         il = QGridLayout(ident)
         il.setContentsMargins(4, 4, 4, 4)
         self._spin_modes = QSpinBox()
@@ -696,19 +780,14 @@ class BioacousticChorusTab(QWidget):
         self._spin_reid.setValue(self._cfg.reid_interval_s)
         self._spin_reid.valueChanged.connect(
             lambda v: self._on_knob("reid_interval_s", float(v)))
-        self._combo_axis = QComboBox()
-        self._combo_axis.addItems(["ax", "ay"])
-        self._combo_axis.currentTextChanged.connect(
-            lambda v: self._on_knob("axis", v))
+        # The axis combo is gone: the channel follows the excitation axis in the
+        # Settings map, which is the direction the rig is actually shaken in.
+        # Two places to set one physical fact is how they end up disagreeing.
         for r, (lbl, w) in enumerate((("modes", self._spin_modes),
-                                      ("re-ID (s)", self._spin_reid),
-                                      ("axis", self._combo_axis))):
+                                      ("re-ID (s)", self._spin_reid))):
             il.addWidget(QLabel(lbl), r, 0)
             il.addWidget(w, r, 1)
-        lay.addWidget(ident)
-        lay.addStretch(1)
-        scroll.setWidget(inner)
-        return scroll
+        return ident
 
     def _build_stage(self) -> QWidget:
         stage = QWidget()
@@ -741,6 +820,73 @@ class BioacousticChorusTab(QWidget):
 
     # ---------------------------------------------------------------- control
     @Slot(str, object)
+    @Slot(bool)
+    def _on_advanced_toggled(self, on: bool) -> None:
+        self._advanced.setVisible(bool(on))
+        self._btn_advanced.setText(("▾  Advanced" if on else "▸  Advanced"))
+
+    @Slot(str, float)
+    def _on_expression(self, _attr: str, value) -> None:
+        """Scale every case voice together, relative to its default.
+
+        Coalesced to one application per event-loop turn: a slider emits on
+        every pixel, and each application pushes seven options to the worker.
+        """
+        self._pending_expression = float(value)
+        if not getattr(self, "_expression_scheduled", False):
+            self._expression_scheduled = True
+            QTimer.singleShot(0, self._apply_expression)
+
+    def _apply_expression(self) -> None:
+        self._expression_scheduled = False
+        scale = float(getattr(self, "_pending_expression", 1.0))
+        for attr, default in _CASE_VOICES.items():
+            self._on_knob(attr, default * scale)
+            row = self._rows.get(attr)
+            if row is not None:
+                row.set_value(default * scale)
+
+    # ---------------------------------------------- placement (from Settings)
+    def apply_sensor_map(self, mapping) -> None:
+        """Adopt the placement map from Settings. This tab owns no picker.
+
+        The map decides three things here: which sensor is the shaker (excluded
+        from identification, because it is the input), which channel to listen on
+        (the excitation axis), and where each sensor sits — which is what lets the
+        chorus be laid out like the rig instead of in arbitrary stereo positions.
+        """
+        if hasattr(mapping, "to_mapping"):
+            mapping = mapping.to_mapping()
+        mapping = dict(mapping) if isinstance(mapping, dict) else None
+        self._sensor_mapping = mapping
+        self._on_knob("sensor_map", mapping)
+        layout = slayout.layout_from_mapping(mapping)
+        # Listen on the axis the structure is actually being shaken along.
+        self._on_knob("axis", layout.channel)
+        if hasattr(self, "_spin_modes"):
+            cap = layout.max_modes(int(self._spin_modes.value()))
+            if layout.is_valid and cap < int(self._spin_modes.value()):
+                self._spin_modes.setValue(cap)
+        self._refresh_map_summary()
+
+    def _refresh_map_summary(self) -> None:
+        label = getattr(self, "_map_summary", None)
+        if label is None:
+            return
+        layout = slayout.layout_from_mapping(getattr(self, "_sensor_mapping", None))
+        if not layout.is_valid:
+            label.setText(
+                "<span style='color:#ffd93d'>No placement set.</span> The chorus "
+                "still sings, but every animal sits centre and the shaker is "
+                "treated as a floor. Set it in Settings → Sensor placement map.")
+            return
+        bits = [layout.describe()]
+        if layout.has_base:
+            bits.append(f"S{layout.base_sensor_id} is the shaker — excluded from "
+                        f"identification, so it cannot be heard as a mode")
+        bits.append("plan column → stereo position · floor → distance")
+        label.setText(" · ".join(bits))
+
     def _on_knob(self, attr: str, value) -> None:
         try:
             setattr(self._cfg, attr, type(getattr(self._cfg, attr))(value))

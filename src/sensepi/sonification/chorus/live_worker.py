@@ -147,9 +147,12 @@ class ChorusWorker(QObject):
     def _save_capture(self) -> None:
         try:
             from ...config.app_config import AppPaths
-            base = Path(AppPaths().processed_data) / "sonification_chorus"
+            # Produced audio, not recorded data: it belongs under the one output
+            # root with everything else the application generates, rather than in
+            # data/processed alongside things that came off the sensors.
+            base = Path(AppPaths().sonification_output)
         except Exception:
-            base = Path("data/processed/sonification_chorus")
+            base = Path("output/sonification")
         stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
         try:
             path = self._capture.save(base / f"chorus_{stamp}.wav")

@@ -60,6 +60,11 @@ class ChorusEngine:
         self.renderer.set_config(self.cfg)
         if key in ("f_lo", "f_hi", "c_lo", "c_hi"):
             self.cfg.autofit = False        # the user is driving the map now
+        if key in ("sensor_map", "axis", "n_modes"):
+            # The placement decides which rows are responses and how many modes
+            # may be claimed: re-identify on the next tick rather than singing
+            # from the old identification for up to reid_interval_s.
+            self.tracker._last_t = -1e9
         if key in ("f_lo", "f_hi", "c_lo", "c_hi", "n_chorus", "n_ambient",
                    "enabled_roles", "chorus_size", "pitch_rise", "depth"):
             # Do NOT recast here. A slider emits on every pixel of drag, and a
@@ -195,12 +200,20 @@ def run_offline(ax_session, gz_session=None, cfg: ChorusConfig | None = None,
     if gz is not None and gz.ndim == 1:
         gz = gz[None, :]
 
+    # Carries sensor_ids so the offline path honours the placement map exactly
+    # as the live path does — otherwise a rendered recording would treat the
+    # shaker as a floor while the live tab excluded it, and the two would not
+    # sound the same.
+    sensor_ids = list(getattr(ax_session, "sensor_ids", None)
+                      or range(1, data.shape[0] + 1))
+
     class _Snap:
-        __slots__ = ("data", "fs")
+        __slots__ = ("data", "fs", "sensor_ids")
 
         def __init__(self, d, f):
             self.data = d
             self.fs = f
+            self.sensor_ids = sensor_ids[:d.shape[0]] if d.ndim == 2 else sensor_ids
 
     n_ticks = max(1, int(total * CONTROL_HZ))
     fast = int(cfg.fast_window_s * fs)

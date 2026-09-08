@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Transient (time-history) analysis for the OpenSees frame model."""
 
+from ..paths import output_str as _out
 import os
 import math
 import time
@@ -62,7 +63,7 @@ def setup_dynamic_excitation(params):
     ops.pattern('UniformExcitation', 20, 1, '-accel', 20)
 
 
-def setup_recorders(ctx, prefix=""):
+def setup_recorders(ctx, prefix="", output_base=None):
     """
     Set up OpenSees node recorders for floor displacements and accelerations.
 
@@ -80,16 +81,20 @@ def setup_recorders(ctx, prefix=""):
     master_nodes = ctx["master_nodes"]
     roof_master = master_nodes[-1]
 
-    ops.recorder('Node', '-file', f'output/{prefix}time_floor_disp_X.out',
+    # These filenames cross into the OpenSees C++ layer, where a relative path
+    # is resolved against the process working directory and a wrong one is
+    # silent — the file is simply written somewhere else. An absolute path
+    # removes the possibility.
+    ops.recorder('Node', '-file', _out(f'{prefix}time_floor_disp_X.out', output_base),
                  '-time', '-node', *master_nodes, '-dof', 1, 'disp')
 
-    ops.recorder('Node', '-file', f'output/{prefix}time_floor_accel_X.out',
+    ops.recorder('Node', '-file', _out(f'{prefix}time_floor_accel_X.out', output_base),
                  '-time', '-node', *master_nodes, '-dof', 1, 'accel')
 
-    ops.recorder('Node', '-file', f'output/{prefix}time_roof_disp_X.out',
+    ops.recorder('Node', '-file', _out(f'{prefix}time_roof_disp_X.out', output_base),
                  '-time', '-node', roof_master, '-dof', 1, 'disp')
 
-    ops.recorder('Node', '-file', f'output/{prefix}time_roof_accel_X.out',
+    ops.recorder('Node', '-file', _out(f'{prefix}time_roof_accel_X.out', output_base),
                  '-time', '-node', roof_master, '-dof', 1, 'accel')
 
     return roof_master
@@ -177,7 +182,8 @@ def render_transient_to_png(transient_data, modal_data=None, overlay_response=No
     return buf.read()
 
 
-def run_transient_analysis_collect_data(params, modal_data, show_info=False, recorder_prefix=""):
+def run_transient_analysis_collect_data(params, modal_data, show_info=False,
+                                        recorder_prefix="", output_base=None):
     """
     Run transient analysis and collect roof response data (no visualization).
 
@@ -209,7 +215,7 @@ def run_transient_analysis_collect_data(params, modal_data, show_info=False, rec
         print("betaKinit =", betaKinit)
 
     setup_dynamic_excitation(params)
-    roof_master = setup_recorders(ctx, prefix=recorder_prefix)
+    roof_master = setup_recorders(ctx, prefix=recorder_prefix, output_base=output_base)
 
     ops.wipeAnalysis()
     ops.constraints('Transformation')
@@ -261,6 +267,7 @@ def run_transient_analysis_stream(
     modal_data,
     show_info=False,
     recorder_prefix="",
+    output_base=None,
     frame_callback=None,
     plot_every=10,
     anim_every=10,
@@ -325,7 +332,7 @@ def run_transient_analysis_stream(
         print("betaKinit =", betaKinit)
 
     setup_dynamic_excitation(params)
-    roof_master = setup_recorders(ctx, prefix=recorder_prefix)
+    roof_master = setup_recorders(ctx, prefix=recorder_prefix, output_base=output_base)
 
     ops.wipeAnalysis()
     ops.constraints('Transformation')
