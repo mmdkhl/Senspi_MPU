@@ -43,25 +43,34 @@ def _synthetic(freqs=(1.9, 8.37, 12.77), fs=41.0, dur=60.0, seed=0):
 
 
 class TestCastingMap(unittest.TestCase):
+    """The carrier ends are the catalog's (or a type's) own span, not knobs."""
+
+    def _span(self):
+        from sensepi.sonification.chorus.catalog import carrier_span
+        return carrier_span()
+
     def test_carrier_map_is_monotonic_and_bounded(self):
         cfg = ChorusConfig()
+        c_lo, c_hi = self._span()
         prev = -1.0
         for f in np.linspace(0.5, 20.0, 40):
             c = carrier_for_mode(float(f), cfg)
-            self.assertGreaterEqual(c, cfg.c_lo - 1e-6)
-            self.assertLessEqual(c, cfg.c_hi + 1e-6)
+            self.assertGreaterEqual(c, c_lo - 1e-6)
+            self.assertLessEqual(c, c_hi + 1e-6)
             self.assertGreater(c, prev)
             prev = c
 
     def test_map_clamps_outside_the_declared_range(self):
         cfg = ChorusConfig()
-        self.assertAlmostEqual(carrier_for_mode(0.01, cfg), cfg.c_lo, places=3)
-        self.assertAlmostEqual(carrier_for_mode(1e4, cfg), cfg.c_hi, places=3)
+        c_lo, c_hi = self._span()
+        self.assertAlmostEqual(carrier_for_mode(0.01, cfg), c_lo, places=3)
+        self.assertAlmostEqual(carrier_for_mode(1e4, cfg), c_hi, places=3)
 
-    def test_endpoints_hit_the_configured_carriers(self):
+    def test_endpoints_hit_the_span_ends(self):
         cfg = ChorusConfig()
-        self.assertAlmostEqual(carrier_for_mode(cfg.f_lo, cfg), cfg.c_lo, places=3)
-        self.assertAlmostEqual(carrier_for_mode(cfg.f_hi, cfg), cfg.c_hi, places=3)
+        c_lo, c_hi = self._span()
+        self.assertAlmostEqual(carrier_for_mode(cfg.f_lo, cfg), c_lo, places=3)
+        self.assertAlmostEqual(carrier_for_mode(cfg.f_hi, cfg), c_hi, places=3)
 
 
 @unittest.skipUnless(HAVE_DATA, "species catalog / grain bank not installed")
@@ -282,8 +291,8 @@ class TestEngine(unittest.TestCase):
         engine.set_option("master", 0.4)
         self.assertAlmostEqual(engine.cfg.master, 0.4)
         engine.set_option("not_a_real_option", 3)      # must not raise
-        engine.set_option("c_hi", 9000.0)
-        self.assertAlmostEqual(engine.cfg.c_hi, 9000.0)
+        engine.set_option("f_hi", 15.0)
+        self.assertAlmostEqual(engine.cfg.f_hi, 15.0)
 
     def test_config_is_clamped(self):
         cfg = ChorusConfig()
@@ -337,15 +346,14 @@ class TestAutofitCastingMap(unittest.TestCase):
     """Matching the structural range to the species range, and holding the fit."""
 
     def test_fit_spreads_the_modes_across_the_whole_palette(self):
-        from sensepi.sonification.chorus.catalog import carrier_span, fit_casting_map
+        from sensepi.sonification.chorus.catalog import fit_casting_map
         cfg = ChorusConfig()
         freqs = np.array([1.9, 8.37, 12.77])
-        f_lo, f_hi, c_lo, c_hi = fit_casting_map(freqs, cfg)
+        f_lo, f_hi = fit_casting_map(freqs, cfg)
         self.assertLess(f_lo, freqs.min())
         self.assertGreater(f_hi, freqs.max())
-        self.assertEqual((c_lo, c_hi), carrier_span())
         fitted = ChorusConfig()
-        fitted.f_lo, fitted.f_hi, fitted.c_lo, fitted.c_hi = f_lo, f_hi, c_lo, c_hi
+        fitted.f_lo, fitted.f_hi = f_lo, f_hi
         spread = [carrier_for_mode(float(f), fitted) for f in freqs]
         default = [carrier_for_mode(float(f), cfg) for f in freqs]
         # the fitted map must use more of the available carrier range
@@ -361,21 +369,20 @@ class TestAutofitCastingMap(unittest.TestCase):
             damping=np.array([0.016, 0.004, 0.002]))
         engine._recast()
         first = [c.info.species for c in engine.cast if c.role == "lead"]
-        fitted = (engine.cfg.f_lo, engine.cfg.f_hi, engine.cfg.c_lo, engine.cfg.c_hi)
+        fitted = (engine.cfg.f_lo, engine.cfg.f_hi)
         # the structure softens
         engine.tracker._state = ModalState(
             frequencies_hz=np.array([1.9, 8.37, 12.77]) * 0.7, ok=True,
             damping=np.array([0.016, 0.004, 0.002]))
         engine._recast()
-        self.assertEqual(fitted, (engine.cfg.f_lo, engine.cfg.f_hi,
-                                  engine.cfg.c_lo, engine.cfg.c_hi))
+        self.assertEqual(fitted, (engine.cfg.f_lo, engine.cfg.f_hi))
         self.assertNotEqual(first, [c.info.species for c in engine.cast
                                     if c.role == "lead"])
 
     def test_editing_the_map_by_hand_disables_autofit(self):
         engine = ChorusEngine(ChorusConfig())
         self.assertTrue(engine.cfg.autofit)
-        engine.set_option("c_hi", 9000.0)
+        engine.set_option("f_hi", 15.0)
         self.assertFalse(engine.cfg.autofit)
 
     def test_autofit_off_leaves_the_declared_map_alone(self):
@@ -386,7 +393,7 @@ class TestAutofitCastingMap(unittest.TestCase):
         engine.tracker._state = ModalState(frequencies_hz=np.array([2.0, 9.0]), ok=True)
         engine._recast()
         self.assertAlmostEqual(engine.cfg.f_lo, defaults.f_lo)
-        self.assertAlmostEqual(engine.cfg.c_hi, defaults.c_hi)
+        self.assertAlmostEqual(engine.cfg.f_hi, defaults.f_hi)
 
     def test_the_declared_band_covers_real_buildings(self):
         """0-20 Hz, with mode 1 commonly below 2 Hz."""
@@ -397,10 +404,11 @@ class TestAutofitCastingMap(unittest.TestCase):
         self.assertGreaterEqual(cfg.f_hi, 20.0)
 
     def test_a_sub_2hz_mode_one_is_not_squashed_to_the_floor(self):
-        """A 0.4 Hz mode 1 must still get a distinct carrier, not the c_lo clamp."""
+        """A 0.4 Hz mode 1 must still get a distinct carrier, not the floor clamp."""
+        from sensepi.sonification.chorus.catalog import carrier_span
         cfg = ChorusConfig()
         low = carrier_for_mode(0.4, cfg)
-        self.assertGreater(low, cfg.c_lo)
+        self.assertGreater(low, carrier_span()[0])
         self.assertLess(low, carrier_for_mode(1.9, cfg))
 
 
@@ -413,7 +421,7 @@ class TestCastStability(unittest.TestCase):
     def _fitted(self):
         from sensepi.sonification.chorus.catalog import fit_casting_map
         cfg = ChorusConfig()
-        cfg.f_lo, cfg.f_hi, cfg.c_lo, cfg.c_hi = fit_casting_map(self.BASE, cfg)
+        cfg.f_lo, cfg.f_hi = fit_casting_map(self.BASE, cfg)
         return cfg
 
     def _leads(self, cast):

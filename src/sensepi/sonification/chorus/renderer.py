@@ -372,7 +372,12 @@ class ChorusRenderer:
             n_sing = int(round(v.n * drive ** 0.8))
             loud = drive * cfg.resonance_voice
         elif role == "drift":
-            d = float(np.max(frame.drift)) if np.size(frame.drift) else 0.0
+            # Two ways a floor can move against its neighbours: the driven-axis
+            # difference between adjacent floors, or the floor rocking on its
+            # own (gx/gy). Whichever is stronger drives the voice.
+            d_diff = float(np.max(frame.drift)) if np.size(frame.drift) else 0.0
+            d_rock = float(np.max(frame.rock_floor)) if np.size(frame.rock_floor) else 0.0
+            d = max(d_diff, d_rock)
             drive = max(0.0, (d - 0.45) / 0.55)
             n_sing = int(round(v.n * drive))
             loud = drive * cfg.drift_voice
@@ -395,13 +400,22 @@ class ChorusRenderer:
                 v.row_i = np.full(v.n, int(np.argmax(tf)))
         elif role == "ambient":
             n_sing = v.n
-            loud = (0.5 + 0.5 * float(np.clip(frame.env_global * 4, 0, 1))) * cfg.ambient_bed
+            # Vertical motion (az) makes the meadow denser: a rig that only
+            # sways keeps the bed calm, a pumping table thickens it.
+            loud = ((0.5 + 0.5 * float(np.clip(frame.env_global * 4, 0, 1)))
+                    * (0.55 + 0.75 * float(np.clip(frame.vertical, 0.0, 1.0)))
+                    * cfg.ambient_bed)
         else:
             # RESONANCE APPROACH: the chorus grows agitated as excitation closes
             # in, so the lock arrives with a build-up instead of out of nowhere.
             appr = 0.0
             if 0 <= m < np.size(frame.approach):
                 appr = float(frame.approach[m]) * cfg.approach_voice
+            if role == "chorus" and 0 <= m < np.size(frame.cross_energy):
+                # The supporting voice follows the OTHER horizontal axis too,
+                # so cross-axis motion is heard as the chorus swelling while
+                # the lead stays with the driven direction.
+                e = max(e, float(frame.cross_energy[m]))
             n_sing = int(round(1 + (v.n - 1) * min(1.0, e ** 1.35 + 0.4 * appr)))
             loud = 0.28 + 0.72 * e + 0.25 * appr
         n_sing = int(np.clip(n_sing, 0, v.n))
@@ -447,11 +461,26 @@ class ChorusRenderer:
                 pan = v.pan_i[k]
             if role == "torsion":
                 pan = float(np.clip(0.75 * frame.torsion_pan + 0.25 * pan, -0.95, 0.95))
-            elif role == "drift" and np.size(frame.drift):
-                # sit between the pair that is separating: lower pairs left
-                j = int(np.argmax(frame.drift))
-                spread = (j / max(np.size(frame.drift) - 1, 1)) * 1.4 - 0.7
-                pan = float(np.clip(spread + 0.25 * pan, -0.95, 0.95))
+            elif role == "chorus" and frame.cross_ratio > 0.0:
+                # cross-axis motion widens the chorus: alternate individuals
+                # are pushed outward the more the structure moves across
+                side = 1.0 if k % 2 else -1.0
+                pan = float(np.clip(pan + 0.6 * float(frame.cross_ratio) * side,
+                                    -0.95, 0.95))
+            elif role == "drift":
+                d_diff = float(np.max(frame.drift)) if np.size(frame.drift) else 0.0
+                d_rock = float(np.max(frame.rock_floor)) if np.size(frame.rock_floor) else 0.0
+                if d_rock > d_diff and np.size(frame.rock_floor):
+                    # sing from the floor that is rocking
+                    r = int(np.argmax(frame.rock_floor))
+                    row = r
+                    if pans and r < len(pans):
+                        pan = float(np.clip(pans[r] + v.pan_jit[k], -0.95, 0.95))
+                elif np.size(frame.drift):
+                    # sit between the pair that is separating: lower pairs left
+                    j = int(np.argmax(frame.drift))
+                    spread = (j / max(np.size(frame.drift) - 1, 1)) * 1.4 - 0.7
+                    pan = float(np.clip(spread + 0.25 * pan, -0.95, 0.95))
             gl = float(np.sqrt(1 - (pan + 1) / 2))
             gr = float(np.sqrt((pan + 1) / 2))
             # Height becomes distance: the higher the floor, the nearer and

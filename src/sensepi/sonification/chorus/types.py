@@ -29,6 +29,9 @@ class SpeciesInfo:
     observer: str = ""
     observation: str = ""
     common: str = ""
+    # User-facing animal type ("frogs", "owls", ...), see TYPES. Filled from the
+    # catalog, or derived from the taxonomic group for older catalogs.
+    type: str = ""
 
     @property
     def is_train(self) -> bool:
@@ -101,6 +104,15 @@ class ControlFrame:
     dead_sensors: tuple = ()
     # instantaneous per-sensor displacement proxy, for the animated structure
     motion: np.ndarray = field(default_factory=lambda: np.zeros(3))
+    # --- the other channels (2026-09-15) ----------------------------------
+    # The driven axis carries the modes; the rest of the sensor carries the
+    # rest of the story. Each is 0..1, rolling-percentile normalised like the
+    # driven-axis features, and 0 when that channel is not streamed.
+    cross_energy: np.ndarray = field(default_factory=lambda: np.zeros(0))  # per mode, other horizontal axis
+    cross_ratio: float = 0.0        # cross-axis / driven-axis RMS, 0..1
+    vertical: float = 0.0           # az activity -> ambient bed density
+    rock_floor: np.ndarray = field(default_factory=lambda: np.zeros(0))    # per row, from gx/gy
+    channels: tuple = ()            # which extra channels were actually seen
 
 
 @dataclass
@@ -138,19 +150,32 @@ class ChorusConfig:
     space: float = 0.50
     depth: float = 1.0
     ambient_bed: float = 0.45
-    # casting map. Structural frequency -> audible carrier, log-log.
-    # autofit rescales BOTH ends to match: the frequency ends are fitted to the
-    # structure's own identified modes, the carrier ends to the catalog's actual
-    # range, so the modes spread across the whole species palette instead of
-    # bunching in the middle of it. The fit is taken ONCE, at baseline, and then
-    # held — otherwise the map would rescale along with any frequency drift and
-    # the recasting-on-damage diagnostic would cancel itself out.
+    # casting map. Structural frequency -> audible carrier, log-log, INSIDE the
+    # chosen animal type's own carrier span (see catalog.type_span). The
+    # frequency ends f_lo..f_hi are what the map stretches over; autofit fits
+    # them to the structure's own identified modes so the modes spread across
+    # the whole species palette of each type instead of bunching in the middle.
+    # The fit is taken ONCE, at baseline, and then held — otherwise the map
+    # would rescale along with any frequency drift and the recasting-on-damage
+    # diagnostic would cancel itself out.
     autofit: bool = True
     f_lo: float = 0.25
     f_hi: float = 20.0
-    c_lo: float = 320.0
-    c_hi: float = 13000.0
-    # identification
+    # --- who sings what -----------------------------------------------------
+    # One animal type per eigenfrequency f1, f2, f3, chosen by the user before
+    # Start. Within the type the species is picked by that frequency, so the
+    # damage readout (a softening frequency moves to a neighbouring species)
+    # survives whatever the user chose. Three frequencies are what the rig
+    # gives; a longer tuple is tolerated, a shorter one repeats the last entry.
+    type_of_mode: tuple = ("frogs", "crickets", "katydids")
+    # ...and one type per structural case the model can hear.
+    resonance_type: str = "cicadas"     # sustained layer while a mode is locked
+    torsion_type: str = "bats"          # fast voice that pans with gz
+    alarm_type: str = "squirrels"       # the startled call after an impact
+    drift_type: str = "grasshoppers"    # rasping between separating floors
+    ambient_type: str = "auto"          # background bed; "auto" = quietest fit
+    # identification. Three eigenfrequencies: the structure is a three-storey
+    # frame and the user works with f1, f2, f3.
     n_modes: int = 3
     # Real buildings live in 0-20 Hz and mode 1 is commonly 0.3-2 Hz, so the
     # identification band must reach well below 1 Hz and up to 20.
@@ -176,7 +201,6 @@ class ChorusConfig:
     # main source of mud and blurred the lead they were meant to support.
     n_chorus: int = 1
     n_ambient: int = 1
-    family_per_mode: bool = True   # mode 1 frogs, mode 2 crickets, mode 3 katydids
     # --- clarity ----------------------------------------------------------
     duck_db: float = 9.0           # how hard a locked mode ducks the others
     lock_gesture: bool = True      # unison burst at the moment of locking
@@ -233,22 +257,52 @@ ROLE_COLORS = {
     "ambient": "#6b7280",
 }
 
-# which animal family sings each mode. Register order matches mode order, so a
-# mode is recognised by WHAT KIND of animal it is, not merely by pitch.
-FAMILY_BY_MODE = ("anura", "gryllidae", "tettigoniidae", "oecanthinae")
+# The animal TYPES the user can assign to modes and cases. Each is a pool of
+# catalogued species spread across a carrier range; inside the pool the
+# structure's frequency picks the species. key -> (label, taxonomic groups,
+# one-line character). Order is the order shown in the tab.
+TYPES = {
+    "frogs":        ("Frogs & toads",   ("anura",),                  "croaks and barks, low"),
+    "crickets":     ("Crickets",        ("gryllidae", "oecanthinae"), "clean rhythmic chirps"),
+    "katydids":     ("Katydids",        ("tettigoniidae",),          "buzzy, harsh, high"),
+    "cicadas":      ("Cicadas",         ("cicadidae",),              "sustained buzz"),
+    "woodpeckers":  ("Woodpeckers",     ("picidae",),                "drum rolls and knocks"),
+    "owls":         ("Owls",            ("strigidae",),              "low hoots"),
+    "bats":         ("Bats",            ("chiroptera",),             "sonar clicks, social calls"),
+    "doves":        ("Doves & pigeons", ("columbidae",),             "soft coos"),
+    "squirrels":    ("Squirrels",       ("sciuridae",),              "chip trains and chatter"),
+    "grasshoppers": ("Grasshoppers",    ("acrididae",),              "dry rasping"),
+}
+TYPE_ORDER = tuple(TYPES)
+GROUP_TO_TYPE = {g: k for k, (_lbl, groups, _c) in TYPES.items() for g in groups}
+
+
+def type_of_group(group: str) -> str:
+    """Map a taxonomic group name onto the user-facing type ('' if unknown)."""
+    return GROUP_TO_TYPE.get(str(group).lower(), "")
+
+
+def type_label(key: str) -> str:
+    return TYPES[key][0] if key in TYPES else str(key)
+
+
+# Legacy family-per-mode defaults, kept for anything still importing them.
+FAMILY_BY_MODE = ("anura", "gryllidae", "tettigoniidae", "picidae")
 FAMILY_LABEL = {
     "anura": "frogs", "gryllidae": "crickets", "tettigoniidae": "katydids",
     "oecanthinae": "tree crickets", "cicadidae": "cicadas", "acrididae": "grasshoppers",
+    "picidae": "woodpeckers", "strigidae": "owls", "chiroptera": "bats",
+    "columbidae": "doves", "sciuridae": "squirrels",
 }
 
 ROLE_MEANING = {
     "lead": "the mode's own species; chirp rate = its natural frequency, 1:1",
-    "chorus": "one supporting voice from the same family",
-    "resonance": "sustained cicada buzz = that mode is LOCKED",
-    "torsion": "fast chirps that pan with the sign of rotation (gz)",
-    "drift": "dry rasping between two floors moving against each other",
-    "alarm": "a startled call after an impact — the meadow hushes first",
-    "ambient": "background meadow; never goes dead",
+    "chorus": "one supporting voice of the same type",
+    "resonance": "the resonance type sings sustained = that mode is LOCKED",
+    "torsion": "the torsion type, fast, panned with the sign of rotation (gz)",
+    "drift": "the drift type between two floors moving against each other",
+    "alarm": "the alarm type calls after an impact — the meadow hushes first",
+    "ambient": "background bed; never goes dead",
 }
 
 CASE_MEANING = {
@@ -256,7 +310,7 @@ CASE_MEANING = {
     "lock": "chorus phase-locks, pitch rises, cicada joins, other modes duck",
     "beating": "two close frequencies — the chorus pulses at the beat rate",
     "torsion": "twisting — fast chirps ping-ponging across the stereo field",
-    "drift": "adjacent floors moving apart — rasping between them",
+    "drift": "adjacent floors moving apart, or a floor rocking (gx/gy) — rasping there",
     "impact": "a knock — the whole meadow falls silent, then one startled call",
     "dropout": "lost samples or a dead sensor — the scene stutters and thins",
 }

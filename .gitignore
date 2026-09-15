@@ -52,3 +52,7 @@ src/sensepi/config/sensors.local.yaml
 deploy_pi.local.bat
 .env
 .env.*
+
+# bioacoustic dataset build inputs/outputs (regenerable; see chorus/dataset/README.md)
+data/raw/bioacoustics/
+data/processed/sonification_chorus/

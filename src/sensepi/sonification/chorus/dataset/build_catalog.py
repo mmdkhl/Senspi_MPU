@@ -43,14 +43,48 @@ def convert_all():
     return out
 
 
-# insects never call this low; a sub-kHz "peak" is wind/handling/traffic rumble
+# insects never call this low; a sub-kHz "peak" is wind/handling/traffic rumble.
+# Every taxon gets its own window: the carrier search must be taxon-limited or
+# the loudest thing in the recording (wind, a road, a heterodyne detector's
+# hiss) wins the peak instead of the animal.
 CARRIER_BAND = {
     "anura":         (250, 9000),      # frogs genuinely go low
     "gryllidae":     (1500, 20000),
     "tettigoniidae": (1500, 20000),
     "oecanthinae":   (1500, 20000),
     "cicadidae":     (1500, 20000),
+    "acrididae":     (1500, 20000),
+    "picidae":       (600, 6000),      # drum knocks ~1.2 kHz, calls to ~4 kHz
+    "strigidae":     (200, 2500),      # hoots
+    "columbidae":    (200, 1500),      # coos
+    "sciuridae":     (500, 9000),      # chips and chatter
+    "chiroptera":    (1000, 16000),    # what survives iNaturalist's MP3: detector
+                                       # output and audible social calls
 }
+
+
+# How long one call unit is, per taxon. The insect rule (threshold a raw
+# envelope, take the median run) finds a 1.5 ms tooth strike, which is what a
+# katydid IS made of. Applied to an owl it finds the 3 ms wiggles on top of a
+# 250 ms hoot and the "owl" ships as a click. So the envelope is smoothed to
+# the note timescale first, and a floor keeps the note whole:
+#   group -> (envelope smoothing ms, minimum unit s)
+UNIT_SHAPE = {
+    "strigidae":  (30.0, 0.12),    # a hoot is a note, not a strike
+    "columbidae": (30.0, 0.10),    # a coo likewise
+    "sciuridae":  (8.0, 0.02),     # a chip is 20-50 ms
+    "picidae":    (3.0, 0.015),    # a knock is an impulse plus its ring
+    "chiroptera": (1.0, 0.003),    # detector pulses
+}
+_DEFAULT_SHAPE = (0.6, 0.0008)     # insects and frogs: the original rule
+
+
+def _smooth(env: np.ndarray, fs: float, ms: float) -> np.ndarray:
+    n = max(1, int(fs * ms / 1000.0))
+    if n <= 1:
+        return env
+    k = np.ones(n) / n
+    return np.convolve(env, k, mode="same")
 
 
 def measure(path: Path, group: str):
@@ -84,7 +118,7 @@ def measure(path: Path, group: str):
     flat = float(np.exp(np.mean(np.log(Pb[near] + 1e-20))) / (np.mean(Pb[near]) + 1e-20))
 
     # envelope in the species' own band -> call unit length + repetition rate
-    lo, hi = max(120, carrier * 0.55), min(carrier * 1.9, fs / 2 * 0.95)
+    lo, hi = max(80, carrier * 0.55), min(carrier * 1.9, fs / 2 * 0.95)
     sos = sg.butter(4, [lo, hi], "bandpass", fs=fs, output="sos")
     xb = sg.sosfilt(sos, x)
     env = np.abs(sg.hilbert(xb))
@@ -96,7 +130,7 @@ def measure(path: Path, group: str):
     #   echeme_rate = how often a chirp/call repeats   (slow, the phrase rhythm)
     #   pulse_rate  = tooth-strikes inside one chirp   (fast, the buzzy timbre)
     fe, Pe = sg.welch(env - env.mean(), fse, nperseg=min(len(env), int(fse * 4)))
-    slow = (fe > 0.6) & (fe < 28)
+    slow = (fe > 0.3) & (fe < 28)
     fast = (fe >= 28) & (fe < 320)
     echeme_rate = float(fe[slow][np.argmax(Pe[slow])]) if slow.sum() else 0.0
     pulse_rate = float(fe[fast][np.argmax(Pe[fast])]) if fast.sum() else 0.0
@@ -105,6 +139,8 @@ def measure(path: Path, group: str):
         if (fast.sum() and slow.sum()) else 0.0
     rate = echeme_rate
 
+    smooth_ms, min_unit = UNIT_SHAPE.get(group, _DEFAULT_SHAPE)
+    env = _smooth(env, fse, smooth_ms)
     thr = np.percentile(env, 88)
     ab = env > thr
     on = np.flatnonzero(np.diff(ab.astype(int)) == 1)
@@ -118,7 +154,7 @@ def measure(path: Path, group: str):
     dur = dur[dur > 0.0008]
     if not len(dur):
         return None
-    unit_s = float(np.median(dur))
+    unit_s = float(max(np.median(dur), min_unit))
     duty = float(np.mean(ab))
     return dict(carrier=carrier, snr=snr, flat=flat, rate=rate,
                 echeme_rate=echeme_rate, pulse_rate=pulse_rate,
@@ -126,8 +162,9 @@ def measure(path: Path, group: str):
                 unit_s=unit_s, duty=duty, fs=fs, n=len(x))
 
 
-def cut_units(path, info, n_units=64):
+def cut_units(path, info, n_units=64, group: str = ""):
     """Cut this species' own call units out of a clean recording."""
+    smooth_ms, _min_unit = UNIT_SHAPE.get(group, _DEFAULT_SHAPE)
     fs, x = wavfile.read(path)
     x = x.astype(np.float64) / 32768.0
     if x.ndim > 1:
@@ -135,11 +172,11 @@ def cut_units(path, info, n_units=64):
     x -= x.mean()
     x /= max(np.abs(x).max(), 1e-9)
     c = info["carrier"]
-    lo, hi = max(120, c * 0.5), min(c * 2.1, fs / 2 * 0.95)
+    lo, hi = max(80, c * 0.5), min(c * 2.1, fs / 2 * 0.95)
     sos = sg.butter(4, [lo, hi], "bandpass", fs=fs, output="sos")
     xb = sg.sosfilt(sos, x)
     env = np.abs(sg.hilbert(xb))
-    envs = sg.savgol_filter(env, max(5, int(fs * 0.0006) | 1), 2)
+    envs = sg.savgol_filter(env, max(5, int(fs * smooth_ms / 1000.0) | 1), 2)
 
     # unit length from this species' own biology, padded for the ring-out
     L = int(np.clip(info["unit_s"] * 1.8, 0.002, 0.45) * fs)
@@ -204,7 +241,7 @@ def main():
     catalog, banks = [], {}
     for sp, rec in sorted(per_species.items()):
         try:
-            units = cut_units(rec["wav"], rec["info"])
+            units = cut_units(rec["wav"], rec["info"], group=rec["group"])
         except Exception:
             units = None
         if not units:

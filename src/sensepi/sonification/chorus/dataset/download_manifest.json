@@ -4728,5 +4728,3825 @@
     "observation": "https://www.inaturalist.org/observations/86134427",
     "file": "acrididae/Aglaothorax_amathitis_033.m4a",
     "bytes": 467163
+  },
+  {
+    "species": "Dendrocoptes medius",
+    "common": "Middle Spotted Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1682032.m4a?1761839176",
+    "license": "cc-by-nc",
+    "observer": "\u0410\u043d\u0434\u0440\u0435\u0439 \u0420\u0430\u0434\u044b\u0433\u0438\u043d",
+    "observation": "https://www.inaturalist.org/observations/323996074",
+    "file": "picidae/Dendrocoptes_medius_000.m4a",
+    "bytes": 142947
+  },
+  {
+    "species": "Dendrocoptes medius",
+    "common": "Middle Spotted Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1719420.m4a?1766135093",
+    "license": "cc0",
+    "observer": "Jo Doolin",
+    "observation": "https://www.inaturalist.org/observations/331287454",
+    "file": "picidae/Dendrocoptes_medius_001.m4a",
+    "bytes": 148661
+  },
+  {
+    "species": "Dendrocoptes medius",
+    "common": "Middle Spotted Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/467749.m4a?1654940722",
+    "license": "cc-by-nc",
+    "observer": "Nelly Semenova",
+    "observation": "https://www.inaturalist.org/observations/121208976",
+    "file": "picidae/Dendrocoptes_medius_002.m4a",
+    "bytes": 84756
+  },
+  {
+    "species": "Picus viridis",
+    "common": "Eurasian Green Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/796417.m4a?1692529500",
+    "license": "cc-by-nc",
+    "observer": "Ata\u00ef",
+    "observation": "https://www.inaturalist.org/observations/179320489",
+    "file": "picidae/Picus_viridis_003.m4a",
+    "bytes": 227529
+  },
+  {
+    "species": "Picus viridis",
+    "common": "Eurasian Green Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/952946.mp3?1712227485",
+    "license": "cc-by-nc",
+    "observer": "Svetlana Akulova",
+    "observation": "https://www.inaturalist.org/observations/204976568",
+    "file": "picidae/Picus_viridis_004.mp3",
+    "bytes": 51231
+  },
+  {
+    "species": "Picus viridis",
+    "common": "Eurasian Green Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/798205.mp3?1692773381",
+    "license": "cc-by",
+    "observer": "Gianni Del Bufalo bygdb",
+    "observation": "https://www.inaturalist.org/observations/179792263",
+    "file": "picidae/Picus_viridis_005.mp3",
+    "bytes": 303021
+  },
+  {
+    "species": "Colaptes auratus",
+    "common": "Northern Flicker",
+    "url": "https://static.inaturalist.org/sounds/179583.m4a?1617148041",
+    "license": "cc-by-nc",
+    "observer": "Shauna Doll",
+    "observation": "https://www.inaturalist.org/observations/72488486",
+    "file": "picidae/Colaptes_auratus_006.m4a",
+    "bytes": 57070
+  },
+  {
+    "species": "Colaptes auratus",
+    "common": "Northern Flicker",
+    "url": "https://static.inaturalist.org/sounds/1598075.mp3?1754702322",
+    "license": "cc-by-nc",
+    "observer": "Kristen M",
+    "observation": "https://www.inaturalist.org/observations/304858589",
+    "file": "picidae/Colaptes_auratus_007.mp3",
+    "bytes": 39597
+  },
+  {
+    "species": "Colaptes auratus",
+    "common": "Northern Flicker",
+    "url": "https://static.inaturalist.org/sounds/202858.m4a?1619899961",
+    "license": "cc-by",
+    "observer": "Sean Frey",
+    "observation": "https://www.inaturalist.org/observations/76268044",
+    "file": "picidae/Colaptes_auratus_008.m4a",
+    "bytes": 39299
+  },
+  {
+    "species": "Picoides tridactylus",
+    "common": "Eurasian Three-toed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/590705.mp3?1675086224",
+    "license": "cc-by-nc",
+    "observer": "\u041e\u043b\u0435\u0441\u044f",
+    "observation": "https://www.inaturalist.org/observations/147696380",
+    "file": "picidae/Picoides_tridactylus_009.mp3",
+    "bytes": 996947
+  },
+  {
+    "species": "Picoides tridactylus",
+    "common": "Eurasian Three-toed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/545436.mp3?1665005506",
+    "license": "cc-by-nc",
+    "observer": "Aleksey Levashkin",
+    "observation": "https://www.inaturalist.org/observations/137682309",
+    "file": "picidae/Picoides_tridactylus_010.mp3",
+    "bytes": 1255030
+  },
+  {
+    "species": "Picoides tridactylus",
+    "common": "Eurasian Three-toed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/2039386.mp3?1782244389",
+    "license": "cc-by-sa",
+    "observer": "avsdov",
+    "observation": "https://www.inaturalist.org/observations/374703014",
+    "file": "picidae/Picoides_tridactylus_011.mp3",
+    "bytes": 1138319
+  },
+  {
+    "species": "Jynx torquilla",
+    "common": "Eurasian Wryneck",
+    "url": "https://static.inaturalist.org/sounds/413626.mp3?1651352853",
+    "license": "cc-by-nc",
+    "observer": "jansson",
+    "observation": "https://www.inaturalist.org/observations/113966440",
+    "file": "picidae/Jynx_torquilla_012.mp3",
+    "bytes": 98562
+  },
+  {
+    "species": "Jynx torquilla",
+    "common": "Eurasian Wryneck",
+    "url": "https://static.inaturalist.org/sounds/1776946.mp3?1771930448",
+    "license": "cc-by-nc",
+    "observer": "tatianakirova",
+    "observation": "https://www.inaturalist.org/observations/340014891",
+    "file": "picidae/Jynx_torquilla_013.mp3",
+    "bytes": 283008
+  },
+  {
+    "species": "Jynx torquilla",
+    "common": "Eurasian Wryneck",
+    "url": "https://static.inaturalist.org/sounds/1066226.m4a?1716932873",
+    "license": "cc-by-nc",
+    "observer": "Quirin",
+    "observation": "https://www.inaturalist.org/observations/218986221",
+    "file": "picidae/Jynx_torquilla_014.m4a",
+    "bytes": 322627
+  },
+  {
+    "species": "Dryocopus martius",
+    "common": "Black Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1603291.m4a?1755110514",
+    "license": "cc-by",
+    "observer": "Daniel Castanhal Garc\u00eda",
+    "observation": "https://www.inaturalist.org/observations/306074015",
+    "file": "picidae/Dryocopus_martius_015.m4a",
+    "bytes": 1822760
+  },
+  {
+    "species": "Dryocopus martius",
+    "common": "Black Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/90817.m4a?1589796174",
+    "license": "cc-by-nc",
+    "observer": "Simon Eisele",
+    "observation": "https://www.inaturalist.org/observations/46076152",
+    "file": "picidae/Dryocopus_martius_016.m4a",
+    "bytes": 45084
+  },
+  {
+    "species": "Dryocopus martius",
+    "common": "Black Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/91597.mp3?1589906947",
+    "license": "cc-by",
+    "observer": "Marianna Boi",
+    "observation": "https://www.inaturalist.org/observations/46502702",
+    "file": "picidae/Dryocopus_martius_017.mp3",
+    "bytes": 905994
+  },
+  {
+    "species": "Dryocopus pileatus",
+    "common": "Pileated Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/283171.mp3?1627427904",
+    "license": "cc-by-nc",
+    "observer": "Brenna Farrell",
+    "observation": "https://www.inaturalist.org/observations/73362354",
+    "file": "picidae/Dryocopus_pileatus_018.mp3",
+    "bytes": 423293
+  },
+  {
+    "species": "Dryocopus pileatus",
+    "common": "Pileated Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1040812.m4a?1715834053",
+    "license": "cc-by-nc",
+    "observer": "M\u00e9lodie",
+    "observation": "https://www.inaturalist.org/observations/216050823",
+    "file": "picidae/Dryocopus_pileatus_019.m4a",
+    "bytes": 45359
+  },
+  {
+    "species": "Dryocopus pileatus",
+    "common": "Pileated Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1863293.mp3?1776367252",
+    "license": "cc0",
+    "observer": "Chase Harris",
+    "observation": "https://www.inaturalist.org/observations/350338979",
+    "file": "picidae/Dryocopus_pileatus_020.mp3",
+    "bytes": 91799
+  },
+  {
+    "species": "Leuconotopicus villosus",
+    "common": "Hairy Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/53860.m4a?1577904056",
+    "license": "cc-by-nc",
+    "observer": "Cynthia Brossard",
+    "observation": "https://www.inaturalist.org/observations/36924478",
+    "file": "picidae/Leuconotopicus_villosus_021.m4a",
+    "bytes": 134782
+  },
+  {
+    "species": "Leuconotopicus villosus",
+    "common": "Hairy Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/324112.m4a?1635813332",
+    "license": "cc-by-nc",
+    "observer": "jmwilkerson",
+    "observation": "https://www.inaturalist.org/observations/100026809",
+    "file": "picidae/Leuconotopicus_villosus_022.m4a",
+    "bytes": 19912
+  },
+  {
+    "species": "Leuconotopicus villosus",
+    "common": "Hairy Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/847722.mp3?1700414333",
+    "license": "cc-by-nc",
+    "observer": "little_blue_heron",
+    "observation": "https://www.inaturalist.org/observations/191490178",
+    "file": "picidae/Leuconotopicus_villosus_023.mp3",
+    "bytes": 154572
+  },
+  {
+    "species": "Colaptes melanochloros",
+    "common": "Green-barred Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1242388.mp3?1730486270",
+    "license": "cc-by-nc",
+    "observer": "Victor",
+    "observation": "https://www.inaturalist.org/observations/250035819",
+    "file": "picidae/Colaptes_melanochloros_024.mp3",
+    "bytes": 382361
+  },
+  {
+    "species": "Colaptes melanochloros",
+    "common": "Green-barred Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1242389.mp3?1730486270",
+    "license": "cc-by-nc",
+    "observer": "Victor",
+    "observation": "https://www.inaturalist.org/observations/250035819",
+    "file": "picidae/Colaptes_melanochloros_025.mp3",
+    "bytes": 289364
+  },
+  {
+    "species": "Colaptes melanochloros",
+    "common": "Green-barred Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1335742.mp3?1742046610",
+    "license": "cc-by-nc",
+    "observer": "Alisson",
+    "observation": "https://www.inaturalist.org/observations/265401858",
+    "file": "picidae/Colaptes_melanochloros_026.mp3",
+    "bytes": 461889
+  },
+  {
+    "species": "Melanerpes erythrocephalus",
+    "common": "Red-headed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1859437.m4a?1776198124",
+    "license": "cc-by-nc",
+    "observer": "thesoulflowers",
+    "observation": "https://www.inaturalist.org/observations/349858697",
+    "file": "picidae/Melanerpes_erythrocephalus_027.m4a",
+    "bytes": 190893
+  },
+  {
+    "species": "Melanerpes erythrocephalus",
+    "common": "Red-headed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1134362.m4a?1721166891",
+    "license": "cc-by-nc",
+    "observer": "Elijah Hicks",
+    "observation": "https://www.inaturalist.org/observations/229785986",
+    "file": "picidae/Melanerpes_erythrocephalus_028.m4a",
+    "bytes": 53692
+  },
+  {
+    "species": "Melanerpes erythrocephalus",
+    "common": "Red-headed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/760107.mp3?1688533527",
+    "license": "cc-by-sa",
+    "observer": "Linzy L.",
+    "observation": "https://www.inaturalist.org/observations/171158603",
+    "file": "picidae/Melanerpes_erythrocephalus_029.mp3",
+    "bytes": 140574
+  },
+  {
+    "species": "Melanerpes carolinus",
+    "common": "Red-bellied Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/627172.m4a?1680125244",
+    "license": "cc-by-nc",
+    "observer": "Maureen Clare Murphy",
+    "observation": "https://www.inaturalist.org/observations/152760197",
+    "file": "picidae/Melanerpes_carolinus_030.m4a",
+    "bytes": 121929
+  },
+  {
+    "species": "Melanerpes carolinus",
+    "common": "Red-bellied Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1848168.m4a?1775688262",
+    "license": "cc-by-nc",
+    "observer": "Argentina Campeon Del Mundo",
+    "observation": "https://www.inaturalist.org/observations/348386993",
+    "file": "picidae/Melanerpes_carolinus_031.m4a",
+    "bytes": 287934
+  },
+  {
+    "species": "Melanerpes carolinus",
+    "common": "Red-bellied Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1848168.m4a?1775688262",
+    "license": "cc-by-nc",
+    "observer": "Argentina Campeon Del Mundo",
+    "observation": "https://www.inaturalist.org/observations/348386993",
+    "file": "picidae/Melanerpes_carolinus_032.m4a",
+    "bytes": 287934
+  },
+  {
+    "species": "Dendrocopos major",
+    "common": "Great Spotted Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1346735.m4a?1742786962",
+    "license": "cc-by-nc",
+    "observer": "Risto ja Kirsi Gylden",
+    "observation": "https://www.inaturalist.org/observations/266622970",
+    "file": "picidae/Dendrocopos_major_033.m4a",
+    "bytes": 151088
+  },
+  {
+    "species": "Dendrocopos major",
+    "common": "Great Spotted Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/155729.mp3?1609162243",
+    "license": "cc-by-nc",
+    "observer": "Jos\u00e9 Ignacio M\u00e1rquez Corro",
+    "observation": "https://www.inaturalist.org/observations/67191837",
+    "file": "picidae/Dendrocopos_major_034.mp3",
+    "bytes": 380479
+  },
+  {
+    "species": "Dendrocopos major",
+    "common": "Great Spotted Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1421413.m4a?1745864808",
+    "license": "cc-by-nc",
+    "observer": "mattyratty",
+    "observation": "https://www.inaturalist.org/observations/275919672",
+    "file": "picidae/Dendrocopos_major_035.m4a",
+    "bytes": 136181
+  },
+  {
+    "species": "Picus canus",
+    "common": "Grey-headed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/109070.m4a?1592509153",
+    "license": "cc-by-nc",
+    "observer": "Michele Chiacchio",
+    "observation": "https://www.inaturalist.org/observations/50080539",
+    "file": "picidae/Picus_canus_036.m4a",
+    "bytes": 58521
+  },
+  {
+    "species": "Picus canus",
+    "common": "Grey-headed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/513352.mp3?1659509601",
+    "license": "cc-by-nc",
+    "observer": "Peter Holub",
+    "observation": "https://www.inaturalist.org/observations/129245780",
+    "file": "picidae/Picus_canus_037.mp3",
+    "bytes": 133210
+  },
+  {
+    "species": "Picus canus",
+    "common": "Grey-headed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/735723.m4a?1686579213",
+    "license": "cc-by-nc",
+    "observer": "\u041b\u044e\u0431\u043e\u0432\u044c",
+    "observation": "https://www.inaturalist.org/observations/167013221",
+    "file": "picidae/Picus_canus_038.m4a",
+    "bytes": 828875
+  },
+  {
+    "species": "Leuconotopicus borealis",
+    "common": "Red-cockaded Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1769581.m4a?1771292814",
+    "license": "cc-by-nc",
+    "observer": "Josh Emm",
+    "observation": "https://www.inaturalist.org/observations/338970608",
+    "file": "picidae/Leuconotopicus_borealis_039.m4a",
+    "bytes": 191249
+  },
+  {
+    "species": "Leuconotopicus borealis",
+    "common": "Red-cockaded Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/555158.m4a?1666877172",
+    "license": "cc-by-nc",
+    "observer": "Manoli Strecker",
+    "observation": "https://www.inaturalist.org/observations/140149512",
+    "file": "picidae/Leuconotopicus_borealis_040.m4a",
+    "bytes": 106593
+  },
+  {
+    "species": "Leuconotopicus borealis",
+    "common": "Red-cockaded Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/193544.m4a?1619205344",
+    "license": "cc-by",
+    "observer": "Jonathan Layman",
+    "observation": "https://www.inaturalist.org/observations/74959269",
+    "file": "picidae/Leuconotopicus_borealis_041.m4a",
+    "bytes": 128658
+  },
+  {
+    "species": "Dryobates minor",
+    "common": "Lesser Spotted Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1954304.m4a?1778940469",
+    "license": "cc-by-nc",
+    "observer": "practicepeas",
+    "observation": "https://www.inaturalist.org/observations/362003077",
+    "file": "picidae/Dryobates_minor_042.m4a",
+    "bytes": 185496
+  },
+  {
+    "species": "Dryobates minor",
+    "common": "Lesser Spotted Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1954305.m4a?1778940471",
+    "license": "cc-by-nc",
+    "observer": "practicepeas",
+    "observation": "https://www.inaturalist.org/observations/362003077",
+    "file": "picidae/Dryobates_minor_043.m4a",
+    "bytes": 206135
+  },
+  {
+    "species": "Dryobates minor",
+    "common": "Lesser Spotted Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1748458.mp3?1769158857",
+    "license": "cc-by-nc",
+    "observer": "Herbert Stadelmann",
+    "observation": "https://www.inaturalist.org/observations/335807590",
+    "file": "picidae/Dryobates_minor_044.mp3",
+    "bytes": 1307364
+  },
+  {
+    "species": "Dryobates pubescens",
+    "common": "Downy Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/155864.mp3?1609259380",
+    "license": "cc-by-sa",
+    "observer": "Linzy L.",
+    "observation": "https://www.inaturalist.org/observations/66797377",
+    "file": "picidae/Dryobates_pubescens_045.mp3",
+    "bytes": 111109
+  },
+  {
+    "species": "Dryobates pubescens",
+    "common": "Downy Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1859898.m4a?1776213062",
+    "license": "cc-by-nc",
+    "observer": "Nathan Klay",
+    "observation": "https://www.inaturalist.org/observations/349909982",
+    "file": "picidae/Dryobates_pubescens_046.m4a",
+    "bytes": 136092
+  },
+  {
+    "species": "Dryobates pubescens",
+    "common": "Downy Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1535704.mp3?1750540635",
+    "license": "cc-by-sa",
+    "observer": "frogspotter",
+    "observation": "https://www.inaturalist.org/observations/291590176",
+    "file": "picidae/Dryobates_pubescens_047.mp3",
+    "bytes": 225777
+  },
+  {
+    "species": "Dendrocopos leucotos",
+    "common": "White-backed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1330089.mp3?1741711552",
+    "license": "cc-by-nc",
+    "observer": "Svetlana Akulova",
+    "observation": "https://www.inaturalist.org/observations/264948719",
+    "file": "picidae/Dendrocopos_leucotos_048.mp3",
+    "bytes": 39025
+  },
+  {
+    "species": "Dendrocopos leucotos",
+    "common": "White-backed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1330090.mp3?1741711555",
+    "license": "cc-by-nc",
+    "observer": "Svetlana Akulova",
+    "observation": "https://www.inaturalist.org/observations/264948719",
+    "file": "picidae/Dendrocopos_leucotos_049.mp3",
+    "bytes": 167939
+  },
+  {
+    "species": "Dendrocopos leucotos",
+    "common": "White-backed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1330089.mp3?1741711552",
+    "license": "cc-by-nc",
+    "observer": "Svetlana Akulova",
+    "observation": "https://www.inaturalist.org/observations/264948719",
+    "file": "picidae/Dendrocopos_leucotos_050.mp3",
+    "bytes": 39025
+  },
+  {
+    "species": "Dryobates scalaris",
+    "common": "Ladder-backed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1364809.mp3?1743996669",
+    "license": "cc-by-nc",
+    "observer": "Kelly Tolentino",
+    "observation": "https://www.inaturalist.org/observations/269066765",
+    "file": "picidae/Dryobates_scalaris_051.mp3",
+    "bytes": 300974
+  },
+  {
+    "species": "Dryobates scalaris",
+    "common": "Ladder-backed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1364809.mp3?1743996669",
+    "license": "cc-by-nc",
+    "observer": "Kelly Tolentino",
+    "observation": "https://www.inaturalist.org/observations/269066765",
+    "file": "picidae/Dryobates_scalaris_052.mp3",
+    "bytes": 300974
+  },
+  {
+    "species": "Dryobates scalaris",
+    "common": "Ladder-backed Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1776043.m4a?1771854361",
+    "license": "cc-by-nc",
+    "observer": "Daniel S. Cooper",
+    "observation": "https://www.inaturalist.org/observations/339889495",
+    "file": "picidae/Dryobates_scalaris_053.m4a",
+    "bytes": 121286
+  },
+  {
+    "species": "Melanerpes uropygialis",
+    "common": "Gila Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/2023140.mp3?1781517132",
+    "license": "cc-by-nc",
+    "observer": "parakie",
+    "observation": "https://www.inaturalist.org/observations/371909363",
+    "file": "picidae/Melanerpes_uropygialis_054.mp3",
+    "bytes": 55740
+  },
+  {
+    "species": "Melanerpes uropygialis",
+    "common": "Gila Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/676053.mp3?1682995492",
+    "license": "cc-by-nc",
+    "observer": "Roxanna",
+    "observation": "https://www.inaturalist.org/observations/159024238",
+    "file": "picidae/Melanerpes_uropygialis_055.mp3",
+    "bytes": 152599
+  },
+  {
+    "species": "Melanerpes uropygialis",
+    "common": "Gila Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/170276.mp3?1615230144",
+    "license": "cc-by-nc",
+    "observer": "Eliseo D Moreno",
+    "observation": "https://www.inaturalist.org/observations/70828796",
+    "file": "picidae/Melanerpes_uropygialis_056.mp3",
+    "bytes": 65201
+  },
+  {
+    "species": "Melanerpes formicivorus",
+    "common": "Acorn Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/662670.m4a?1682737414",
+    "license": "cc-by-nc",
+    "observer": "Hailey Adler",
+    "observation": "https://www.inaturalist.org/observations/157420078",
+    "file": "picidae/Melanerpes_formicivorus_057.m4a",
+    "bytes": 36443
+  },
+  {
+    "species": "Melanerpes formicivorus",
+    "common": "Acorn Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/115515.m4a?1593699451",
+    "license": "cc-by-nc",
+    "observer": "Juan Carlos P\u00e9rez Maga\u00f1a",
+    "observation": "https://www.inaturalist.org/observations/51691597",
+    "file": "picidae/Melanerpes_formicivorus_058.m4a",
+    "bytes": 792600
+  },
+  {
+    "species": "Melanerpes formicivorus",
+    "common": "Acorn Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1813016.m4a?1773936252",
+    "license": "cc-by-nc",
+    "observer": "brookesullivan3131",
+    "observation": "https://www.inaturalist.org/observations/343820285",
+    "file": "picidae/Melanerpes_formicivorus_059.m4a",
+    "bytes": 78433
+  },
+  {
+    "species": "Colaptes pitius",
+    "common": "Chilean Flicker",
+    "url": "https://static.inaturalist.org/sounds/832396.m4a?1697565845",
+    "license": "cc-by",
+    "observer": "Nicolas Olejnik",
+    "observation": "https://www.inaturalist.org/observations/187909799",
+    "file": "picidae/Colaptes_pitius_060.m4a",
+    "bytes": 376012
+  },
+  {
+    "species": "Colaptes pitius",
+    "common": "Chilean Flicker",
+    "url": "https://static.inaturalist.org/sounds/578665.m4a?1672430793",
+    "license": "cc-by-nc",
+    "observer": "Boyka",
+    "observation": "https://www.inaturalist.org/observations/145255694",
+    "file": "picidae/Colaptes_pitius_061.m4a",
+    "bytes": 121704
+  },
+  {
+    "species": "Colaptes pitius",
+    "common": "Chilean Flicker",
+    "url": "https://static.inaturalist.org/sounds/476108.mp3?1655613952",
+    "license": "cc-by-nc",
+    "observer": "Diego Almendras",
+    "observation": "https://www.inaturalist.org/observations/122427150",
+    "file": "picidae/Colaptes_pitius_062.mp3",
+    "bytes": 335340
+  },
+  {
+    "species": "Sphyrapicus varius",
+    "common": "Yellow-bellied Sapsucker",
+    "url": "https://static.inaturalist.org/sounds/999261.m4a?1714343348",
+    "license": "cc-by",
+    "observer": "Jamie VanBuskirk",
+    "observation": "https://www.inaturalist.org/observations/211163944",
+    "file": "picidae/Sphyrapicus_varius_063.m4a",
+    "bytes": 513934
+  },
+  {
+    "species": "Sphyrapicus varius",
+    "common": "Yellow-bellied Sapsucker",
+    "url": "https://static.inaturalist.org/sounds/267418.m4a?1625348331",
+    "license": "cc-by-nc",
+    "observer": "mixxiechick",
+    "observation": "https://www.inaturalist.org/observations/85531183",
+    "file": "picidae/Sphyrapicus_varius_064.m4a",
+    "bytes": 231834
+  },
+  {
+    "species": "Sphyrapicus varius",
+    "common": "Yellow-bellied Sapsucker",
+    "url": "https://static.inaturalist.org/sounds/972008.mp3?1713394625",
+    "license": "cc-by-nc",
+    "observer": "Kristen M",
+    "observation": "https://www.inaturalist.org/observations/207840650",
+    "file": "picidae/Sphyrapicus_varius_065.mp3",
+    "bytes": 132234
+  },
+  {
+    "species": "Melanerpes candidus",
+    "common": "White Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/845597.mp3?1699963832",
+    "license": "cc-by",
+    "observer": "Nico Fernandez-Sauleda",
+    "observation": "https://www.inaturalist.org/observations/190992420",
+    "file": "picidae/Melanerpes_candidus_066.mp3",
+    "bytes": 96384
+  },
+  {
+    "species": "Melanerpes candidus",
+    "common": "White Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/295443.mp3?1629682755",
+    "license": "cc-by-nc",
+    "observer": "Claudio Martins de Souza",
+    "observation": "https://www.inaturalist.org/observations/92188871",
+    "file": "picidae/Melanerpes_candidus_067.mp3",
+    "bytes": 592595
+  },
+  {
+    "species": "Melanerpes candidus",
+    "common": "White Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1656252.m4a?1759490496",
+    "license": "cc-by-nc",
+    "observer": "Hugo",
+    "observation": "https://www.inaturalist.org/observations/318380081",
+    "file": "picidae/Melanerpes_candidus_068.m4a",
+    "bytes": 291259
+  },
+  {
+    "species": "Dryobates nuttallii",
+    "common": "Nuttall's Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/219832.m4a?1620917274",
+    "license": "cc0",
+    "observer": "Sarah Angulo",
+    "observation": "https://www.inaturalist.org/observations/78578654",
+    "file": "picidae/Dryobates_nuttallii_069.m4a",
+    "bytes": 205843
+  },
+  {
+    "species": "Dryobates nuttallii",
+    "common": "Nuttall's Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1223519.m4a?1728229442",
+    "license": "cc-by-nc",
+    "observer": "Susan Levinson",
+    "observation": "https://www.inaturalist.org/observations/245967997",
+    "file": "picidae/Dryobates_nuttallii_070.m4a",
+    "bytes": 256992
+  },
+  {
+    "species": "Dryobates nuttallii",
+    "common": "Nuttall's Woodpecker",
+    "url": "https://static.inaturalist.org/sounds/1163463.mp3?1723743807",
+    "license": "cc-by-nc",
+    "observer": "Phil Calvert",
+    "observation": "https://www.inaturalist.org/observations/235944620",
+    "file": "picidae/Dryobates_nuttallii_071.mp3",
+    "bytes": 114432
+  },
+  {
+    "species": "Strix varia",
+    "common": "Barred Owl",
+    "url": "https://static.inaturalist.org/sounds/307365.m4a?1632079722",
+    "license": "cc-by-nc",
+    "observer": "kitemongoose",
+    "observation": "https://www.inaturalist.org/observations/95440844",
+    "file": "strigidae/Strix_varia_000.m4a",
+    "bytes": 35976
+  },
+  {
+    "species": "Strix varia",
+    "common": "Barred Owl",
+    "url": "https://static.inaturalist.org/sounds/534364.mp3?1662942834",
+    "license": "cc-by-nc",
+    "observer": "kitemongoose",
+    "observation": "https://www.inaturalist.org/observations/134671618",
+    "file": "strigidae/Strix_varia_001.mp3",
+    "bytes": 306818
+  },
+  {
+    "species": "Strix varia",
+    "common": "Barred Owl",
+    "url": "https://static.inaturalist.org/sounds/308379.m4a?1632335337",
+    "license": "cc-by-nc",
+    "observer": "kitemongoose",
+    "observation": "https://www.inaturalist.org/observations/95778152",
+    "file": "strigidae/Strix_varia_002.m4a",
+    "bytes": 542169
+  },
+  {
+    "species": "Aegolius funereus",
+    "common": "Boreal Owl",
+    "url": "https://static.inaturalist.org/sounds/114013.m4a?1593412211",
+    "license": "cc-by-nc",
+    "observer": "Phil Chaon",
+    "observation": "https://www.inaturalist.org/observations/51334880",
+    "file": "strigidae/Aegolius_funereus_003.m4a",
+    "bytes": 170672
+  },
+  {
+    "species": "Aegolius funereus",
+    "common": "Boreal Owl",
+    "url": "https://static.inaturalist.org/sounds/254824.m4a?1623845202",
+    "license": "cc-by",
+    "observer": "John Powers",
+    "observation": "https://www.inaturalist.org/observations/83249631",
+    "file": "strigidae/Aegolius_funereus_004.m4a",
+    "bytes": 218586
+  },
+  {
+    "species": "Aegolius funereus",
+    "common": "Boreal Owl",
+    "url": "https://static.inaturalist.org/sounds/189612.mp3?1618693558",
+    "license": "cc-by",
+    "observer": "Jan Ebr &amp; Ivana Ebrov\u00e1",
+    "observation": "https://www.inaturalist.org/observations/74289801",
+    "file": "strigidae/Aegolius_funereus_005.mp3",
+    "bytes": 461952
+  },
+  {
+    "species": "Bubo bubo",
+    "common": "Eurasian Eagle-Owl",
+    "url": "https://static.inaturalist.org/sounds/545640.mp3?1665050444",
+    "license": "cc-by-nc",
+    "observer": "Aleksey Levashkin",
+    "observation": "https://www.inaturalist.org/observations/137728950",
+    "file": "strigidae/Bubo_bubo_006.mp3",
+    "bytes": 738850
+  },
+  {
+    "species": "Bubo bubo",
+    "common": "Eurasian Eagle-Owl",
+    "url": "https://static.inaturalist.org/sounds/944481.mp3?1711751592",
+    "license": "cc-by-nc",
+    "observer": "Tobias Gratzer",
+    "observation": "https://www.inaturalist.org/observations/204465232",
+    "file": "strigidae/Bubo_bubo_007.mp3",
+    "bytes": 739540
+  },
+  {
+    "species": "Bubo bubo",
+    "common": "Eurasian Eagle-Owl",
+    "url": "https://static.inaturalist.org/sounds/595169.mp3?1675978155",
+    "license": "cc-by-nc",
+    "observer": "garethwilson",
+    "observation": "https://www.inaturalist.org/observations/148406786",
+    "file": "strigidae/Bubo_bubo_008.mp3",
+    "bytes": 85609
+  },
+  {
+    "species": "Athene cunicularia",
+    "common": "Burrowing Owl",
+    "url": "https://static.inaturalist.org/sounds/764517.mp3?1688919055",
+    "license": "cc-by-nc",
+    "observer": "Adam Kalab",
+    "observation": "https://www.inaturalist.org/observations/171990866",
+    "file": "strigidae/Athene_cunicularia_009.mp3",
+    "bytes": 177033
+  },
+  {
+    "species": "Athene cunicularia",
+    "common": "Burrowing Owl",
+    "url": "https://static.inaturalist.org/sounds/597872.m4a?1676430038",
+    "license": "cc-by-nc",
+    "observer": "karolmalaver",
+    "observation": "https://www.inaturalist.org/observations/148802985",
+    "file": "strigidae/Athene_cunicularia_010.m4a",
+    "bytes": 483916
+  },
+  {
+    "species": "Athene cunicularia",
+    "common": "Burrowing Owl",
+    "url": "https://static.inaturalist.org/sounds/597879.m4a?1676430275",
+    "license": "cc-by-nc",
+    "observer": "karolmalaver",
+    "observation": "https://www.inaturalist.org/observations/148802985",
+    "file": "strigidae/Athene_cunicularia_011.m4a",
+    "bytes": 483916
+  },
+  {
+    "species": "Megascops choliba",
+    "common": "Tropical Screech-Owl",
+    "url": "https://static.inaturalist.org/sounds/2067916.m4a?1783817440",
+    "license": "cc-by",
+    "observer": "Valent\u00edn Alfano",
+    "observation": "https://www.inaturalist.org/observations/380511738",
+    "file": "strigidae/Megascops_choliba_012.m4a",
+    "bytes": 535903
+  },
+  {
+    "species": "Megascops choliba",
+    "common": "Tropical Screech-Owl",
+    "url": "https://static.inaturalist.org/sounds/1271404.mp3?1734911816",
+    "license": "cc-by-nc",
+    "observer": "Daniel Alejandro Paiz",
+    "observation": "https://www.inaturalist.org/observations/255933254",
+    "file": "strigidae/Megascops_choliba_013.mp3",
+    "bytes": 309324
+  },
+  {
+    "species": "Megascops choliba",
+    "common": "Tropical Screech-Owl",
+    "url": "https://static.inaturalist.org/sounds/942033.mp3?1711554954",
+    "license": "cc-by-nc",
+    "observer": "Victor",
+    "observation": "https://www.inaturalist.org/observations/204153593",
+    "file": "strigidae/Megascops_choliba_014.mp3",
+    "bytes": 260653
+  },
+  {
+    "species": "Megascops kennicottii",
+    "common": "Western Screech-Owl",
+    "url": "https://static.inaturalist.org/sounds/1261514.mp3?1733218255",
+    "license": "cc-by-nc",
+    "observer": "Davis Provan",
+    "observation": "https://www.inaturalist.org/observations/253846864",
+    "file": "strigidae/Megascops_kennicottii_015.mp3",
+    "bytes": 656195
+  },
+  {
+    "species": "Megascops kennicottii",
+    "common": "Western Screech-Owl",
+    "url": "https://static.inaturalist.org/sounds/167891.m4a?1614616058",
+    "license": "cc-by-nc",
+    "observer": "David F. Fraser",
+    "observation": "https://www.inaturalist.org/observations/70397456",
+    "file": "strigidae/Megascops_kennicottii_016.m4a",
+    "bytes": 376631
+  },
+  {
+    "species": "Megascops kennicottii",
+    "common": "Western Screech-Owl",
+    "url": "https://static.inaturalist.org/sounds/704231.m4a?1684542263",
+    "license": "cc-by-nc",
+    "observer": "Jorge H. Valdez",
+    "observation": "https://www.inaturalist.org/observations/162575896",
+    "file": "strigidae/Megascops_kennicottii_017.m4a",
+    "bytes": 76598
+  },
+  {
+    "species": "Bubo virginianus",
+    "common": "Great Horned Owl",
+    "url": "https://static.inaturalist.org/sounds/1076513.mp3?1717457490",
+    "license": "cc-by-nc",
+    "observer": "Brenna Farrell",
+    "observation": "https://www.inaturalist.org/observations/220360023",
+    "file": "strigidae/Bubo_virginianus_018.mp3",
+    "bytes": 2013963
+  },
+  {
+    "species": "Bubo virginianus",
+    "common": "Great Horned Owl",
+    "url": "https://static.inaturalist.org/sounds/1076524.mp3?1717457865",
+    "license": "cc-by-nc",
+    "observer": "Brenna Farrell",
+    "observation": "https://www.inaturalist.org/observations/220360023",
+    "file": "strigidae/Bubo_virginianus_019.mp3",
+    "bytes": 1740939
+  },
+  {
+    "species": "Bubo virginianus",
+    "common": "Great Horned Owl",
+    "url": "https://static.inaturalist.org/sounds/1076631.mp3?1717458352",
+    "license": "cc-by-nc",
+    "observer": "Brenna Farrell",
+    "observation": "https://www.inaturalist.org/observations/220360023",
+    "file": "strigidae/Bubo_virginianus_020.mp3",
+    "bytes": 2135499
+  },
+  {
+    "species": "Glaucidium passerinum",
+    "common": "Eurasian Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/361047.mp3?1645641951",
+    "license": "cc-by-nc",
+    "observer": "Aleksey Levashkin",
+    "observation": "https://www.inaturalist.org/observations/107326878",
+    "file": "strigidae/Glaucidium_passerinum_021.mp3",
+    "bytes": 386719
+  },
+  {
+    "species": "Glaucidium passerinum",
+    "common": "Eurasian Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/165519.mp3?1613900358",
+    "license": "cc-by-nc",
+    "observer": "dallenstein",
+    "observation": "https://www.inaturalist.org/observations/69913328",
+    "file": "strigidae/Glaucidium_passerinum_022.mp3",
+    "bytes": 189924
+  },
+  {
+    "species": "Glaucidium passerinum",
+    "common": "Eurasian Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/165520.mp3?1613900361",
+    "license": "cc-by-nc",
+    "observer": "dallenstein",
+    "observation": "https://www.inaturalist.org/observations/69913328",
+    "file": "strigidae/Glaucidium_passerinum_023.mp3",
+    "bytes": 183655
+  },
+  {
+    "species": "Otus scops",
+    "common": "Eurasian Scops-Owl",
+    "url": "https://static.inaturalist.org/sounds/281438.m4a?1627157411",
+    "license": "cc-by-nc",
+    "observer": "marionlaremoise",
+    "observation": "https://www.inaturalist.org/observations/88440780",
+    "file": "strigidae/Otus_scops_024.m4a",
+    "bytes": 74981
+  },
+  {
+    "species": "Otus scops",
+    "common": "Eurasian Scops-Owl",
+    "url": "https://static.inaturalist.org/sounds/641233.m4a?1681341129",
+    "license": "cc-by-nc",
+    "observer": "Jakob Fahr",
+    "observation": "https://www.inaturalist.org/observations/154629691",
+    "file": "strigidae/Otus_scops_025.m4a",
+    "bytes": 533989
+  },
+  {
+    "species": "Otus scops",
+    "common": "Eurasian Scops-Owl",
+    "url": "https://static.inaturalist.org/sounds/362519.m4a?1645926198",
+    "license": "cc-by-nc",
+    "observer": "E. Raven Teva",
+    "observation": "https://www.inaturalist.org/observations/107522834",
+    "file": "strigidae/Otus_scops_026.m4a",
+    "bytes": 47630
+  },
+  {
+    "species": "Ninox novaeseelandiae novaeseelandiae",
+    "common": "New Zealand Morepork",
+    "url": "https://static.inaturalist.org/sounds/1638425.m4a?1758022628",
+    "license": "cc-by-nc",
+    "observer": "tobse35",
+    "observation": "https://www.inaturalist.org/observations/314305776",
+    "file": "strigidae/Ninox_novaeseelandiae_novaeseelandiae_027.m4a",
+    "bytes": 34670
+  },
+  {
+    "species": "Ninox novaeseelandiae novaeseelandiae",
+    "common": "New Zealand Morepork",
+    "url": "https://static.inaturalist.org/sounds/1411643.mp3?1745756576",
+    "license": "cc-by",
+    "observer": "kiwialli",
+    "observation": "https://www.inaturalist.org/observations/274606245",
+    "file": "strigidae/Ninox_novaeseelandiae_novaeseelandiae_028.mp3",
+    "bytes": 107520
+  },
+  {
+    "species": "Ninox novaeseelandiae novaeseelandiae",
+    "common": "New Zealand Morepork",
+    "url": "https://static.inaturalist.org/sounds/1362144.m4a?1743845648",
+    "license": "cc-by-nc",
+    "observer": "Jade Griffin",
+    "observation": "https://www.inaturalist.org/observations/268693051",
+    "file": "strigidae/Ninox_novaeseelandiae_novaeseelandiae_029.m4a",
+    "bytes": 66917
+  },
+  {
+    "species": "Asio otus",
+    "common": "Long-eared Owl",
+    "url": "https://static.inaturalist.org/sounds/1950582.m4a?1778787176",
+    "license": "cc-by-nc",
+    "observer": "volkerhahn",
+    "observation": "https://www.inaturalist.org/observations/361507710",
+    "file": "strigidae/Asio_otus_030.m4a",
+    "bytes": 216659
+  },
+  {
+    "species": "Asio otus",
+    "common": "Long-eared Owl",
+    "url": "https://static.inaturalist.org/sounds/745858.m4a?1687291753",
+    "license": "cc-by",
+    "observer": "Saskia",
+    "observation": "https://www.inaturalist.org/observations/168543124",
+    "file": "strigidae/Asio_otus_031.m4a",
+    "bytes": 186609
+  },
+  {
+    "species": "Asio otus",
+    "common": "Long-eared Owl",
+    "url": "https://static.inaturalist.org/sounds/1911509.m4a?1777450594",
+    "license": "cc-by-nc",
+    "observer": "Valia Pavlou",
+    "observation": "https://www.inaturalist.org/observations/356424478",
+    "file": "strigidae/Asio_otus_032.m4a",
+    "bytes": 38186
+  },
+  {
+    "species": "Aegolius acadicus",
+    "common": "Northern Saw-whet Owl",
+    "url": "https://static.inaturalist.org/sounds/160079.m4a?1611423949",
+    "license": "cc-by-nc",
+    "observer": "Susan Fawcett",
+    "observation": "https://www.inaturalist.org/observations/68499866",
+    "file": "strigidae/Aegolius_acadicus_033.m4a",
+    "bytes": 111160
+  },
+  {
+    "species": "Aegolius acadicus",
+    "common": "Northern Saw-whet Owl",
+    "url": "https://static.inaturalist.org/sounds/1040718.m4a?1715827027",
+    "license": "cc-by-nc",
+    "observer": "Derek Armstrong",
+    "observation": "https://www.inaturalist.org/observations/216036955",
+    "file": "strigidae/Aegolius_acadicus_034.m4a",
+    "bytes": 116910
+  },
+  {
+    "species": "Aegolius acadicus",
+    "common": "Northern Saw-whet Owl",
+    "url": "https://static.inaturalist.org/sounds/547427.m4a?1665360722",
+    "license": "cc-by-nc",
+    "observer": "John D Reynolds",
+    "observation": "https://www.inaturalist.org/observations/138196776",
+    "file": "strigidae/Aegolius_acadicus_035.m4a",
+    "bytes": 177344
+  },
+  {
+    "species": "Ninox strenua",
+    "common": "Powerful Owl",
+    "url": "https://static.inaturalist.org/sounds/375336.m4a?1647803763",
+    "license": "cc-by",
+    "observer": "Ian Rainbow",
+    "observation": "https://www.inaturalist.org/observations/109072596",
+    "file": "strigidae/Ninox_strenua_036.m4a",
+    "bytes": 234501
+  },
+  {
+    "species": "Ninox strenua",
+    "common": "Powerful Owl",
+    "url": "https://static.inaturalist.org/sounds/975170.m4a?1713612921",
+    "license": "cc-by-nc",
+    "observer": "rjennion",
+    "observation": "https://www.inaturalist.org/observations/208248224",
+    "file": "strigidae/Ninox_strenua_037.m4a",
+    "bytes": 337521
+  },
+  {
+    "species": "Ninox strenua",
+    "common": "Powerful Owl",
+    "url": "https://static.inaturalist.org/sounds/390140.m4a?1649674579",
+    "license": "cc-by",
+    "observer": "Ian Rainbow",
+    "observation": "https://www.inaturalist.org/observations/111079824",
+    "file": "strigidae/Ninox_strenua_038.m4a",
+    "bytes": 389879
+  },
+  {
+    "species": "Athene noctua",
+    "common": "Little Owl",
+    "url": "https://static.inaturalist.org/sounds/1205742.m4a?1726809485",
+    "license": "cc-by-nc",
+    "observer": "Graziar",
+    "observation": "https://www.inaturalist.org/observations/242809918",
+    "file": "strigidae/Athene_noctua_040.m4a",
+    "bytes": 132770
+  },
+  {
+    "species": "Athene noctua",
+    "common": "Little Owl",
+    "url": "https://static.inaturalist.org/sounds/1351022.m4a?1743105415",
+    "license": "cc-by-nc",
+    "observer": "Ginevra\ud83c\udf3f",
+    "observation": "https://www.inaturalist.org/observations/267243674",
+    "file": "strigidae/Athene_noctua_041.m4a",
+    "bytes": 543024
+  },
+  {
+    "species": "Strix aluco",
+    "common": "Tawny Owl",
+    "url": "https://static.inaturalist.org/sounds/449933.mp3?1653425643",
+    "license": "cc-by",
+    "observer": "Patrick Hacker",
+    "observation": "https://www.inaturalist.org/observations/118566351",
+    "file": "strigidae/Strix_aluco_042.mp3",
+    "bytes": 513831
+  },
+  {
+    "species": "Strix aluco",
+    "common": "Tawny Owl",
+    "url": "https://static.inaturalist.org/sounds/1785732.m4a?1772297857",
+    "license": "cc-by-nc",
+    "observer": "natalya_khristolybova72",
+    "observation": "https://www.inaturalist.org/observations/340615877",
+    "file": "strigidae/Strix_aluco_043.m4a",
+    "bytes": 444824
+  },
+  {
+    "species": "Strix aluco",
+    "common": "Tawny Owl",
+    "url": "https://static.inaturalist.org/sounds/1629921.m4a?1757366152",
+    "license": "cc-by-nc",
+    "observer": "Kajks",
+    "observation": "https://www.inaturalist.org/observations/312543971",
+    "file": "strigidae/Strix_aluco_044.m4a",
+    "bytes": 519208
+  },
+  {
+    "species": "Megascops asio",
+    "common": "Eastern Screech-Owl",
+    "url": "https://static.inaturalist.org/sounds/1559663.m4a?1751940141",
+    "license": "cc-by-nc",
+    "observer": "Spencer Bennett",
+    "observation": "https://www.inaturalist.org/observations/296149698",
+    "file": "strigidae/Megascops_asio_045.m4a",
+    "bytes": 114301
+  },
+  {
+    "species": "Megascops asio",
+    "common": "Eastern Screech-Owl",
+    "url": "https://static.inaturalist.org/sounds/1820693.m4a?1774320547",
+    "license": "cc-by-nc",
+    "observer": "ishelbizzle",
+    "observation": "https://www.inaturalist.org/observations/344823165",
+    "file": "strigidae/Megascops_asio_046.m4a",
+    "bytes": 218612
+  },
+  {
+    "species": "Megascops asio",
+    "common": "Eastern Screech-Owl",
+    "url": "https://static.inaturalist.org/sounds/2115420.m4a?1786522541",
+    "license": "cc-by-nc",
+    "observer": "Mia",
+    "observation": "https://www.inaturalist.org/observations/390510116",
+    "file": "strigidae/Megascops_asio_047.m4a",
+    "bytes": 627236
+  },
+  {
+    "species": "Glaucidium gnoma",
+    "common": "Northern Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/1846897.m4a?1775629215",
+    "license": "cc-by-nc",
+    "observer": "Moses J. Michelsohn",
+    "observation": "https://www.inaturalist.org/observations/348227977",
+    "file": "strigidae/Glaucidium_gnoma_048.m4a",
+    "bytes": 177508
+  },
+  {
+    "species": "Glaucidium gnoma",
+    "common": "Northern Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/545114.mp3?1664944597",
+    "license": "cc-by-nc",
+    "observer": "garrett",
+    "observation": "https://www.inaturalist.org/observations/137602550",
+    "file": "strigidae/Glaucidium_gnoma_049.mp3",
+    "bytes": 400292
+  },
+  {
+    "species": "Glaucidium gnoma",
+    "common": "Northern Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/309499.m4a?1632635285",
+    "license": "cc-by-nc",
+    "observer": "Ian Cruickshank",
+    "observation": "https://www.inaturalist.org/observations/96174993",
+    "file": "strigidae/Glaucidium_gnoma_050.m4a",
+    "bytes": 165869
+  },
+  {
+    "species": "Glaucidium brasilianum",
+    "common": "Ferruginous Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/1308138.m4a?1739723484",
+    "license": "cc-by-nc",
+    "observer": "Jos\u00e9 Gabriel Sodr\u00e9",
+    "observation": "https://www.inaturalist.org/observations/261859196",
+    "file": "strigidae/Glaucidium_brasilianum_051.m4a",
+    "bytes": 84481
+  },
+  {
+    "species": "Glaucidium brasilianum",
+    "common": "Ferruginous Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/514341.m4a?1659632715",
+    "license": "cc-by-nc",
+    "observer": "Oliver Kohler",
+    "observation": "https://www.inaturalist.org/observations/129430890",
+    "file": "strigidae/Glaucidium_brasilianum_052.m4a",
+    "bytes": 110400
+  },
+  {
+    "species": "Glaucidium brasilianum",
+    "common": "Ferruginous Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/1687172.mp3?1762384585",
+    "license": "cc-by",
+    "observer": "Augusto Guerrante",
+    "observation": "https://www.inaturalist.org/observations/325103472",
+    "file": "strigidae/Glaucidium_brasilianum_053.mp3",
+    "bytes": 953856
+  },
+  {
+    "species": "Ninox boobook",
+    "common": "Australian Boobook",
+    "url": "https://static.inaturalist.org/sounds/812753.m4a?1694768259",
+    "license": "cc-by-nc",
+    "observer": "Sue Tardif",
+    "observation": "https://www.inaturalist.org/observations/183332621",
+    "file": "strigidae/Ninox_boobook_054.m4a",
+    "bytes": 295564
+  },
+  {
+    "species": "Ninox boobook",
+    "common": "Australian Boobook",
+    "url": "https://static.inaturalist.org/sounds/1687442.m4a?1762422120",
+    "license": "cc-by-nc",
+    "observer": "angebake",
+    "observation": "https://www.inaturalist.org/observations/325161984",
+    "file": "strigidae/Ninox_boobook_055.m4a",
+    "bytes": 155714
+  },
+  {
+    "species": "Ninox boobook",
+    "common": "Australian Boobook",
+    "url": "https://static.inaturalist.org/sounds/558093.m4a?1667395093",
+    "license": "cc-by-nc",
+    "observer": "Mark",
+    "observation": "https://www.inaturalist.org/observations/140872790",
+    "file": "strigidae/Ninox_boobook_056.m4a",
+    "bytes": 174014
+  },
+  {
+    "species": "Strix uralensis",
+    "common": "Ural Owl",
+    "url": "https://static.inaturalist.org/sounds/1756419.mp3?1770041005",
+    "license": "cc-by",
+    "observer": "Andrejus Gaidamavi\u010dius",
+    "observation": "https://www.inaturalist.org/observations/337100220",
+    "file": "strigidae/Strix_uralensis_057.mp3",
+    "bytes": 122517
+  },
+  {
+    "species": "Strix uralensis",
+    "common": "Ural Owl",
+    "url": "https://static.inaturalist.org/sounds/1374490.mp3?1744607786",
+    "license": "cc-by-nc",
+    "observer": "Alt. Hans",
+    "observation": "https://www.inaturalist.org/observations/270368786",
+    "file": "strigidae/Strix_uralensis_058.mp3",
+    "bytes": 155473
+  },
+  {
+    "species": "Strix uralensis",
+    "common": "Ural Owl",
+    "url": "https://static.inaturalist.org/sounds/1384431.m4a?1745152581",
+    "license": "cc-by-nc",
+    "observer": "Alt. Hans",
+    "observation": "https://www.inaturalist.org/observations/270368786",
+    "file": "strigidae/Strix_uralensis_059.m4a",
+    "bytes": 524487
+  },
+  {
+    "species": "Glaucidium nana",
+    "common": "Austral Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/2071945.m4a?1784037337",
+    "license": "cc-by-nc",
+    "observer": "tuckylozano_pispeandoaves",
+    "observation": "https://www.inaturalist.org/observations/381367660",
+    "file": "strigidae/Glaucidium_nana_060.m4a",
+    "bytes": 556616
+  },
+  {
+    "species": "Glaucidium nana",
+    "common": "Austral Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/1286801.mp3?1737042060",
+    "license": "cc-by-nc",
+    "observer": "Diego Donoso",
+    "observation": "https://www.inaturalist.org/observations/258657697",
+    "file": "strigidae/Glaucidium_nana_061.mp3",
+    "bytes": 1216827
+  },
+  {
+    "species": "Glaucidium nana",
+    "common": "Austral Pygmy-Owl",
+    "url": "https://static.inaturalist.org/sounds/835479.m4a?1698035382",
+    "license": "cc-by-nc",
+    "observer": "Thomas Koplow Villavicencio",
+    "observation": "https://www.inaturalist.org/observations/188625890",
+    "file": "strigidae/Glaucidium_nana_062.m4a",
+    "bytes": 65967
+  },
+  {
+    "species": "Asio clamator",
+    "common": "Striped Owl",
+    "url": "https://static.inaturalist.org/sounds/1560844.m4a?1752013395",
+    "license": "cc-by-nc",
+    "observer": "Fernanda Karolayne",
+    "observation": "https://www.inaturalist.org/observations/296365221",
+    "file": "strigidae/Asio_clamator_063.m4a",
+    "bytes": 178861
+  },
+  {
+    "species": "Asio clamator",
+    "common": "Striped Owl",
+    "url": "https://static.inaturalist.org/sounds/1235369.m4a?1729563466",
+    "license": "cc-by",
+    "observer": "Valent\u00edn Alfano",
+    "observation": "https://www.inaturalist.org/observations/248544138",
+    "file": "strigidae/Asio_clamator_064.m4a",
+    "bytes": 173936
+  },
+  {
+    "species": "Asio clamator",
+    "common": "Striped Owl",
+    "url": "https://static.inaturalist.org/sounds/1235369.m4a?1729563466",
+    "license": "cc-by",
+    "observer": "Valent\u00edn Alfano",
+    "observation": "https://www.inaturalist.org/observations/248544138",
+    "file": "strigidae/Asio_clamator_065.m4a",
+    "bytes": 173936
+  },
+  {
+    "species": "Asio flammeus",
+    "common": "Short-eared Owl",
+    "url": "https://static.inaturalist.org/sounds/835309.mp3?1698010467",
+    "license": "cc-by-nc",
+    "observer": "nacho1998",
+    "observation": "https://www.inaturalist.org/observations/187586386",
+    "file": "strigidae/Asio_flammeus_066.mp3",
+    "bytes": 50825
+  },
+  {
+    "species": "Asio flammeus",
+    "common": "Short-eared Owl",
+    "url": "https://static.inaturalist.org/sounds/835308.mp3?1698010467",
+    "license": "cc-by-nc",
+    "observer": "nacho1998",
+    "observation": "https://www.inaturalist.org/observations/187586386",
+    "file": "strigidae/Asio_flammeus_067.mp3",
+    "bytes": 42377
+  },
+  {
+    "species": "Asio flammeus",
+    "common": "Short-eared Owl",
+    "url": "https://static.inaturalist.org/sounds/835314.mp3?1698011003",
+    "license": "cc-by-nc",
+    "observer": "nacho1998",
+    "observation": "https://www.inaturalist.org/observations/187586386",
+    "file": "strigidae/Asio_flammeus_068.mp3",
+    "bytes": 28169
+  },
+  {
+    "species": "Bubo magellanicus",
+    "common": "Lesser Horned Owl",
+    "url": "https://static.inaturalist.org/sounds/1245233.m4a?1730836914",
+    "license": "cc-by-nc",
+    "observer": "Rigoberto Y\u00e1\u00f1ez",
+    "observation": "https://www.inaturalist.org/observations/250599061",
+    "file": "strigidae/Bubo_magellanicus_069.m4a",
+    "bytes": 98898
+  },
+  {
+    "species": "Bubo magellanicus",
+    "common": "Lesser Horned Owl",
+    "url": "https://static.inaturalist.org/sounds/294980.mp3?1629599613",
+    "license": "cc-by-nc",
+    "observer": "Hugo Mu\u00f1oz-Quintana",
+    "observation": "https://www.inaturalist.org/observations/81985921",
+    "file": "strigidae/Bubo_magellanicus_070.mp3",
+    "bytes": 55986
+  },
+  {
+    "species": "Bubo magellanicus",
+    "common": "Lesser Horned Owl",
+    "url": "https://static.inaturalist.org/sounds/443327.mp3?1652919836",
+    "license": "cc-by",
+    "observer": "Leonardo Mondaca Lara",
+    "observation": "https://www.inaturalist.org/observations/117668615",
+    "file": "strigidae/Bubo_magellanicus_071.mp3",
+    "bytes": 260887
+  },
+  {
+    "species": "Pteropus poliocephalus",
+    "common": "Grey-headed Flying-fox",
+    "url": "https://static.inaturalist.org/sounds/847587.mp3?1700392768",
+    "license": "cc-by",
+    "observer": "Carl Ramirez",
+    "observation": "https://www.inaturalist.org/observations/191460155",
+    "file": "chiroptera/Pteropus_poliocephalus_000.mp3",
+    "bytes": 316809
+  },
+  {
+    "species": "Pteropus poliocephalus",
+    "common": "Grey-headed Flying-fox",
+    "url": "https://static.inaturalist.org/sounds/847588.mp3?1700392770",
+    "license": "cc-by",
+    "observer": "Carl Ramirez",
+    "observation": "https://www.inaturalist.org/observations/191460155",
+    "file": "chiroptera/Pteropus_poliocephalus_001.mp3",
+    "bytes": 417609
+  },
+  {
+    "species": "Pteropus poliocephalus",
+    "common": "Grey-headed Flying-fox",
+    "url": "https://static.inaturalist.org/sounds/847589.mp3?1700392772",
+    "license": "cc-by",
+    "observer": "Carl Ramirez",
+    "observation": "https://www.inaturalist.org/observations/191460155",
+    "file": "chiroptera/Pteropus_poliocephalus_002.mp3",
+    "bytes": 630729
+  },
+  {
+    "species": "Austronomus australis",
+    "common": "White-striped Free-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/1714649.mp3?1765624752",
+    "license": "cc-by-nc",
+    "observer": "Antoni Camozzato",
+    "observation": "https://www.inaturalist.org/observations/330569135",
+    "file": "chiroptera/Austronomus_australis_003.mp3",
+    "bytes": 257089
+  },
+  {
+    "species": "Austronomus australis",
+    "common": "White-striped Free-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/140127.m4a?1601641248",
+    "license": "cc-by-nc",
+    "observer": "eco_erin",
+    "observation": "https://www.inaturalist.org/observations/61470947",
+    "file": "chiroptera/Austronomus_australis_004.m4a",
+    "bytes": 362068
+  },
+  {
+    "species": "Austronomus australis",
+    "common": "White-striped Free-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/843702.m4a?1699613903",
+    "license": "cc-by-nc",
+    "observer": "caliginous",
+    "observation": "https://www.inaturalist.org/observations/190567014",
+    "file": "chiroptera/Austronomus_australis_005.m4a",
+    "bytes": 121031
+  },
+  {
+    "species": "Rousettus aegyptiacus",
+    "common": "Egyptian Rousette",
+    "url": "https://static.inaturalist.org/sounds/1700722.m4a?1763913184",
+    "license": "cc-by-nc",
+    "observer": "Ismael Khalifa",
+    "observation": "https://www.inaturalist.org/observations/327865289",
+    "file": "chiroptera/Rousettus_aegyptiacus_006.m4a",
+    "bytes": 273839
+  },
+  {
+    "species": "Rousettus aegyptiacus",
+    "common": "Egyptian Rousette",
+    "url": "https://static.inaturalist.org/sounds/803496.mp3?1693475612",
+    "license": "cc-by-nc",
+    "observer": "Mickey",
+    "observation": "https://www.inaturalist.org/observations/181029783",
+    "file": "chiroptera/Rousettus_aegyptiacus_007.mp3",
+    "bytes": 92907
+  },
+  {
+    "species": "Rousettus aegyptiacus",
+    "common": "Egyptian Rousette",
+    "url": "https://static.inaturalist.org/sounds/1323604.m4a?1741178278",
+    "license": "cc-by-nc",
+    "observer": "aargon",
+    "observation": "https://www.inaturalist.org/observations/263972571",
+    "file": "chiroptera/Rousettus_aegyptiacus_008.m4a",
+    "bytes": 159577
+  },
+  {
+    "species": "Eumops floridanus",
+    "common": "Florida Bonneted Bat",
+    "url": "https://static.inaturalist.org/sounds/1312601.m4a?1740182632",
+    "license": "cc-by-nc",
+    "observer": "calebbergman",
+    "observation": "https://www.inaturalist.org/observations/262635779",
+    "file": "chiroptera/Eumops_floridanus_009.m4a",
+    "bytes": 75930
+  },
+  {
+    "species": "Eumops floridanus",
+    "common": "Florida Bonneted Bat",
+    "url": "https://static.inaturalist.org/sounds/940695.m4a?1711416413",
+    "license": "cc-by",
+    "observer": "Noah Frade",
+    "observation": "https://www.inaturalist.org/observations/203968368",
+    "file": "chiroptera/Eumops_floridanus_010.m4a",
+    "bytes": 244243
+  },
+  {
+    "species": "Eumops floridanus",
+    "common": "Florida Bonneted Bat",
+    "url": "https://static.inaturalist.org/sounds/769710.m4a?1689439068",
+    "license": "cc-by-nc",
+    "observer": "Amiel Hopkins",
+    "observation": "https://www.inaturalist.org/observations/173042167",
+    "file": "chiroptera/Eumops_floridanus_011.m4a",
+    "bytes": 102810
+  },
+  {
+    "species": "Eidolon helvum",
+    "common": "Straw-coloured Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/733799.mp3?1686468432",
+    "license": "cc-by-sa",
+    "observer": "Jan Vr\u0161ovsk\u00fd",
+    "observation": "https://www.inaturalist.org/observations/163943847",
+    "file": "chiroptera/Eidolon_helvum_012.mp3",
+    "bytes": 474336
+  },
+  {
+    "species": "Eidolon helvum",
+    "common": "Straw-coloured Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/1312189.m4a?1740144305",
+    "license": "cc-by-nc",
+    "observer": "Oluwaranti Emmanuel",
+    "observation": "https://www.inaturalist.org/observations/262529428",
+    "file": "chiroptera/Eidolon_helvum_013.m4a",
+    "bytes": 200416
+  },
+  {
+    "species": "Eidolon helvum",
+    "common": "Straw-coloured Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/1272115.mp3?1735057786",
+    "license": "cc-by-nc",
+    "observer": "Gunte, Oliveira Fernando",
+    "observation": "https://www.inaturalist.org/observations/255671894",
+    "file": "chiroptera/Eidolon_helvum_014.mp3",
+    "bytes": 651735
+  },
+  {
+    "species": "Epomophorus wahlbergi",
+    "common": "Wahlberg's Epauletted Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/48498.mp3?1571147412",
+    "license": "cc-by-nc",
+    "observer": "Sally Adam",
+    "observation": "https://www.inaturalist.org/observations/34407046",
+    "file": "chiroptera/Epomophorus_wahlbergi_015.mp3",
+    "bytes": 277760
+  },
+  {
+    "species": "Epomophorus wahlbergi",
+    "common": "Wahlberg's Epauletted Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/1119298.m4a?1720018457",
+    "license": "cc-by-sa",
+    "observer": "Suvarna Parbhoo Mohan",
+    "observation": "https://www.inaturalist.org/observations/226902012",
+    "file": "chiroptera/Epomophorus_wahlbergi_016.m4a",
+    "bytes": 404460
+  },
+  {
+    "species": "Epomophorus wahlbergi",
+    "common": "Wahlberg's Epauletted Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/72405.mp3?1587436146",
+    "license": "cc-by-nc",
+    "observer": "Peter Vos",
+    "observation": "https://www.inaturalist.org/observations/42727026",
+    "file": "chiroptera/Epomophorus_wahlbergi_017.mp3",
+    "bytes": 187382
+  },
+  {
+    "species": "Tadarida brasiliensis",
+    "common": "Mexican Free-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/241314.m4a?1622535098",
+    "license": "cc-by-nc",
+    "observer": "Ashwin Narayanan",
+    "observation": "https://www.inaturalist.org/observations/80554949",
+    "file": "chiroptera/Tadarida_brasiliensis_018.m4a",
+    "bytes": 51273
+  },
+  {
+    "species": "Tadarida brasiliensis",
+    "common": "Mexican Free-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/23921.mp3?1530922409",
+    "license": "cc-by-nc",
+    "observer": "Arturo Cruz",
+    "observation": "https://www.inaturalist.org/observations/14118611",
+    "file": "chiroptera/Tadarida_brasiliensis_019.mp3",
+    "bytes": 284257
+  },
+  {
+    "species": "Tadarida brasiliensis",
+    "common": "Mexican Free-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/1635070.m4a?1757781803",
+    "license": "cc-by-nc",
+    "observer": "Ashley Fruhwirth",
+    "observation": "https://www.inaturalist.org/observations/313602601",
+    "file": "chiroptera/Tadarida_brasiliensis_020.m4a",
+    "bytes": 120267
+  },
+  {
+    "species": "Myotis dasycneme",
+    "common": "pond bat",
+    "url": "https://static.inaturalist.org/sounds/741643.m4a?1687003308",
+    "license": "cc-by-nc",
+    "observer": "\u0424\u0435\u0434\u043e\u0440 \u041a\u043e\u043d\u0434\u0440\u0430\u0447\u0443\u043a",
+    "observation": "https://www.inaturalist.org/observations/167596591",
+    "file": "chiroptera/Myotis_dasycneme_021.m4a",
+    "bytes": 138758
+  },
+  {
+    "species": "Myotis dasycneme",
+    "common": "pond bat",
+    "url": "https://static.inaturalist.org/sounds/741617.m4a?1687002228",
+    "license": "cc-by-nc",
+    "observer": "\u0424\u0435\u0434\u043e\u0440 \u041a\u043e\u043d\u0434\u0440\u0430\u0447\u0443\u043a",
+    "observation": "https://www.inaturalist.org/observations/167596591",
+    "file": "chiroptera/Myotis_dasycneme_022.m4a",
+    "bytes": 174566
+  },
+  {
+    "species": "Myotis dasycneme",
+    "common": "pond bat",
+    "url": "https://static.inaturalist.org/sounds/741618.m4a?1687002230",
+    "license": "cc-by-nc",
+    "observer": "\u0424\u0435\u0434\u043e\u0440 \u041a\u043e\u043d\u0434\u0440\u0430\u0447\u0443\u043a",
+    "observation": "https://www.inaturalist.org/observations/167596591",
+    "file": "chiroptera/Myotis_dasycneme_023.m4a",
+    "bytes": 210236
+  },
+  {
+    "species": "Eidolon dupreanum",
+    "common": "Madagascan Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/1390762.m4a?1745396959",
+    "license": "cc-by-nc",
+    "observer": "Andrianiaina Angelo",
+    "observation": "https://www.inaturalist.org/observations/272394934",
+    "file": "chiroptera/Eidolon_dupreanum_024.m4a",
+    "bytes": 216464
+  },
+  {
+    "species": "Eidolon dupreanum",
+    "common": "Madagascan Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/1390763.m4a?1745396964",
+    "license": "cc-by-nc",
+    "observer": "Andrianiaina Angelo",
+    "observation": "https://www.inaturalist.org/observations/272394934",
+    "file": "chiroptera/Eidolon_dupreanum_025.m4a",
+    "bytes": 209769
+  },
+  {
+    "species": "Eidolon dupreanum",
+    "common": "Madagascan Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/1390764.m4a?1745397035",
+    "license": "cc-by-nc",
+    "observer": "Andrianiaina Angelo",
+    "observation": "https://www.inaturalist.org/observations/272394934",
+    "file": "chiroptera/Eidolon_dupreanum_026.m4a",
+    "bytes": 254841
+  },
+  {
+    "species": "Pipistrellus pipistrellus",
+    "common": "Common Pipistrelle",
+    "url": "https://static.inaturalist.org/sounds/702121.mp3?1684411786",
+    "license": "cc-by-nc",
+    "observer": "Stefano Doglio",
+    "observation": "https://www.inaturalist.org/observations/162286355",
+    "file": "chiroptera/Pipistrellus_pipistrellus_027.mp3",
+    "bytes": 38320
+  },
+  {
+    "species": "Pipistrellus pipistrellus",
+    "common": "Common Pipistrelle",
+    "url": "https://static.inaturalist.org/sounds/662953.m4a?1682749723",
+    "license": "cc-by-nc",
+    "observer": "Friends of Rising Sun Country Park",
+    "observation": "https://www.inaturalist.org/observations/157466038",
+    "file": "chiroptera/Pipistrellus_pipistrellus_028.m4a",
+    "bytes": 243393
+  },
+  {
+    "species": "Pipistrellus pipistrellus",
+    "common": "Common Pipistrelle",
+    "url": "https://static.inaturalist.org/sounds/191775.mp3?1618946390",
+    "license": "cc-by-nc",
+    "observer": "olliedav",
+    "observation": "https://www.inaturalist.org/observations/74663351",
+    "file": "chiroptera/Pipistrellus_pipistrellus_029.mp3",
+    "bytes": 868451
+  },
+  {
+    "species": "Cnephaeus nilssonii",
+    "common": "Northern Serotine",
+    "url": "https://static.inaturalist.org/sounds/109107.m4a?1592516502",
+    "license": "cc-by-nc",
+    "observer": "Juha Kinnunen",
+    "observation": "https://www.inaturalist.org/observations/50093186",
+    "file": "chiroptera/Cnephaeus_nilssonii_030.m4a",
+    "bytes": 58439
+  },
+  {
+    "species": "Cnephaeus nilssonii",
+    "common": "Northern Serotine",
+    "url": "https://static.inaturalist.org/sounds/104553.m4a?1591649350",
+    "license": "cc-by-nc",
+    "observer": "Juha Kinnunen",
+    "observation": "https://www.inaturalist.org/observations/48952204",
+    "file": "chiroptera/Cnephaeus_nilssonii_031.m4a",
+    "bytes": 100659
+  },
+  {
+    "species": "Cnephaeus nilssonii",
+    "common": "Northern Serotine",
+    "url": "https://static.inaturalist.org/sounds/104492.m4a?1591648773",
+    "license": "cc-by-nc",
+    "observer": "Juha Kinnunen",
+    "observation": "https://www.inaturalist.org/observations/48951156",
+    "file": "chiroptera/Cnephaeus_nilssonii_032.m4a",
+    "bytes": 179279
+  },
+  {
+    "species": "Eptesicus fuscus",
+    "common": "Big Brown Bat",
+    "url": "https://static.inaturalist.org/sounds/1346216.m4a?1742753938",
+    "license": "cc-by-nc",
+    "observer": "arkaen",
+    "observation": "https://www.inaturalist.org/observations/266609002",
+    "file": "chiroptera/Eptesicus_fuscus_033.m4a",
+    "bytes": 23296
+  },
+  {
+    "species": "Eptesicus fuscus",
+    "common": "Big Brown Bat",
+    "url": "https://static.inaturalist.org/sounds/1346217.mp3?1742753944",
+    "license": "cc-by-nc",
+    "observer": "arkaen",
+    "observation": "https://www.inaturalist.org/observations/266609002",
+    "file": "chiroptera/Eptesicus_fuscus_034.mp3",
+    "bytes": 140879
+  },
+  {
+    "species": "Eptesicus fuscus",
+    "common": "Big Brown Bat",
+    "url": "https://static.inaturalist.org/sounds/1346216.m4a?1742753938",
+    "license": "cc-by-nc",
+    "observer": "arkaen",
+    "observation": "https://www.inaturalist.org/observations/266609002",
+    "file": "chiroptera/Eptesicus_fuscus_035.m4a",
+    "bytes": 23296
+  },
+  {
+    "species": "Tadarida teniotis",
+    "common": "European Free-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/1345003.m4a?1742673405",
+    "license": "cc-by-nc",
+    "observer": "Goro Saber Animal",
+    "observation": "https://www.inaturalist.org/observations/266430642",
+    "file": "chiroptera/Tadarida_teniotis_036.m4a",
+    "bytes": 80387
+  },
+  {
+    "species": "Tadarida teniotis",
+    "common": "European Free-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/435237.mp3?1652356855",
+    "license": "cc-by-nc",
+    "observer": "Julien Bottinelli",
+    "observation": "https://www.inaturalist.org/observations/116679469",
+    "file": "chiroptera/Tadarida_teniotis_037.mp3",
+    "bytes": 446558
+  },
+  {
+    "species": "Eumops bonariensis",
+    "common": "Dwarf Bonneted Bat",
+    "url": "https://static.inaturalist.org/sounds/1716600.mp3?1765813517",
+    "license": "cc-by-nc",
+    "observer": "Franco Palandri",
+    "observation": "https://www.inaturalist.org/observations/330582057",
+    "file": "chiroptera/Eumops_bonariensis_038.mp3",
+    "bytes": 131792
+  },
+  {
+    "species": "Eumops bonariensis",
+    "common": "Dwarf Bonneted Bat",
+    "url": "https://static.inaturalist.org/sounds/1716601.mp3?1765813527",
+    "license": "cc-by-nc",
+    "observer": "Franco Palandri",
+    "observation": "https://www.inaturalist.org/observations/330582057",
+    "file": "chiroptera/Eumops_bonariensis_039.mp3",
+    "bytes": 60382
+  },
+  {
+    "species": "Coleura seychellensis",
+    "common": "Seychelles Sheath-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/884225.m4a?1706285009",
+    "license": "cc-by-nc",
+    "observer": "\u0424\u0435\u0434\u043e\u0440 \u041a\u043e\u043d\u0434\u0440\u0430\u0447\u0443\u043a",
+    "observation": "https://www.inaturalist.org/observations/197614189",
+    "file": "chiroptera/Coleura_seychellensis_040.m4a",
+    "bytes": 78107
+  },
+  {
+    "species": "Coleura seychellensis",
+    "common": "Seychelles Sheath-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/884226.m4a?1706285009",
+    "license": "cc-by-nc",
+    "observer": "\u0424\u0435\u0434\u043e\u0440 \u041a\u043e\u043d\u0434\u0440\u0430\u0447\u0443\u043a",
+    "observation": "https://www.inaturalist.org/observations/197614189",
+    "file": "chiroptera/Coleura_seychellensis_041.m4a",
+    "bytes": 93100
+  },
+  {
+    "species": "Rhinolophus hipposideros",
+    "common": "Lesser Horseshoe Bat",
+    "url": "https://static.inaturalist.org/sounds/1141226.m4a?1721731081",
+    "license": "cc-by-nc",
+    "observer": "alcon_blue",
+    "observation": "https://www.inaturalist.org/observations/231172262",
+    "file": "chiroptera/Rhinolophus_hipposideros_042.m4a",
+    "bytes": 251602
+  },
+  {
+    "species": "Rhinolophus hipposideros",
+    "common": "Lesser Horseshoe Bat",
+    "url": "https://static.inaturalist.org/sounds/1141226.m4a?1721731081",
+    "license": "cc-by-nc",
+    "observer": "alcon_blue",
+    "observation": "https://www.inaturalist.org/observations/231172262",
+    "file": "chiroptera/Rhinolophus_hipposideros_043.m4a",
+    "bytes": 251602
+  },
+  {
+    "species": "Pteropus medius",
+    "common": "Indian Flying Fox",
+    "url": "https://static.inaturalist.org/sounds/1335681.m4a?1742043681",
+    "license": "cc-by-nc",
+    "observer": "val_la_may",
+    "observation": "https://www.inaturalist.org/observations/265397056",
+    "file": "chiroptera/Pteropus_medius_044.m4a",
+    "bytes": 165850
+  },
+  {
+    "species": "Pteropus medius",
+    "common": "Indian Flying Fox",
+    "url": "https://static.inaturalist.org/sounds/1335681.m4a?1742043681",
+    "license": "cc-by-nc",
+    "observer": "val_la_may",
+    "observation": "https://www.inaturalist.org/observations/265397056",
+    "file": "chiroptera/Pteropus_medius_045.m4a",
+    "bytes": 165850
+  },
+  {
+    "species": "Pipistrellus pygmaeus",
+    "common": "Soprano Pipistrelle",
+    "url": "https://static.inaturalist.org/sounds/2143267.mp3?1788300102",
+    "license": "cc-by",
+    "observer": "Denis Forzy",
+    "observation": "https://www.inaturalist.org/observations/396497855",
+    "file": "chiroptera/Pipistrellus_pygmaeus_046.mp3",
+    "bytes": 801271
+  },
+  {
+    "species": "Pipistrellus pygmaeus",
+    "common": "Soprano Pipistrelle",
+    "url": "https://static.inaturalist.org/sounds/2108915.m4a?1786126311",
+    "license": "cc-by-nc",
+    "observer": "Leo Grosche",
+    "observation": "https://www.inaturalist.org/observations/389105754",
+    "file": "chiroptera/Pipistrellus_pygmaeus_047.m4a",
+    "bytes": 111252
+  },
+  {
+    "species": "Macroderma gigas",
+    "common": "Ghost Bat",
+    "url": "https://static.inaturalist.org/sounds/2030706.m4a?1781875538",
+    "license": "cc-by-nc",
+    "observer": "Michael Tervo",
+    "observation": "https://www.inaturalist.org/observations/373225121",
+    "file": "chiroptera/Macroderma_gigas_048.m4a",
+    "bytes": 168950
+  },
+  {
+    "species": "Macroderma gigas",
+    "common": "Ghost Bat",
+    "url": "https://static.inaturalist.org/sounds/2030707.m4a?1781875547",
+    "license": "cc-by-nc",
+    "observer": "Michael Tervo",
+    "observation": "https://www.inaturalist.org/observations/373225121",
+    "file": "chiroptera/Macroderma_gigas_049.m4a",
+    "bytes": 150220
+  },
+  {
+    "species": "Rhogeessa aenea",
+    "common": "Yucat\u00e1n Yellow Bat",
+    "url": "https://static.inaturalist.org/sounds/43874.m4a?1648758089",
+    "license": "cc-by-nc-sa",
+    "observer": "Thomas Brooks",
+    "observation": "https://www.inaturalist.org/observations/28983310",
+    "file": "chiroptera/Rhogeessa_aenea_050.m4a",
+    "bytes": 87583
+  },
+  {
+    "species": "Rhogeessa aenea",
+    "common": "Yucat\u00e1n Yellow Bat",
+    "url": "https://static.inaturalist.org/sounds/43875.m4a?1648758091",
+    "license": "cc-by-nc-sa",
+    "observer": "Thomas Brooks",
+    "observation": "https://www.inaturalist.org/observations/28983310",
+    "file": "chiroptera/Rhogeessa_aenea_051.m4a",
+    "bytes": 59428
+  },
+  {
+    "species": "Pteropus alecto",
+    "common": "Black Flying-fox",
+    "url": "https://static.inaturalist.org/sounds/126521.mp3?1596258513",
+    "license": "cc-by-nc",
+    "observer": "kalimata",
+    "observation": "https://www.inaturalist.org/observations/55005866",
+    "file": "chiroptera/Pteropus_alecto_052.mp3",
+    "bytes": 403330
+  },
+  {
+    "species": "Chalinolobus tuberculatus",
+    "common": "New Zealand Long-tailed Bat",
+    "url": "https://static.inaturalist.org/sounds/47695.mp3?1569662068",
+    "license": "cc-by-nc",
+    "observer": "Madara Vilde",
+    "observation": "https://www.inaturalist.org/observations/33519816",
+    "file": "chiroptera/Chalinolobus_tuberculatus_053.mp3",
+    "bytes": 399195
+  },
+  {
+    "species": "Hypsignathus monstrosus",
+    "common": "Hammer-headed Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/1230118.mp3?1729000459",
+    "license": "cc-by-nc",
+    "observer": "Frank Willems",
+    "observation": "https://www.inaturalist.org/observations/247472126",
+    "file": "chiroptera/Hypsignathus_monstrosus_054.mp3",
+    "bytes": 1405104
+  },
+  {
+    "species": "Epomophorus gambianus",
+    "common": "Gambian Epauletted Fruit Bat",
+    "url": "https://static.inaturalist.org/sounds/47916.mp3?1570116673",
+    "license": "cc-by-nc",
+    "observer": "bolare",
+    "observation": "https://www.inaturalist.org/observations/33800610",
+    "file": "chiroptera/Epomophorus_gambianus_055.mp3",
+    "bytes": 415227
+  },
+  {
+    "species": "Turtur chalcospilos",
+    "common": "Emerald-spotted Wood-Dove",
+    "url": "https://static.inaturalist.org/sounds/19052.mp3?1522609715",
+    "license": "cc-by-nc",
+    "observer": "magdastlucia",
+    "observation": "https://www.inaturalist.org/observations/10553438",
+    "file": "columbidae/Turtur_chalcospilos_000.mp3",
+    "bytes": 427709
+  },
+  {
+    "species": "Turtur chalcospilos",
+    "common": "Emerald-spotted Wood-Dove",
+    "url": "https://static.inaturalist.org/sounds/504571.m4a?1658471711",
+    "license": "cc-by",
+    "observer": "Sun\u010dana Bradley",
+    "observation": "https://www.inaturalist.org/observations/127325786",
+    "file": "columbidae/Turtur_chalcospilos_001.m4a",
+    "bytes": 82294
+  },
+  {
+    "species": "Turtur chalcospilos",
+    "common": "Emerald-spotted Wood-Dove",
+    "url": "https://static.inaturalist.org/sounds/1554328.m4a?1751638822",
+    "license": "cc-by",
+    "observer": "i_c_riddell",
+    "observation": "https://www.inaturalist.org/observations/295112182",
+    "file": "columbidae/Turtur_chalcospilos_002.m4a",
+    "bytes": 1538250
+  },
+  {
+    "species": "Streptopelia turtur",
+    "common": "European Turtle-Dove",
+    "url": "https://static.inaturalist.org/sounds/1388834.m4a?1745327356",
+    "license": "cc-by-nc",
+    "observer": "Maria Rita Gelso",
+    "observation": "https://www.inaturalist.org/observations/272189779",
+    "file": "columbidae/Streptopelia_turtur_003.m4a",
+    "bytes": 198589
+  },
+  {
+    "species": "Streptopelia turtur",
+    "common": "European Turtle-Dove",
+    "url": "https://static.inaturalist.org/sounds/1103211.m4a?1718974954",
+    "license": "cc-by-nc",
+    "observer": "Fedan Hac\u0131zade",
+    "observation": "https://www.inaturalist.org/observations/224175683",
+    "file": "columbidae/Streptopelia_turtur_004.m4a",
+    "bytes": 314482
+  },
+  {
+    "species": "Streptopelia turtur",
+    "common": "European Turtle-Dove",
+    "url": "https://static.inaturalist.org/sounds/97939.mp3?1590690724",
+    "license": "cc-by",
+    "observer": "Duncan Brooks",
+    "observation": "https://www.inaturalist.org/observations/47642753",
+    "file": "columbidae/Streptopelia_turtur_005.mp3",
+    "bytes": 443880
+  },
+  {
+    "species": "Spilopelia senegalensis",
+    "common": "Laughing Dove",
+    "url": "https://static.inaturalist.org/sounds/210660.mp3?1620147282",
+    "license": "cc-by-nc",
+    "observer": "Ila France",
+    "observation": "https://www.inaturalist.org/observations/77300129",
+    "file": "columbidae/Spilopelia_senegalensis_006.mp3",
+    "bytes": 215280
+  },
+  {
+    "species": "Spilopelia senegalensis",
+    "common": "Laughing Dove",
+    "url": "https://static.inaturalist.org/sounds/789911.mp3?1691710252",
+    "license": "cc-by-nc",
+    "observer": "dbeadle",
+    "observation": "https://www.inaturalist.org/observations/177657931",
+    "file": "columbidae/Spilopelia_senegalensis_007.mp3",
+    "bytes": 127872
+  },
+  {
+    "species": "Spilopelia senegalensis",
+    "common": "Laughing Dove",
+    "url": "https://static.inaturalist.org/sounds/1835773.m4a?1775110911",
+    "license": "cc-by-nc",
+    "observer": "hugoyann",
+    "observation": "https://www.inaturalist.org/observations/346733309",
+    "file": "columbidae/Spilopelia_senegalensis_008.m4a",
+    "bytes": 195846
+  },
+  {
+    "species": "Ocyphaps lophotes",
+    "common": "Crested Pigeon",
+    "url": "https://static.inaturalist.org/sounds/1699288.m4a?1763764803",
+    "license": "cc-by-nc",
+    "observer": "Antoinette Beckwith",
+    "observation": "https://www.inaturalist.org/observations/327574117",
+    "file": "columbidae/Ocyphaps_lophotes_009.m4a",
+    "bytes": 279100
+  },
+  {
+    "species": "Ocyphaps lophotes",
+    "common": "Crested Pigeon",
+    "url": "https://static.inaturalist.org/sounds/1166100.mp3?1723967880",
+    "license": "cc-by-nc",
+    "observer": "deborod",
+    "observation": "https://www.inaturalist.org/observations/236455482",
+    "file": "columbidae/Ocyphaps_lophotes_010.mp3",
+    "bytes": 403093
+  },
+  {
+    "species": "Ocyphaps lophotes",
+    "common": "Crested Pigeon",
+    "url": "https://static.inaturalist.org/sounds/1166100.mp3?1723967880",
+    "license": "cc-by-nc",
+    "observer": "deborod",
+    "observation": "https://www.inaturalist.org/observations/236455482",
+    "file": "columbidae/Ocyphaps_lophotes_011.mp3",
+    "bytes": 403093
+  },
+  {
+    "species": "Spilopelia chinensis",
+    "common": "Spotted Dove",
+    "url": "https://static.inaturalist.org/sounds/836991.m4a?1698280711",
+    "license": "cc-by-nc",
+    "observer": "JIN Pin-Tsen",
+    "observation": "https://www.inaturalist.org/observations/188957738",
+    "file": "columbidae/Spilopelia_chinensis_012.m4a",
+    "bytes": 140537
+  },
+  {
+    "species": "Spilopelia chinensis",
+    "common": "Spotted Dove",
+    "url": "https://static.inaturalist.org/sounds/901225.m4a?1708305518",
+    "license": "cc-by-nc",
+    "observer": "smathichong",
+    "observation": "https://www.inaturalist.org/observations/199743723",
+    "file": "columbidae/Spilopelia_chinensis_013.m4a",
+    "bytes": 241776
+  },
+  {
+    "species": "Spilopelia chinensis",
+    "common": "Spotted Dove",
+    "url": "https://static.inaturalist.org/sounds/260719.m4a?1624497898",
+    "license": "cc-by-nc",
+    "observer": "Hong",
+    "observation": "https://www.inaturalist.org/observations/84255102",
+    "file": "columbidae/Spilopelia_chinensis_014.m4a",
+    "bytes": 318363
+  },
+  {
+    "species": "Zenaida macroura",
+    "common": "Mourning Dove",
+    "url": "https://static.inaturalist.org/sounds/2069109.m4a?1783872576",
+    "license": "cc-by-nc",
+    "observer": "Ray Snook",
+    "observation": "https://www.inaturalist.org/observations/380711583",
+    "file": "columbidae/Zenaida_macroura_015.m4a",
+    "bytes": 232790
+  },
+  {
+    "species": "Zenaida macroura",
+    "common": "Mourning Dove",
+    "url": "https://static.inaturalist.org/sounds/175497.m4a?1616442694",
+    "license": "cc-by-nc",
+    "observer": "dluciano",
+    "observation": "https://www.inaturalist.org/observations/71819689",
+    "file": "columbidae/Zenaida_macroura_016.m4a",
+    "bytes": 66572
+  },
+  {
+    "species": "Zenaida macroura",
+    "common": "Mourning Dove",
+    "url": "https://static.inaturalist.org/sounds/2010228.m4a?1780932621",
+    "license": "cc-by-nc",
+    "observer": "mixxiechick",
+    "observation": "https://www.inaturalist.org/observations/369726444",
+    "file": "columbidae/Zenaida_macroura_017.m4a",
+    "bytes": 371332
+  },
+  {
+    "species": "Columba oenas",
+    "common": "Stock Dove",
+    "url": "https://static.inaturalist.org/sounds/736941.m4a?1686671939",
+    "license": "cc-by-nc",
+    "observer": "\ud835\udd17\ud835\udd2c\ud835\udd1f\ud835\udd26\ud835\udd1e\ud835\udd30 \ud835\udd16\ud835\udd20\ud835\udd25\ud835\udd32\ud835\udd29\ud835\udd31\ud835\udd22",
+    "observation": "https://www.inaturalist.org/observations/167208276",
+    "file": "columbidae/Columba_oenas_018.m4a",
+    "bytes": 57356
+  },
+  {
+    "species": "Columba oenas",
+    "common": "Stock Dove",
+    "url": "https://static.inaturalist.org/sounds/773648.m4a?1689850738",
+    "license": "cc-by",
+    "observer": "bungus354",
+    "observation": "https://www.inaturalist.org/observations/173913880",
+    "file": "columbidae/Columba_oenas_019.m4a",
+    "bytes": 113735
+  },
+  {
+    "species": "Columba oenas",
+    "common": "Stock Dove",
+    "url": "https://static.inaturalist.org/sounds/773655.m4a?1689851531",
+    "license": "cc-by",
+    "observer": "bungus354",
+    "observation": "https://www.inaturalist.org/observations/173913880",
+    "file": "columbidae/Columba_oenas_020.m4a",
+    "bytes": 113735
+  },
+  {
+    "species": "Leptotila verreauxi",
+    "common": "White-tipped Dove",
+    "url": "https://static.inaturalist.org/sounds/1808339.mp3?1773662347",
+    "license": "cc-by-nc",
+    "observer": "Sandra Palomino",
+    "observation": "https://www.inaturalist.org/observations/343299641",
+    "file": "columbidae/Leptotila_verreauxi_021.mp3",
+    "bytes": 1631852
+  },
+  {
+    "species": "Leptotila verreauxi",
+    "common": "White-tipped Dove",
+    "url": "https://static.inaturalist.org/sounds/365296.mp3?1646405674",
+    "license": "cc-by-nc",
+    "observer": "Efra\u00edn Octavio Aguilar P\u00e9rez",
+    "observation": "https://www.inaturalist.org/observations/107888633",
+    "file": "columbidae/Leptotila_verreauxi_022.mp3",
+    "bytes": 114419
+  },
+  {
+    "species": "Leptotila verreauxi",
+    "common": "White-tipped Dove",
+    "url": "https://static.inaturalist.org/sounds/693432.m4a?1683890400",
+    "license": "cc-by",
+    "observer": "Eduardo Luis Beltrocco",
+    "observation": "https://www.inaturalist.org/observations/161215056",
+    "file": "columbidae/Leptotila_verreauxi_023.m4a",
+    "bytes": 245244
+  },
+  {
+    "species": "Geopelia striata",
+    "common": "Zebra Dove",
+    "url": "https://static.inaturalist.org/sounds/880591.m4a?1705862419",
+    "license": "cc-by-nc",
+    "observer": "abbeybiard",
+    "observation": "https://www.inaturalist.org/observations/197244487",
+    "file": "columbidae/Geopelia_striata_024.m4a",
+    "bytes": 116175
+  },
+  {
+    "species": "Geopelia striata",
+    "common": "Zebra Dove",
+    "url": "https://static.inaturalist.org/sounds/1998367.mp3?1780449811",
+    "license": "cc-by-nc",
+    "observer": "snappyhappyhikers",
+    "observation": "https://www.inaturalist.org/observations/367913553",
+    "file": "columbidae/Geopelia_striata_025.mp3",
+    "bytes": 500132
+  },
+  {
+    "species": "Geopelia striata",
+    "common": "Zebra Dove",
+    "url": "https://static.inaturalist.org/sounds/803094.m4a?1693413110",
+    "license": "cc-by-nc",
+    "observer": "Linda Minato",
+    "observation": "https://www.inaturalist.org/observations/180932553",
+    "file": "columbidae/Geopelia_striata_026.m4a",
+    "bytes": 77727
+  },
+  {
+    "species": "Columba leucomela",
+    "common": "White-headed Pigeon",
+    "url": "https://static.inaturalist.org/sounds/874555.m4a?1705043889",
+    "license": "cc-by-nc",
+    "observer": "rosewise",
+    "observation": "https://www.inaturalist.org/observations/196409902",
+    "file": "columbidae/Columba_leucomela_027.m4a",
+    "bytes": 84554
+  },
+  {
+    "species": "Columba leucomela",
+    "common": "White-headed Pigeon",
+    "url": "https://static.inaturalist.org/sounds/915475.m4a?1709499313",
+    "license": "cc-by-nc",
+    "observer": "heathercoffs",
+    "observation": "https://www.inaturalist.org/observations/201174670",
+    "file": "columbidae/Columba_leucomela_028.m4a",
+    "bytes": 88431
+  },
+  {
+    "species": "Columba leucomela",
+    "common": "White-headed Pigeon",
+    "url": "https://static.inaturalist.org/sounds/915639.m4a?1709504752",
+    "license": "cc-by-nc",
+    "observer": "heathercoffs",
+    "observation": "https://www.inaturalist.org/observations/201174670",
+    "file": "columbidae/Columba_leucomela_029.m4a",
+    "bytes": 88431
+  },
+  {
+    "species": "Phaps chalcoptera",
+    "common": "Common Bronzewing",
+    "url": "https://static.inaturalist.org/sounds/851503.m4a?1700986056",
+    "license": "cc-by-nc",
+    "observer": "Tanveer Alvi",
+    "observation": "https://www.inaturalist.org/observations/192175082",
+    "file": "columbidae/Phaps_chalcoptera_030.m4a",
+    "bytes": 283762
+  },
+  {
+    "species": "Phaps chalcoptera",
+    "common": "Common Bronzewing",
+    "url": "https://static.inaturalist.org/sounds/879451.m4a?1705656779",
+    "license": "cc-by",
+    "observer": "Ian Rainbow",
+    "observation": "https://www.inaturalist.org/observations/197051043",
+    "file": "columbidae/Phaps_chalcoptera_031.m4a",
+    "bytes": 131395
+  },
+  {
+    "species": "Phaps chalcoptera",
+    "common": "Common Bronzewing",
+    "url": "https://static.inaturalist.org/sounds/903658.m4a?1708464677",
+    "license": "cc-by-nc",
+    "observer": "Vermilingua_pygmaeus",
+    "observation": "https://www.inaturalist.org/observations/199933229",
+    "file": "columbidae/Phaps_chalcoptera_032.m4a",
+    "bytes": 291227
+  },
+  {
+    "species": "Patagioenas picazuro",
+    "common": "Picazuro Pigeon",
+    "url": "https://static.inaturalist.org/sounds/796623.m4a?1692554778",
+    "license": "cc-by-nc",
+    "observer": "paupitz",
+    "observation": "https://www.inaturalist.org/observations/179386163",
+    "file": "columbidae/Patagioenas_picazuro_033.m4a",
+    "bytes": 109038
+  },
+  {
+    "species": "Patagioenas picazuro",
+    "common": "Picazuro Pigeon",
+    "url": "https://static.inaturalist.org/sounds/1996891.m4a?1780392640",
+    "license": "cc-by-nc",
+    "observer": "Carlos Pontes",
+    "observation": "https://www.inaturalist.org/observations/367673736",
+    "file": "columbidae/Patagioenas_picazuro_034.m4a",
+    "bytes": 103405
+  },
+  {
+    "species": "Patagioenas picazuro",
+    "common": "Picazuro Pigeon",
+    "url": "https://static.inaturalist.org/sounds/586262.mp3?1674098278",
+    "license": "cc-by-nc",
+    "observer": "Gonzalo Diaz",
+    "observation": "https://www.inaturalist.org/observations/146868004",
+    "file": "columbidae/Patagioenas_picazuro_035.mp3",
+    "bytes": 95531
+  },
+  {
+    "species": "Zenaida aurita",
+    "common": "Zenaida Dove",
+    "url": "https://static.inaturalist.org/sounds/1351091.m4a?1743110863",
+    "license": "cc-by-nc",
+    "observer": "xaymarie",
+    "observation": "https://www.inaturalist.org/observations/267255750",
+    "file": "columbidae/Zenaida_aurita_036.m4a",
+    "bytes": 37331
+  },
+  {
+    "species": "Zenaida aurita",
+    "common": "Zenaida Dove",
+    "url": "https://static.inaturalist.org/sounds/1286542.m4a?1736988253",
+    "license": "cc-by-nc",
+    "observer": "infinity2024",
+    "observation": "https://www.inaturalist.org/observations/258606445",
+    "file": "columbidae/Zenaida_aurita_037.m4a",
+    "bytes": 58081
+  },
+  {
+    "species": "Zenaida aurita",
+    "common": "Zenaida Dove",
+    "url": "https://static.inaturalist.org/sounds/757577.mp3?1688303528",
+    "license": "cc-by-nc",
+    "observer": "marcienne",
+    "observation": "https://www.inaturalist.org/observations/170658611",
+    "file": "columbidae/Zenaida_aurita_038.mp3",
+    "bytes": 125735
+  },
+  {
+    "species": "Streptopelia orientalis",
+    "common": "Oriental Turtle-Dove",
+    "url": "https://static.inaturalist.org/sounds/1278347.m4a?1735867126",
+    "license": "cc-by",
+    "observer": "IMORI MIHO",
+    "observation": "https://www.inaturalist.org/observations/257186985",
+    "file": "columbidae/Streptopelia_orientalis_039.m4a",
+    "bytes": 91936
+  },
+  {
+    "species": "Streptopelia orientalis",
+    "common": "Oriental Turtle-Dove",
+    "url": "https://static.inaturalist.org/sounds/1786465.m4a?1772332477",
+    "license": "cc-by-nc",
+    "observer": "sala_mandur_luvr",
+    "observation": "https://www.inaturalist.org/observations/340704652",
+    "file": "columbidae/Streptopelia_orientalis_040.m4a",
+    "bytes": 110663
+  },
+  {
+    "species": "Streptopelia orientalis",
+    "common": "Oriental Turtle-Dove",
+    "url": "https://static.inaturalist.org/sounds/1786465.m4a?1772332477",
+    "license": "cc-by-nc",
+    "observer": "sala_mandur_luvr",
+    "observation": "https://www.inaturalist.org/observations/340704652",
+    "file": "columbidae/Streptopelia_orientalis_041.m4a",
+    "bytes": 110663
+  },
+  {
+    "species": "Columba palumbus",
+    "common": "Common Wood-Pigeon",
+    "url": "https://static.inaturalist.org/sounds/1527379.m4a?1750101696",
+    "license": "cc-by-nc",
+    "observer": "Michael Nivi",
+    "observation": "https://www.inaturalist.org/observations/290211081",
+    "file": "columbidae/Columba_palumbus_042.m4a",
+    "bytes": 87752
+  },
+  {
+    "species": "Columba palumbus",
+    "common": "Common Wood-Pigeon",
+    "url": "https://static.inaturalist.org/sounds/173875.mp3?1616088660",
+    "license": "cc-by-nc",
+    "observer": "Carles Guinart",
+    "observation": "https://www.inaturalist.org/observations/71497210",
+    "file": "columbidae/Columba_palumbus_043.mp3",
+    "bytes": 255788
+  },
+  {
+    "species": "Columba palumbus",
+    "common": "Common Wood-Pigeon",
+    "url": "https://static.inaturalist.org/sounds/1777808.m4a?1771997617",
+    "license": "cc-by-nc",
+    "observer": "rockingdiplodocus",
+    "observation": "https://www.inaturalist.org/observations/340123769",
+    "file": "columbidae/Columba_palumbus_044.m4a",
+    "bytes": 29598
+  },
+  {
+    "species": "Claravis pretiosa",
+    "common": "Blue Ground Dove",
+    "url": "https://static.inaturalist.org/sounds/1958805.mp3?1779055802",
+    "license": "cc-by-nc",
+    "observer": "Breno Farias",
+    "observation": "https://www.inaturalist.org/observations/362550343",
+    "file": "columbidae/Claravis_pretiosa_045.mp3",
+    "bytes": 155036
+  },
+  {
+    "species": "Claravis pretiosa",
+    "common": "Blue Ground Dove",
+    "url": "https://static.inaturalist.org/sounds/1290090.mp3?1737497185",
+    "license": "cc-by-nc",
+    "observer": "dbeadle",
+    "observation": "https://www.inaturalist.org/observations/259194789",
+    "file": "columbidae/Claravis_pretiosa_046.mp3",
+    "bytes": 94641
+  },
+  {
+    "species": "Claravis pretiosa",
+    "common": "Blue Ground Dove",
+    "url": "https://static.inaturalist.org/sounds/1290090.mp3?1737497185",
+    "license": "cc-by-nc",
+    "observer": "dbeadle",
+    "observation": "https://www.inaturalist.org/observations/259194789",
+    "file": "columbidae/Claravis_pretiosa_047.mp3",
+    "bytes": 94641
+  },
+  {
+    "species": "Streptopelia decaocto",
+    "common": "Eurasian Collared-Dove",
+    "url": "https://static.inaturalist.org/sounds/852434.m4a?1701094551",
+    "license": "cc-by-nc",
+    "observer": "bsteer",
+    "observation": "https://www.inaturalist.org/observations/192345981",
+    "file": "columbidae/Streptopelia_decaocto_048.m4a",
+    "bytes": 94093
+  },
+  {
+    "species": "Streptopelia decaocto",
+    "common": "Eurasian Collared-Dove",
+    "url": "https://static.inaturalist.org/sounds/178677.m4a?1617016730",
+    "license": "cc-by-nc",
+    "observer": "Alexander Baransky",
+    "observation": "https://www.inaturalist.org/observations/72355213",
+    "file": "columbidae/Streptopelia_decaocto_049.m4a",
+    "bytes": 314211
+  },
+  {
+    "species": "Streptopelia decaocto",
+    "common": "Eurasian Collared-Dove",
+    "url": "https://static.inaturalist.org/sounds/31875.mp3?1551831339",
+    "license": "cc-by-nc",
+    "observer": "Kat",
+    "observation": "https://www.inaturalist.org/observations/20982757",
+    "file": "columbidae/Streptopelia_decaocto_050.mp3",
+    "bytes": 111618
+  },
+  {
+    "species": "Macropygia phasianella",
+    "common": "Brown Cuckoo-Dove",
+    "url": "https://static.inaturalist.org/sounds/897449.m4a?1707951049",
+    "license": "cc-by-nc",
+    "observer": "pratyeka",
+    "observation": "https://www.inaturalist.org/observations/199314684",
+    "file": "columbidae/Macropygia_phasianella_051.m4a",
+    "bytes": 94807
+  },
+  {
+    "species": "Macropygia phasianella",
+    "common": "Brown Cuckoo-Dove",
+    "url": "https://static.inaturalist.org/sounds/1568832.m4a?1752532553",
+    "license": "cc-by-nc",
+    "observer": "hlogie",
+    "observation": "https://www.inaturalist.org/observations/298014632",
+    "file": "columbidae/Macropygia_phasianella_052.m4a",
+    "bytes": 115404
+  },
+  {
+    "species": "Macropygia phasianella",
+    "common": "Brown Cuckoo-Dove",
+    "url": "https://static.inaturalist.org/sounds/290210.m4a?1628644269",
+    "license": "cc-by-nc",
+    "observer": "Margaret Sky",
+    "observation": "https://www.inaturalist.org/observations/90726497",
+    "file": "columbidae/Macropygia_phasianella_053.m4a",
+    "bytes": 128231
+  },
+  {
+    "species": "Leucosarcia melanoleuca",
+    "common": "Wonga Pigeon",
+    "url": "https://static.inaturalist.org/sounds/345143.mp3?1641791097",
+    "license": "cc-by-nc",
+    "observer": "funky_drewster",
+    "observation": "https://www.inaturalist.org/observations/104690512",
+    "file": "columbidae/Leucosarcia_melanoleuca_054.mp3",
+    "bytes": 549359
+  },
+  {
+    "species": "Leucosarcia melanoleuca",
+    "common": "Wonga Pigeon",
+    "url": "https://static.inaturalist.org/sounds/334996.mp3?1638518564",
+    "license": "cc-by-nc",
+    "observer": "Reiner Richter",
+    "observation": "https://www.inaturalist.org/observations/102398936",
+    "file": "columbidae/Leucosarcia_melanoleuca_055.mp3",
+    "bytes": 319426
+  },
+  {
+    "species": "Leucosarcia melanoleuca",
+    "common": "Wonga Pigeon",
+    "url": "https://static.inaturalist.org/sounds/849856.m4a?1700803016",
+    "license": "cc-by-nc",
+    "observer": "urungaroger",
+    "observation": "https://www.inaturalist.org/observations/192330590",
+    "file": "columbidae/Leucosarcia_melanoleuca_056.m4a",
+    "bytes": 130874
+  },
+  {
+    "species": "Columbina squammata",
+    "common": "Scaled Dove",
+    "url": "https://static.inaturalist.org/sounds/855404.mp3?1701626337",
+    "license": "cc-by-nc",
+    "observer": "Evandro Mariano",
+    "observation": "https://www.inaturalist.org/observations/192947496",
+    "file": "columbidae/Columbina_squammata_057.mp3",
+    "bytes": 200302
+  },
+  {
+    "species": "Columbina squammata",
+    "common": "Scaled Dove",
+    "url": "https://static.inaturalist.org/sounds/886872.mp3?1706630556",
+    "license": "cc-by-nc",
+    "observer": "Alejandro Luy",
+    "observation": "https://www.inaturalist.org/observations/197980177",
+    "file": "columbidae/Columbina_squammata_058.mp3",
+    "bytes": 512879
+  },
+  {
+    "species": "Columbina squammata",
+    "common": "Scaled Dove",
+    "url": "https://static.inaturalist.org/sounds/886872.mp3?1706630556",
+    "license": "cc-by-nc",
+    "observer": "Alejandro Luy",
+    "observation": "https://www.inaturalist.org/observations/197980177",
+    "file": "columbidae/Columbina_squammata_059.mp3",
+    "bytes": 512879
+  },
+  {
+    "species": "Sciurus carolinensis",
+    "common": "Eastern Gray Squirrel",
+    "url": "https://static.inaturalist.org/sounds/841582.mp3?1699140546",
+    "license": "cc-by-nc",
+    "observer": "joe dziewa",
+    "observation": "https://www.inaturalist.org/observations/190011349",
+    "file": "sciuridae/Sciurus_carolinensis_000.mp3",
+    "bytes": 147501
+  },
+  {
+    "species": "Sciurus carolinensis",
+    "common": "Eastern Gray Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1724253.mp3?1766686325",
+    "license": "cc-by-nc",
+    "observer": "little_blue_heron",
+    "observation": "https://www.inaturalist.org/observations/277770838",
+    "file": "sciuridae/Sciurus_carolinensis_001.mp3",
+    "bytes": 528384
+  },
+  {
+    "species": "Sciurus carolinensis",
+    "common": "Eastern Gray Squirrel",
+    "url": "https://static.inaturalist.org/sounds/27332.m4a?1648746307",
+    "license": "cc-by-nc",
+    "observer": "sea-kangaroo",
+    "observation": "https://www.inaturalist.org/observations/18359173",
+    "file": "sciuridae/Sciurus_carolinensis_002.m4a",
+    "bytes": 806179
+  },
+  {
+    "species": "Stenobothrus lineatus",
+    "common": "Stripe-winged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/762066.m4a?1688721127",
+    "license": "cc-by",
+    "observer": "Emanuel Kern",
+    "observation": "https://www.inaturalist.org/observations/171526611",
+    "file": "acrididae/Stenobothrus_lineatus_000.m4a",
+    "bytes": 65642
+  },
+  {
+    "species": "Stenobothrus lineatus",
+    "common": "Stripe-winged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/762074.m4a?1688721354",
+    "license": "cc-by",
+    "observer": "Emanuel Kern",
+    "observation": "https://www.inaturalist.org/observations/171526611",
+    "file": "acrididae/Stenobothrus_lineatus_001.m4a",
+    "bytes": 48782
+  },
+  {
+    "species": "Stenobothrus lineatus",
+    "common": "Stripe-winged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/868364.mp3?1704031720",
+    "license": "cc-by-nc",
+    "observer": "mobbini",
+    "observation": "https://www.inaturalist.org/observations/195367928",
+    "file": "acrididae/Stenobothrus_lineatus_002.mp3",
+    "bytes": 518502
+  },
+  {
+    "species": "Gomphocerippus rufus",
+    "common": "Rufous Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/309272.mp3?1632579121",
+    "license": "cc-by",
+    "observer": "E. A.",
+    "observation": "https://www.inaturalist.org/observations/96083053",
+    "file": "acrididae/Gomphocerippus_rufus_003.mp3",
+    "bytes": 187392
+  },
+  {
+    "species": "Gomphocerippus rufus",
+    "common": "Rufous Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/812993.m4a?1694801757",
+    "license": "cc-by",
+    "observer": "E. A.",
+    "observation": "https://www.inaturalist.org/observations/183390066",
+    "file": "acrididae/Gomphocerippus_rufus_004.m4a",
+    "bytes": 177838
+  },
+  {
+    "species": "Gomphocerippus rufus",
+    "common": "Rufous Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/812994.m4a?1694801761",
+    "license": "cc-by",
+    "observer": "E. A.",
+    "observation": "https://www.inaturalist.org/observations/183390066",
+    "file": "acrididae/Gomphocerippus_rufus_005.m4a",
+    "bytes": 99737
+  },
+  {
+    "species": "Megaulacobothrus aethalinus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/291482.m4a?1628945295",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/91078940",
+    "file": "acrididae/Megaulacobothrus_aethalinus_006.m4a",
+    "bytes": 289414
+  },
+  {
+    "species": "Megaulacobothrus aethalinus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/292214.m4a?1629076402",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/91078940",
+    "file": "acrididae/Megaulacobothrus_aethalinus_007.m4a",
+    "bytes": 389358
+  },
+  {
+    "species": "Megaulacobothrus aethalinus",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/292215.m4a?1629076611",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/91078940",
+    "file": "acrididae/Megaulacobothrus_aethalinus_008.m4a",
+    "bytes": 560038
+  },
+  {
+    "species": "Chorthippus albomarginatus",
+    "common": "Lesser Marsh Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1641917.mp3?1758316679",
+    "license": "cc-by",
+    "observer": "carnifex",
+    "observation": "https://www.inaturalist.org/observations/315098046",
+    "file": "acrididae/Chorthippus_albomarginatus_009.mp3",
+    "bytes": 192869
+  },
+  {
+    "species": "Chorthippus albomarginatus",
+    "common": "Lesser Marsh Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/806308.m4a?1693832572",
+    "license": "cc-by",
+    "observer": "E. A.",
+    "observation": "https://www.inaturalist.org/observations/181729776",
+    "file": "acrididae/Chorthippus_albomarginatus_010.m4a",
+    "bytes": 127756
+  },
+  {
+    "species": "Chorthippus albomarginatus",
+    "common": "Lesser Marsh Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/2080936.mp3?1784591985",
+    "license": "cc-by",
+    "observer": "Gilles San Martin",
+    "observation": "https://www.inaturalist.org/observations/23246841",
+    "file": "acrididae/Chorthippus_albomarginatus_011.mp3",
+    "bytes": 193643
+  },
+  {
+    "species": "Omocestus rufipes",
+    "common": "Woodland Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/276830.m4a?1626597374",
+    "license": "cc-by-nc",
+    "observer": "Joachim Wimmer",
+    "observation": "https://www.inaturalist.org/observations/87521802",
+    "file": "acrididae/Omocestus_rufipes_012.m4a",
+    "bytes": 113627
+  },
+  {
+    "species": "Omocestus rufipes",
+    "common": "Woodland Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1636690.m4a?1757886063",
+    "license": "cc-by-nc",
+    "observer": "Romain BAGHI",
+    "observation": "https://www.inaturalist.org/observations/313962259",
+    "file": "acrididae/Omocestus_rufipes_013.m4a",
+    "bytes": 218114
+  },
+  {
+    "species": "Omocestus rufipes",
+    "common": "Woodland Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1444112.m4a?1746521111",
+    "license": "cc-by-nc",
+    "observer": "melissa-garcia",
+    "observation": "https://www.inaturalist.org/observations/278927422",
+    "file": "acrididae/Omocestus_rufipes_014.m4a",
+    "bytes": 49061
+  },
+  {
+    "species": "Ligurotettix coquilletti",
+    "common": "Desert Clicker Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/183064.mp3?1617754173",
+    "license": "cc-by-nc-sa",
+    "observer": "Carol Blaney",
+    "observation": "https://www.inaturalist.org/observations/73158757",
+    "file": "acrididae/Ligurotettix_coquilletti_015.mp3",
+    "bytes": 1214516
+  },
+  {
+    "species": "Ligurotettix coquilletti",
+    "common": "Desert Clicker Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/333716.m4a?1638283636",
+    "license": "cc-by-nc",
+    "observer": "Andrea Kreuzhage",
+    "observation": "https://www.inaturalist.org/observations/102240756",
+    "file": "acrididae/Ligurotettix_coquilletti_016.m4a",
+    "bytes": 317438
+  },
+  {
+    "species": "Ligurotettix coquilletti",
+    "common": "Desert Clicker Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1559731.m4a?1751945095",
+    "license": "cc-by-nc",
+    "observer": "Logan Young",
+    "observation": "https://www.inaturalist.org/observations/296164248",
+    "file": "acrididae/Ligurotettix_coquilletti_017.m4a",
+    "bytes": 77891
+  },
+  {
+    "species": "Pseudochorthippus parallelus",
+    "common": "Meadow Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1603004.mp3?1755085780",
+    "license": "cc-by-nc",
+    "observer": "Redcorvid",
+    "observation": "https://www.inaturalist.org/observations/305988596",
+    "file": "acrididae/Pseudochorthippus_parallelus_018.mp3",
+    "bytes": 300930
+  },
+  {
+    "species": "Pseudochorthippus parallelus",
+    "common": "Meadow Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/496738.mp3?1657543074",
+    "license": "cc-by",
+    "observer": "E. A.",
+    "observation": "https://www.inaturalist.org/observations/125771049",
+    "file": "acrididae/Pseudochorthippus_parallelus_019.mp3",
+    "bytes": 321999
+  },
+  {
+    "species": "Pseudochorthippus parallelus",
+    "common": "Meadow Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/2080023.m4a?1784547772",
+    "license": "cc-by-nc",
+    "observer": "gernotkunz",
+    "observation": "https://www.inaturalist.org/observations/383261760",
+    "file": "acrididae/Pseudochorthippus_parallelus_020.m4a",
+    "bytes": 171335
+  },
+  {
+    "species": "Podismopsis poppiusi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/152271.mp3?1607074015",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/66080859",
+    "file": "acrididae/Podismopsis_poppiusi_021.mp3",
+    "bytes": 2001099
+  },
+  {
+    "species": "Podismopsis poppiusi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/279054.m4a?1626798112",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/87869016",
+    "file": "acrididae/Podismopsis_poppiusi_022.m4a",
+    "bytes": 557453
+  },
+  {
+    "species": "Podismopsis poppiusi",
+    "common": "",
+    "url": "https://static.inaturalist.org/sounds/279055.m4a?1626798136",
+    "license": "cc-by",
+    "observer": "\u041e\u043b\u0435\u0433 \u041a\u0443\u0434\u0440\u043e\u0432",
+    "observation": "https://www.inaturalist.org/observations/87869016",
+    "file": "acrididae/Podismopsis_poppiusi_023.m4a",
+    "bytes": 1157948
+  },
+  {
+    "species": "Chorthippus mollis",
+    "common": "Lesser Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/2117442.mp3?1786643009",
+    "license": "cc-by-nc",
+    "observer": "Mathieu P\u00e9lissi\u00e9",
+    "observation": "https://www.inaturalist.org/observations/390901927",
+    "file": "acrididae/Chorthippus_mollis_024.mp3",
+    "bytes": 123407
+  },
+  {
+    "species": "Chorthippus mollis",
+    "common": "Lesser Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/2117444.mp3?1786643104",
+    "license": "cc-by-nc",
+    "observer": "Mathieu P\u00e9lissi\u00e9",
+    "observation": "https://www.inaturalist.org/observations/390901927",
+    "file": "acrididae/Chorthippus_mollis_025.mp3",
+    "bytes": 153703
+  },
+  {
+    "species": "Chorthippus mollis",
+    "common": "Lesser Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/809099.m4a?1694262300",
+    "license": "cc-by-nc",
+    "observer": "Miriam \u00d6ttl",
+    "observation": "https://www.inaturalist.org/observations/182452663",
+    "file": "acrididae/Chorthippus_mollis_026.m4a",
+    "bytes": 90883
+  },
+  {
+    "species": "Chorthippus biguttulus",
+    "common": "Bow-winged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1209283.m4a?1727091151",
+    "license": "cc-by-nc",
+    "observer": "Karol \u0141anocha",
+    "observation": "https://www.inaturalist.org/observations/243564797",
+    "file": "acrididae/Chorthippus_biguttulus_027.m4a",
+    "bytes": 250292
+  },
+  {
+    "species": "Chorthippus biguttulus",
+    "common": "Bow-winged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/518560.m4a?1660232751",
+    "license": "cc-by-nc",
+    "observer": "Simon Bertschy",
+    "observation": "https://www.inaturalist.org/observations/130384498",
+    "file": "acrididae/Chorthippus_biguttulus_028.m4a",
+    "bytes": 127657
+  },
+  {
+    "species": "Chorthippus biguttulus",
+    "common": "Bow-winged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1113434.m4a?1719661307",
+    "license": "cc-by-nc",
+    "observer": "gernotkunz",
+    "observation": "https://www.inaturalist.org/observations/225903522",
+    "file": "acrididae/Chorthippus_biguttulus_029.m4a",
+    "bytes": 117719
+  },
+  {
+    "species": "Gomphocerus sibiricus",
+    "common": "Club-legged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/772124.m4a?1689670993",
+    "license": "cc-by-nc",
+    "observer": "dfriemel",
+    "observation": "https://www.inaturalist.org/observations/173562273",
+    "file": "acrididae/Gomphocerus_sibiricus_030.m4a",
+    "bytes": 145967
+  },
+  {
+    "species": "Gomphocerus sibiricus",
+    "common": "Club-legged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/757440.m4a?1688287277",
+    "license": "cc0",
+    "observer": "ahabo",
+    "observation": "https://www.inaturalist.org/observations/170602821",
+    "file": "acrididae/Gomphocerus_sibiricus_031.m4a",
+    "bytes": 80154
+  },
+  {
+    "species": "Gomphocerus sibiricus",
+    "common": "Club-legged Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1146880.m4a?1722253260",
+    "license": "cc0",
+    "observer": "Felix Puff",
+    "observation": "https://www.inaturalist.org/observations/232468918",
+    "file": "acrididae/Gomphocerus_sibiricus_032.m4a",
+    "bytes": 208204
+  },
+  {
+    "species": "Chrysochraon dispar",
+    "common": "Gold Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/2071834.m4a?1784031628",
+    "license": "cc-by",
+    "observer": "Benjamin Schedl",
+    "observation": "https://www.inaturalist.org/observations/381345594",
+    "file": "acrididae/Chrysochraon_dispar_033.m4a",
+    "bytes": 84456
+  },
+  {
+    "species": "Chrysochraon dispar",
+    "common": "Gold Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/498532.mp3?1657747732",
+    "license": "cc-by",
+    "observer": "snaily_naily",
+    "observation": "https://www.inaturalist.org/observations/126119874",
+    "file": "acrididae/Chrysochraon_dispar_034.mp3",
+    "bytes": 419904
+  },
+  {
+    "species": "Chrysochraon dispar",
+    "common": "Gold Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/521625.m4a?1660676960",
+    "license": "cc-by-nc",
+    "observer": "\u0422\u0438\u043c\u043e\u0444\u0435\u0439 \u041f\u0430\u043b\u043a\u0438\u043d",
+    "observation": "https://www.inaturalist.org/observations/131105676",
+    "file": "acrididae/Chrysochraon_dispar_035.m4a",
+    "bytes": 33885
+  },
+  {
+    "species": "Stethophyma grossum",
+    "common": "Large Marsh Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1785835.mp3?1772302931",
+    "license": "cc-by-nc",
+    "observer": "mobbini",
+    "observation": "https://www.inaturalist.org/observations/340635753",
+    "file": "acrididae/Stethophyma_grossum_036.mp3",
+    "bytes": 422400
+  },
+  {
+    "species": "Stethophyma grossum",
+    "common": "Large Marsh Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1785837.mp3?1772303239",
+    "license": "cc-by-nc",
+    "observer": "mobbini",
+    "observation": "https://www.inaturalist.org/observations/340635753",
+    "file": "acrididae/Stethophyma_grossum_037.mp3",
+    "bytes": 844800
+  },
+  {
+    "species": "Stethophyma grossum",
+    "common": "Large Marsh Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/286921.mp3?1628025447",
+    "license": "cc-by-nc",
+    "observer": "Phaulactis",
+    "observation": "https://www.inaturalist.org/observations/89830044",
+    "file": "acrididae/Stethophyma_grossum_038.mp3",
+    "bytes": 101146
+  },
+  {
+    "species": "Chorthippus dorsatus",
+    "common": "Steppe Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/806433.m4a?1693841613",
+    "license": "cc-by-nc",
+    "observer": "Miriam \u00d6ttl",
+    "observation": "https://www.inaturalist.org/observations/181750814",
+    "file": "acrididae/Chorthippus_dorsatus_039.m4a",
+    "bytes": 137766
+  },
+  {
+    "species": "Chorthippus dorsatus",
+    "common": "Steppe Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/807017.m4a?1693918126",
+    "license": "cc-by-nc",
+    "observer": "Miriam \u00d6ttl",
+    "observation": "https://www.inaturalist.org/observations/181898934",
+    "file": "acrididae/Chorthippus_dorsatus_040.m4a",
+    "bytes": 33145
+  },
+  {
+    "species": "Chorthippus dorsatus",
+    "common": "Steppe Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/813611.m4a?1694888663",
+    "license": "cc-by",
+    "observer": "E. A.",
+    "observation": "https://www.inaturalist.org/observations/183540800",
+    "file": "acrididae/Chorthippus_dorsatus_041.m4a",
+    "bytes": 222521
+  },
+  {
+    "species": "Chorthippus brunneus",
+    "common": "Common Field Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/306026.m4a?1631780632",
+    "license": "cc-by-nc",
+    "observer": "Julien Preud'homme",
+    "observation": "https://www.inaturalist.org/observations/93853508",
+    "file": "acrididae/Chorthippus_brunneus_042.m4a",
+    "bytes": 240067
+  },
+  {
+    "species": "Chorthippus brunneus",
+    "common": "Common Field Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/819422.m4a?1695720756",
+    "license": "cc-by-nc",
+    "observer": "Miriam \u00d6ttl",
+    "observation": "https://www.inaturalist.org/observations/184983401",
+    "file": "acrididae/Chorthippus_brunneus_043.m4a",
+    "bytes": 90095
+  },
+  {
+    "species": "Chorthippus brunneus",
+    "common": "Common Field Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/819422.m4a?1695720756",
+    "license": "cc-by-nc",
+    "observer": "Miriam \u00d6ttl",
+    "observation": "https://www.inaturalist.org/observations/184983401",
+    "file": "acrididae/Chorthippus_brunneus_044.m4a",
+    "bytes": 90095
+  },
+  {
+    "species": "Chortophaga viridifasciata",
+    "common": "Green-striped Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1126687.m4a?1720544566",
+    "license": "cc0",
+    "observer": "kristinpiston",
+    "observation": "https://www.inaturalist.org/observations/228270375",
+    "file": "acrididae/Chortophaga_viridifasciata_045.m4a",
+    "bytes": 86702
+  },
+  {
+    "species": "Chortophaga viridifasciata",
+    "common": "Green-striped Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1126687.m4a?1720544566",
+    "license": "cc0",
+    "observer": "kristinpiston",
+    "observation": "https://www.inaturalist.org/observations/228270375",
+    "file": "acrididae/Chortophaga_viridifasciata_046.m4a",
+    "bytes": 86702
+  },
+  {
+    "species": "Chortophaga viridifasciata",
+    "common": "Green-striped Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/414617.m4a?1651365902",
+    "license": "cc-by-nc",
+    "observer": "F Dylan Titmuss",
+    "observation": "https://www.inaturalist.org/observations/114040536",
+    "file": "acrididae/Chortophaga_viridifasciata_047.m4a",
+    "bytes": 109771
+  },
+  {
+    "species": "Chorthippus vagans",
+    "common": "Heath Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1587019.m4a?1753871980",
+    "license": "cc-by-nc",
+    "observer": "simon22199",
+    "observation": "https://www.inaturalist.org/observations/302314144",
+    "file": "acrididae/Chorthippus_vagans_048.m4a",
+    "bytes": 156254
+  },
+  {
+    "species": "Chorthippus vagans",
+    "common": "Heath Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1154521.m4a?1722961583",
+    "license": "cc-by",
+    "observer": "Christoph Moning",
+    "observation": "https://www.inaturalist.org/observations/234170465",
+    "file": "acrididae/Chorthippus_vagans_049.m4a",
+    "bytes": 371507
+  },
+  {
+    "species": "Chorthippus vagans",
+    "common": "Heath Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1154522.m4a?1722961586",
+    "license": "cc-by",
+    "observer": "Christoph Moning",
+    "observation": "https://www.inaturalist.org/observations/234170465",
+    "file": "acrididae/Chorthippus_vagans_050.m4a",
+    "bytes": 222913
+  },
+  {
+    "species": "Pseudochorthippus curtipennis",
+    "common": "Marsh meadow grasshopper",
+    "url": "https://static.inaturalist.org/sounds/121136.mp3?1594844837",
+    "license": "cc-by-nc-sa",
+    "observer": "Daniel Parker",
+    "observation": "https://www.inaturalist.org/observations/53191294",
+    "file": "acrididae/Pseudochorthippus_curtipennis_051.mp3",
+    "bytes": 608568
+  },
+  {
+    "species": "Pseudochorthippus curtipennis",
+    "common": "Marsh meadow grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1717733.mp3?1765909398",
+    "license": "cc-by",
+    "observer": "Rostyslav Yurechko",
+    "observation": "https://www.inaturalist.org/observations/330992408",
+    "file": "acrididae/Pseudochorthippus_curtipennis_052.mp3",
+    "bytes": 289105
+  },
+  {
+    "species": "Pseudochorthippus curtipennis",
+    "common": "Marsh meadow grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1717734.mp3?1765909398",
+    "license": "cc-by",
+    "observer": "Rostyslav Yurechko",
+    "observation": "https://www.inaturalist.org/observations/330992408",
+    "file": "acrididae/Pseudochorthippus_curtipennis_053.mp3",
+    "bytes": 511825
+  },
+  {
+    "species": "Chorthippus apricarius",
+    "common": "Locomotive Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1745900.mp3?1768853822",
+    "license": "cc-by-nc",
+    "observer": "mobbini",
+    "observation": "https://www.inaturalist.org/observations/335393200",
+    "file": "acrididae/Chorthippus_apricarius_054.mp3",
+    "bytes": 288000
+  },
+  {
+    "species": "Chorthippus apricarius",
+    "common": "Locomotive Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/866347.mp3?1703714319",
+    "license": "cc-by-nc",
+    "observer": "\u041c\u0430\u0440\u0438\u043d\u0430 \u0413\u043e\u0440\u0431\u0443\u043d\u043e\u0432\u0430-\u00cb\u043b\u043a\u0438\u043d\u0430",
+    "observation": "https://www.inaturalist.org/observations/195015821",
+    "file": "acrididae/Chorthippus_apricarius_055.mp3",
+    "bytes": 283058
+  },
+  {
+    "species": "Chorthippus apricarius",
+    "common": "Locomotive Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1195296.m4a?1725698602",
+    "license": "cc-by-nc",
+    "observer": "kevinkclausen",
+    "observation": "https://www.inaturalist.org/observations/240280620",
+    "file": "acrididae/Chorthippus_apricarius_056.m4a",
+    "bytes": 92399
+  },
+  {
+    "species": "Trimerotropis verruculata",
+    "common": "Crackling Forest Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/544204.m4a?1664727426",
+    "license": "cc-by",
+    "observer": "Liam Steele",
+    "observation": "https://www.inaturalist.org/observations/137294547",
+    "file": "acrididae/Trimerotropis_verruculata_057.m4a",
+    "bytes": 62286
+  },
+  {
+    "species": "Trimerotropis verruculata",
+    "common": "Crackling Forest Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/548341.m4a?1665534854",
+    "license": "cc-by-nc",
+    "observer": "Wade Tokarek",
+    "observation": "https://www.inaturalist.org/observations/138450334",
+    "file": "acrididae/Trimerotropis_verruculata_058.m4a",
+    "bytes": 129408
+  },
+  {
+    "species": "Trimerotropis verruculata",
+    "common": "Crackling Forest Grasshopper",
+    "url": "https://static.inaturalist.org/sounds/1138766.m4a?1721532411",
+    "license": "cc-by-nc",
+    "observer": "Ian Cruickshank",
+    "observation": "https://www.inaturalist.org/observations/230658681",
+    "file": "acrididae/Trimerotropis_verruculata_059.m4a",
+    "bytes": 142116
+  },
+  {
+    "species": "Marmota monax",
+    "common": "Groundhog",
+    "url": "https://static.inaturalist.org/sounds/727049.m4a?1686004588",
+    "license": "cc-by-nc",
+    "observer": "Michael H. King",
+    "observation": "https://www.inaturalist.org/observations/165803246",
+    "file": "sciuridae/Marmota_monax_000.m4a",
+    "bytes": 66495
+  },
+  {
+    "species": "Marmota monax",
+    "common": "Groundhog",
+    "url": "https://static.inaturalist.org/sounds/739937.m4a?1686870188",
+    "license": "cc-by-nc",
+    "observer": "Michael H. King",
+    "observation": "https://www.inaturalist.org/observations/165803246",
+    "file": "sciuridae/Marmota_monax_001.m4a",
+    "bytes": 164835
+  },
+  {
+    "species": "Marmota monax",
+    "common": "Groundhog",
+    "url": "https://static.inaturalist.org/sounds/1914801.mp3?1777556374",
+    "license": "cc-by-nc",
+    "observer": "Erin O'Connor",
+    "observation": "https://www.inaturalist.org/observations/356840607",
+    "file": "sciuridae/Marmota_monax_002.mp3",
+    "bytes": 130301
+  },
+  {
+    "species": "Tamias striatus",
+    "common": "Eastern Chipmunk",
+    "url": "https://static.inaturalist.org/sounds/24967.mp3?1534044915",
+    "license": "cc-by-nc",
+    "observer": "Daniel Onea",
+    "observation": "https://www.inaturalist.org/observations/15339961",
+    "file": "sciuridae/Tamias_striatus_003.mp3",
+    "bytes": 186063
+  },
+  {
+    "species": "Tamias striatus",
+    "common": "Eastern Chipmunk",
+    "url": "https://static.inaturalist.org/sounds/1412215.m4a?1745762287",
+    "license": "cc-by-nc",
+    "observer": "Summit Metro Parks",
+    "observation": "https://www.inaturalist.org/observations/274672356",
+    "file": "sciuridae/Tamias_striatus_004.m4a",
+    "bytes": 190247
+  },
+  {
+    "species": "Tamias striatus",
+    "common": "Eastern Chipmunk",
+    "url": "https://static.inaturalist.org/sounds/894077.m4a?1707617034",
+    "license": "cc-by-nc",
+    "observer": "Ethan",
+    "observation": "https://www.inaturalist.org/observations/198958115",
+    "file": "sciuridae/Tamias_striatus_005.m4a",
+    "bytes": 106376
+  },
+  {
+    "species": "Otospermophilus beecheyi",
+    "common": "California Ground Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1311682.m4a?1740084666",
+    "license": "cc-by-nc",
+    "observer": "Linda Pardy",
+    "observation": "https://www.inaturalist.org/observations/262432524",
+    "file": "sciuridae/Otospermophilus_beecheyi_006.m4a",
+    "bytes": 287305
+  },
+  {
+    "species": "Otospermophilus beecheyi",
+    "common": "California Ground Squirrel",
+    "url": "https://static.inaturalist.org/sounds/613254.m4a?1678595614",
+    "license": "cc-by-nc",
+    "observer": "Chalon Boesel",
+    "observation": "https://www.inaturalist.org/observations/150789369",
+    "file": "sciuridae/Otospermophilus_beecheyi_007.m4a",
+    "bytes": 61945
+  },
+  {
+    "species": "Otospermophilus beecheyi",
+    "common": "California Ground Squirrel",
+    "url": "https://static.inaturalist.org/sounds/413084.m4a?1651342450",
+    "license": "cc-by-nc",
+    "observer": "ekm18",
+    "observation": "https://www.inaturalist.org/observations/113895262",
+    "file": "sciuridae/Otospermophilus_beecheyi_008.m4a",
+    "bytes": 48328
+  },
+  {
+    "species": "Sciurus brasiliensis ingrami",
+    "common": "Ingram's Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1827252.m4a?1774714496",
+    "license": "cc-by",
+    "observer": "Miguel A. Paix\u00e3o",
+    "observation": "https://www.inaturalist.org/observations/345694697",
+    "file": "sciuridae/Sciurus_brasiliensis_ingrami_009.m4a",
+    "bytes": 83974
+  },
+  {
+    "species": "Sciurus brasiliensis ingrami",
+    "common": "Ingram's Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1408915.m4a?1745710396",
+    "license": "cc-by-nc",
+    "observer": "Fernanda",
+    "observation": "https://www.inaturalist.org/observations/274234697",
+    "file": "sciuridae/Sciurus_brasiliensis_ingrami_010.m4a",
+    "bytes": 184475
+  },
+  {
+    "species": "Sciurus brasiliensis ingrami",
+    "common": "Ingram's Squirrel",
+    "url": "https://static.inaturalist.org/sounds/942406.mp3?1711582438",
+    "license": "cc-by-nc",
+    "observer": "Luciano Bernardes",
+    "observation": "https://www.inaturalist.org/observations/204206126",
+    "file": "sciuridae/Sciurus_brasiliensis_ingrami_011.mp3",
+    "bytes": 431823
+  },
+  {
+    "species": "Sciurus griseus",
+    "common": "Western Gray Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1238008.m4a?1729900468",
+    "license": "cc-by-nc",
+    "observer": "dunnahoo",
+    "observation": "https://www.inaturalist.org/observations/249090560",
+    "file": "sciuridae/Sciurus_griseus_012.m4a",
+    "bytes": 77452
+  },
+  {
+    "species": "Sciurus griseus",
+    "common": "Western Gray Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1309047.m4a?1739817024",
+    "license": "cc-by-nc",
+    "observer": "Camila VR",
+    "observation": "https://www.inaturalist.org/observations/262001842",
+    "file": "sciuridae/Sciurus_griseus_013.m4a",
+    "bytes": 143265
+  },
+  {
+    "species": "Sciurus griseus",
+    "common": "Western Gray Squirrel",
+    "url": "https://static.inaturalist.org/sounds/567198.m4a?1669429913",
+    "license": "cc-by-nc",
+    "observer": "Jeff Ward",
+    "observation": "https://www.inaturalist.org/observations/142879805",
+    "file": "sciuridae/Sciurus_griseus_014.m4a",
+    "bytes": 579649
+  },
+  {
+    "species": "Glaucomys sabrinus",
+    "common": "Northern Flying Squirrel",
+    "url": "https://static.inaturalist.org/sounds/57729.m4a?1581697348",
+    "license": "cc-by-nc",
+    "observer": "Toby Spribille",
+    "observation": "https://www.inaturalist.org/observations/38572207",
+    "file": "sciuridae/Glaucomys_sabrinus_015.m4a",
+    "bytes": 567807
+  },
+  {
+    "species": "Glaucomys sabrinus",
+    "common": "Northern Flying Squirrel",
+    "url": "https://static.inaturalist.org/sounds/483938.m4a?1656353276",
+    "license": "cc-by-nc",
+    "observer": "bridgetmacg",
+    "observation": "https://www.inaturalist.org/observations/123720545",
+    "file": "sciuridae/Glaucomys_sabrinus_016.m4a",
+    "bytes": 252617
+  },
+  {
+    "species": "Glaucomys sabrinus",
+    "common": "Northern Flying Squirrel",
+    "url": "https://static.inaturalist.org/sounds/484738.m4a?1656425452",
+    "license": "cc-by-nc",
+    "observer": "bridgetmacg",
+    "observation": "https://www.inaturalist.org/observations/123720545",
+    "file": "sciuridae/Glaucomys_sabrinus_017.m4a",
+    "bytes": 252617
+  },
+  {
+    "species": "Glaucomys volans",
+    "common": "Southern Flying Squirrel",
+    "url": "https://static.inaturalist.org/sounds/507436.m4a?1658801414",
+    "license": "cc-by-nc",
+    "observer": "Maureen Clare Murphy",
+    "observation": "https://www.inaturalist.org/observations/127936648",
+    "file": "sciuridae/Glaucomys_volans_018.m4a",
+    "bytes": 180187
+  },
+  {
+    "species": "Glaucomys volans",
+    "common": "Southern Flying Squirrel",
+    "url": "https://static.inaturalist.org/sounds/845020.mp3?1699840112",
+    "license": "cc-by",
+    "observer": "Alex Stach",
+    "observation": "https://www.inaturalist.org/observations/190862178",
+    "file": "sciuridae/Glaucomys_volans_019.mp3",
+    "bytes": 1887720
+  },
+  {
+    "species": "Glaucomys volans",
+    "common": "Southern Flying Squirrel",
+    "url": "https://static.inaturalist.org/sounds/55050.m4a?1579198288",
+    "license": "cc-by-nc",
+    "observer": "Michael J. W. Carr",
+    "observation": "https://www.inaturalist.org/observations/37656112",
+    "file": "sciuridae/Glaucomys_volans_020.m4a",
+    "bytes": 398585
+  },
+  {
+    "species": "Tamiasciurus douglasii",
+    "common": "Douglas's Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1248690.m4a?1731284362",
+    "license": "cc-by-nc",
+    "observer": "Milli Vedder",
+    "observation": "https://www.inaturalist.org/observations/251247725",
+    "file": "sciuridae/Tamiasciurus_douglasii_021.m4a",
+    "bytes": 85502
+  },
+  {
+    "species": "Tamiasciurus douglasii",
+    "common": "Douglas's Squirrel",
+    "url": "https://static.inaturalist.org/sounds/305223.m4a?1631576668",
+    "license": "cc-by-nc",
+    "observer": "Chalon Boesel",
+    "observation": "https://www.inaturalist.org/observations/94768448",
+    "file": "sciuridae/Tamiasciurus_douglasii_022.m4a",
+    "bytes": 125564
+  },
+  {
+    "species": "Tamiasciurus douglasii",
+    "common": "Douglas's Squirrel",
+    "url": "https://static.inaturalist.org/sounds/145975.m4a?1604107884",
+    "license": "cc-by-nc",
+    "observer": "Elliott Smeds",
+    "observation": "https://www.inaturalist.org/observations/63857344",
+    "file": "sciuridae/Tamiasciurus_douglasii_023.m4a",
+    "bytes": 171783
+  },
+  {
+    "species": "Sciurus carolinensis",
+    "common": "Eastern Gray Squirrel",
+    "url": "https://static.inaturalist.org/sounds/841582.mp3?1699140546",
+    "license": "cc-by-nc",
+    "observer": "joe dziewa",
+    "observation": "https://www.inaturalist.org/observations/190011349",
+    "file": "sciuridae/Sciurus_carolinensis_024.mp3",
+    "bytes": 147501
+  },
+  {
+    "species": "Sciurus carolinensis",
+    "common": "Eastern Gray Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1724253.mp3?1766686325",
+    "license": "cc-by-nc",
+    "observer": "little_blue_heron",
+    "observation": "https://www.inaturalist.org/observations/277770838",
+    "file": "sciuridae/Sciurus_carolinensis_025.mp3",
+    "bytes": 528384
+  },
+  {
+    "species": "Sciurus carolinensis",
+    "common": "Eastern Gray Squirrel",
+    "url": "https://static.inaturalist.org/sounds/27332.m4a?1648746307",
+    "license": "cc-by-nc",
+    "observer": "sea-kangaroo",
+    "observation": "https://www.inaturalist.org/observations/18359173",
+    "file": "sciuridae/Sciurus_carolinensis_026.m4a",
+    "bytes": 806179
+  },
+  {
+    "species": "Tamiasciurus hudsonicus",
+    "common": "American Red Squirrel",
+    "url": "https://static.inaturalist.org/sounds/868480.mp3?1704048526",
+    "license": "cc-by-nc",
+    "observer": "Nate Marchessault",
+    "observation": "https://www.inaturalist.org/observations/195225951",
+    "file": "sciuridae/Tamiasciurus_hudsonicus_027.mp3",
+    "bytes": 548357
+  },
+  {
+    "species": "Tamiasciurus hudsonicus",
+    "common": "American Red Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1164443.m4a?1723824664",
+    "license": "cc-by-nc",
+    "observer": "bmcm",
+    "observation": "https://www.inaturalist.org/observations/236107845",
+    "file": "sciuridae/Tamiasciurus_hudsonicus_028.m4a",
+    "bytes": 157149
+  },
+  {
+    "species": "Tamiasciurus hudsonicus",
+    "common": "American Red Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1201948.m4a?1726431302",
+    "license": "cc-by-nc",
+    "observer": "Olivier Renaud",
+    "observation": "https://www.inaturalist.org/observations/241950187",
+    "file": "sciuridae/Tamiasciurus_hudsonicus_029.m4a",
+    "bytes": 143254
+  },
+  {
+    "species": "Callosciurus erythraeus",
+    "common": "Pallas' Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1608645.m4a?1755548805",
+    "license": "cc0",
+    "observer": "Davide",
+    "observation": "https://www.inaturalist.org/observations/307355906",
+    "file": "sciuridae/Callosciurus_erythraeus_030.m4a",
+    "bytes": 387800
+  },
+  {
+    "species": "Callosciurus erythraeus",
+    "common": "Pallas' Squirrel",
+    "url": "https://static.inaturalist.org/sounds/21305.mp3?1525971226",
+    "license": "cc-by-sa",
+    "observer": "portioid",
+    "observation": "https://www.inaturalist.org/observations/10506667",
+    "file": "sciuridae/Callosciurus_erythraeus_031.mp3",
+    "bytes": 887381
+  },
+  {
+    "species": "Callosciurus erythraeus",
+    "common": "Pallas' Squirrel",
+    "url": "https://static.inaturalist.org/sounds/866753.mp3?1703776403",
+    "license": "cc-by-nc",
+    "observer": "lava_chen",
+    "observation": "https://www.inaturalist.org/observations/195080398",
+    "file": "sciuridae/Callosciurus_erythraeus_032.mp3",
+    "bytes": 206592
+  },
+  {
+    "species": "Funambulus pennantii",
+    "common": "Five-striped Palm Squirrel",
+    "url": "https://static.inaturalist.org/sounds/50011.m4a?1573174397",
+    "license": "cc-by-nc-sa",
+    "observer": "Thomas Brooks",
+    "observation": "https://www.inaturalist.org/observations/35429264",
+    "file": "sciuridae/Funambulus_pennantii_033.m4a",
+    "bytes": 127620
+  },
+  {
+    "species": "Funambulus pennantii",
+    "common": "Five-striped Palm Squirrel",
+    "url": "https://static.inaturalist.org/sounds/819941.m4a?1695780666",
+    "license": "cc-by-nc",
+    "observer": "Jawad Hasan",
+    "observation": "https://www.inaturalist.org/observations/185092715",
+    "file": "sciuridae/Funambulus_pennantii_034.m4a",
+    "bytes": 311148
+  },
+  {
+    "species": "Funambulus pennantii",
+    "common": "Five-striped Palm Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1281972.m4a?1736330069",
+    "license": "cc-by-nc",
+    "observer": "Abhas Misraraj",
+    "observation": "https://www.inaturalist.org/observations/257785119",
+    "file": "sciuridae/Funambulus_pennantii_035.m4a",
+    "bytes": 62547
+  },
+  {
+    "species": "Sciurus niger",
+    "common": "Eastern Fox Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1821549.m4a?1774374939",
+    "license": "cc-by-nc",
+    "observer": "Lauren",
+    "observation": "https://www.inaturalist.org/observations/344934247",
+    "file": "sciuridae/Sciurus_niger_036.m4a",
+    "bytes": 163821
+  },
+  {
+    "species": "Sciurus niger",
+    "common": "Eastern Fox Squirrel",
+    "url": "https://static.inaturalist.org/sounds/820819.m4a?1695917410",
+    "license": "cc-by-nc",
+    "observer": "hammhead292",
+    "observation": "https://www.inaturalist.org/observations/185295683",
+    "file": "sciuridae/Sciurus_niger_037.m4a",
+    "bytes": 50776
+  },
+  {
+    "species": "Sciurus niger",
+    "common": "Eastern Fox Squirrel",
+    "url": "https://static.inaturalist.org/sounds/675489.m4a?1682984903",
+    "license": "cc0",
+    "observer": "Ian",
+    "observation": "https://www.inaturalist.org/observations/158940636",
+    "file": "sciuridae/Sciurus_niger_038.m4a",
+    "bytes": 224814
+  },
+  {
+    "species": "Cynomys ludovicianus",
+    "common": "Black-tailed Prairie Dog",
+    "url": "https://static.inaturalist.org/sounds/609507.m4a?1678078834",
+    "license": "cc-by-sa",
+    "observer": "Vincent Weber",
+    "observation": "https://www.inaturalist.org/observations/150384808",
+    "file": "sciuridae/Cynomys_ludovicianus_039.m4a",
+    "bytes": 291490
+  },
+  {
+    "species": "Cynomys ludovicianus",
+    "common": "Black-tailed Prairie Dog",
+    "url": "https://static.inaturalist.org/sounds/229697.m4a?1621702581",
+    "license": "cc-by-nc",
+    "observer": "pruprecht",
+    "observation": "https://www.inaturalist.org/observations/79803979",
+    "file": "sciuridae/Cynomys_ludovicianus_040.m4a",
+    "bytes": 49105
+  },
+  {
+    "species": "Cynomys ludovicianus",
+    "common": "Black-tailed Prairie Dog",
+    "url": "https://static.inaturalist.org/sounds/1227774.m4a?1728750430",
+    "license": "cc-by-nc",
+    "observer": "John D Reynolds",
+    "observation": "https://www.inaturalist.org/observations/246955613",
+    "file": "sciuridae/Cynomys_ludovicianus_041.m4a",
+    "bytes": 130171
+  },
+  {
+    "species": "Marmota marmota",
+    "common": "Alpine Marmot",
+    "url": "https://static.inaturalist.org/sounds/1093802.mp3?1718393283",
+    "license": "cc-by-nc",
+    "observer": "jansson",
+    "observation": "https://www.inaturalist.org/observations/222704433",
+    "file": "sciuridae/Marmota_marmota_042.mp3",
+    "bytes": 354877
+  },
+  {
+    "species": "Marmota marmota",
+    "common": "Alpine Marmot",
+    "url": "https://static.inaturalist.org/sounds/799038.m4a?1692883919",
+    "license": "cc-by-nc",
+    "observer": "roby",
+    "observation": "https://www.inaturalist.org/observations/179965718",
+    "file": "sciuridae/Marmota_marmota_043.m4a",
+    "bytes": 41330
+  },
+  {
+    "species": "Marmota marmota",
+    "common": "Alpine Marmot",
+    "url": "https://static.inaturalist.org/sounds/2063938.m4a?1783608166",
+    "license": "cc-by-nc",
+    "observer": "roby",
+    "observation": "https://www.inaturalist.org/observations/379697882",
+    "file": "sciuridae/Marmota_marmota_044.m4a",
+    "bytes": 74865
+  },
+  {
+    "species": "Callosciurus finlaysonii",
+    "common": "Finlayson's Squirrel",
+    "url": "https://static.inaturalist.org/sounds/273870.mp3?1626176805",
+    "license": "cc-by-nc",
+    "observer": "luluchouette",
+    "observation": "https://www.inaturalist.org/observations/86840663",
+    "file": "sciuridae/Callosciurus_finlaysonii_045.mp3",
+    "bytes": 172845
+  },
+  {
+    "species": "Callosciurus finlaysonii",
+    "common": "Finlayson's Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1430852.m4a?1746091987",
+    "license": "cc-by-nc",
+    "observer": "Patrick James",
+    "observation": "https://www.inaturalist.org/observations/277309987",
+    "file": "sciuridae/Callosciurus_finlaysonii_046.m4a",
+    "bytes": 155590
+  },
+  {
+    "species": "Callosciurus finlaysonii",
+    "common": "Finlayson's Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1430853.m4a?1746091990",
+    "license": "cc-by-nc",
+    "observer": "Patrick James",
+    "observation": "https://www.inaturalist.org/observations/277309987",
+    "file": "sciuridae/Callosciurus_finlaysonii_047.m4a",
+    "bytes": 188128
+  },
+  {
+    "species": "Xerospermophilus tereticaudus",
+    "common": "Round-tailed Ground Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1348878.m4a?1742949548",
+    "license": "cc-by-nc",
+    "observer": "Daniel Donovan",
+    "observation": "https://www.inaturalist.org/observations/266983932",
+    "file": "sciuridae/Xerospermophilus_tereticaudus_048.m4a",
+    "bytes": 185664
+  },
+  {
+    "species": "Xerospermophilus tereticaudus",
+    "common": "Round-tailed Ground Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1850766.m4a?1775834463",
+    "license": "cc-by-nc",
+    "observer": "nmoorhatch",
+    "observation": "https://www.inaturalist.org/observations/348730727",
+    "file": "sciuridae/Xerospermophilus_tereticaudus_049.m4a",
+    "bytes": 108807
+  },
+  {
+    "species": "Xerospermophilus tereticaudus",
+    "common": "Round-tailed Ground Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1850766.m4a?1775834463",
+    "license": "cc-by-nc",
+    "observer": "nmoorhatch",
+    "observation": "https://www.inaturalist.org/observations/348730727",
+    "file": "sciuridae/Xerospermophilus_tereticaudus_050.m4a",
+    "bytes": 108807
+  },
+  {
+    "species": "Sciurus brasiliensis",
+    "common": "Brazilian Squirrel",
+    "url": "https://static.inaturalist.org/sounds/566675.mp3?1669323742",
+    "license": "cc0",
+    "observer": "Paula Romano",
+    "observation": "https://www.inaturalist.org/observations/142772758",
+    "file": "sciuridae/Sciurus_brasiliensis_051.mp3",
+    "bytes": 1281642
+  },
+  {
+    "species": "Sciurus brasiliensis",
+    "common": "Brazilian Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1534921.m4a?1750509802",
+    "license": "cc-by-nc",
+    "observer": "chrisfarias",
+    "observation": "https://www.inaturalist.org/observations/291454621",
+    "file": "sciuridae/Sciurus_brasiliensis_052.m4a",
+    "bytes": 269006
+  },
+  {
+    "species": "Sciurus brasiliensis",
+    "common": "Brazilian Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1534921.m4a?1750509802",
+    "license": "cc-by-nc",
+    "observer": "chrisfarias",
+    "observation": "https://www.inaturalist.org/observations/291454621",
+    "file": "sciuridae/Sciurus_brasiliensis_053.m4a",
+    "bytes": 269006
+  },
+  {
+    "species": "Funambulus palmarum",
+    "common": "Three-striped Palm Squirrel",
+    "url": "https://static.inaturalist.org/sounds/870126.m4a?1704262327",
+    "license": "cc-by-nc",
+    "observer": "dogsarethecoolest",
+    "observation": "https://www.inaturalist.org/observations/195639229",
+    "file": "sciuridae/Funambulus_palmarum_054.m4a",
+    "bytes": 53593
+  },
+  {
+    "species": "Funambulus palmarum",
+    "common": "Three-striped Palm Squirrel",
+    "url": "https://static.inaturalist.org/sounds/870127.m4a?1704262329",
+    "license": "cc-by-nc",
+    "observer": "dogsarethecoolest",
+    "observation": "https://www.inaturalist.org/observations/195639229",
+    "file": "sciuridae/Funambulus_palmarum_055.m4a",
+    "bytes": 69663
+  },
+  {
+    "species": "Funambulus palmarum",
+    "common": "Three-striped Palm Squirrel",
+    "url": "https://static.inaturalist.org/sounds/834881.m4a?1697938207",
+    "license": "cc-by-nc",
+    "observer": "einadia",
+    "observation": "https://www.inaturalist.org/observations/188459018",
+    "file": "sciuridae/Funambulus_palmarum_056.m4a",
+    "bytes": 94697
+  },
+  {
+    "species": "Sciurus vulgaris",
+    "common": "Eurasian Red Squirrel",
+    "url": "https://static.inaturalist.org/sounds/531432.m4a?1662404773",
+    "license": "cc0",
+    "observer": "Jeremy Barker",
+    "observation": "https://www.inaturalist.org/observations/133805354",
+    "file": "sciuridae/Sciurus_vulgaris_057.m4a",
+    "bytes": 205335
+  },
+  {
+    "species": "Sciurus vulgaris",
+    "common": "Eurasian Red Squirrel",
+    "url": "https://static.inaturalist.org/sounds/136903.mp3?1600436614",
+    "license": "cc-by-nc",
+    "observer": "Tanguy Lo\u00efs",
+    "observation": "https://www.inaturalist.org/observations/59963890",
+    "file": "sciuridae/Sciurus_vulgaris_058.mp3",
+    "bytes": 1309776
+  },
+  {
+    "species": "Sciurus vulgaris",
+    "common": "Eurasian Red Squirrel",
+    "url": "https://static.inaturalist.org/sounds/1271996.m4a?1735036000",
+    "license": "cc-by-nc",
+    "observer": "Anton Dangl",
+    "observation": "https://www.inaturalist.org/observations/256070244",
+    "file": "sciuridae/Sciurus_vulgaris_059.m4a",
+    "bytes": 182217
   }
 ]

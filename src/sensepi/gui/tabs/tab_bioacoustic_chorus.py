@@ -1,8 +1,11 @@
 """Bioacoustic Chorus — a live sonification workflow.
 
-The structure's own modal frequencies cast a chorus of real recorded insect and
-amphibian voices: mode 1 sings as frogs, mode 2 as crickets, mode 3 as katydids,
-each chirping at exactly its mode's natural frequency with no transposition.
+The structure's own modal frequencies cast a chorus of real recorded animal
+voices. The user chooses WHAT KIND of animal sings each mode and each
+structural case (frogs, crickets, katydids, cicadas, woodpeckers, owls, bats,
+doves, squirrels, grasshoppers); inside that type the mode's frequency picks
+the species, and every voice chirps at exactly its mode's natural frequency
+with no transposition.
 
 This is ONE sonification workflow, on its own tab. The separate "Sonification"
 tab is reserved for the sonification team's own method, so neither blocks the
@@ -30,8 +33,10 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog
                                QSpinBox, QSplitter, QVBoxLayout, QWidget)
 
 from ...analysis import sensor_layout as slayout
-from ...sonification.chorus.types import (CASE_MEANING, FAMILY_LABEL, ROLE_COLORS,
-                                          ROLE_MEANING, ChorusConfig, VizFrame)
+from ..widgets.wireframe import LiveStructureView
+from ...sonification.chorus.types import (CASE_MEANING, ROLE_COLORS, ROLE_MEANING,
+                                          TYPE_ORDER, TYPES, ChorusConfig, VizFrame,
+                                          type_label)
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +46,9 @@ FG = "#e8eaed"
 DIM = "#8b93a1"
 EDGE = "#2b3440"
 MODE_COLORS = ("#5ac8fa", "#7ee787", "#ff9f43", "#c792ea")
+
+#: Eigenfrequencies the tab works with: f1, f2, f3 (a three-storey frame).
+N_FREQS = 3
 
 VIZ_QUEUE_MAX = 8
 DRAIN_MS = 40
@@ -82,7 +90,7 @@ _KNOBS_ADVANCED = {
         ("damping_expression", "Damping expression", 0.0, 2.0, 2),
     ],
     "Cases": [
-        ("resonance_voice", "Resonance (cicada)", 0.0, 1.5, 2),
+        ("resonance_voice", "Resonance", 0.0, 1.5, 2),
         ("approach_voice", "Approach", 0.0, 1.5, 2),
         ("beating_voice", "Beating", 0.0, 1.5, 2),
         ("torsion_voice", "Torsion", 0.0, 1.5, 2),
@@ -94,13 +102,28 @@ _KNOBS_ADVANCED = {
         ("depth", "Depth", 0.0, 1.0, 2),
         ("ambient_bed", "Ambient bed", 0.0, 1.0, 2),
     ],
-    "Casting map": [
+    # The carrier ends are no longer knobs: each animal type maps the building
+    # range onto its OWN catalogued carrier span, so only the frequency ends
+    # remain to be fitted or set.
+    "Frequency map": [
         ("f_lo", "f low (Hz)", 0.1, 5.0, 2),
         ("f_hi", "f high (Hz)", 5.0, 40.0, 1),
-        ("c_lo", "carrier low (Hz)", 100.0, 2000.0, 0),
-        ("c_hi", "carrier high (Hz)", 3000.0, 16000.0, 0),
     ],
 }
+
+#: The case voices the user can assign an animal type to, in panel order:
+#: (config attribute, label, tooltip). Modes are handled separately.
+_CASE_SLOTS = (
+    ("resonance_type", "Resonance", "Sustained layer that joins while a mode is "
+                                    "locked to the excitation"),
+    ("torsion_type", "Torsion", "Fast voice driven by the gyro (gz); pans with the "
+                                "direction of rotation"),
+    ("alarm_type", "Impact", "The startled call right after a knock, once the "
+                             "meadow has hushed"),
+    ("drift_type", "Drift", "Sings between two floors moving against each other"),
+    ("ambient_type", "Ambient", "Background bed that never goes dead; 'auto' picks "
+                                "the quietest fit from any type"),
+)
 
 #: Kept so anything still importing the old flat table keeps working.
 _KNOBS = {**_KNOBS_MAIN, **_KNOBS_ADVANCED}
@@ -219,13 +242,13 @@ class _CastPanel(QScrollArea):
             n_sing = int(viz.singing.get(entry.info.species, 0))
             supporters = [c.info.species for c in viz.cast
                           if c.mode == m and c.role == "chorus"]
-            state = ("▲ RESONANCE — cicada layer active, chorus phase-locked"
+            state = ("▲ RESONANCE — resonance layer active, chorus phase-locked"
                      if s > 0.6 else "scattered chorus, individuals free-running")
             state_col = "#ff9f43" if s > 0.6 else DIM
             bar = int(round(s * 22))
             html = (
-                f"<div style='color:{colour};font-weight:bold;font-size:10px'>MODE {m+1}"
-                f" &nbsp;·&nbsp; {FAMILY_LABEL.get(entry.info.group, entry.info.group).upper()}"
+                f"<div style='color:{colour};font-weight:bold;font-size:10px'>f{m+1}"
+                f" &nbsp;·&nbsp; {type_label(entry.info.type or entry.info.group).upper()}"
                 f"</div>"
                 f"<div style='color:{FG};font-size:13px;font-style:italic;"
                 f"font-weight:bold'>{entry.info.species}</div>"
@@ -434,119 +457,6 @@ class _ScorePanel(pg.PlotWidget):
         self.setYRange(0, max(len(tracked), 1))
 
 
-class _StructurePanel(pg.PlotWidget):
-    """⑤ Structure — the frame ANIMATED by the measured motion.
-
-    Displacement is rebuilt from modal superposition:
-
-        x(floor, t) = Σ_m  shape[floor, m] · band_energy[m] · sin(2π f_m t)
-
-    so the frame sways at the structure's own frequencies, in its own mode
-    shapes, with amplitudes following how excited each mode currently is. The
-    phase advances on the GUI timer, which keeps the motion smooth even when
-    control frames are dropped.
-
-    Modes above a few Hz would alias at a 25 Hz redraw, so ALL modes are slowed
-    by one shared factor. Relative rates therefore stay true — mode 3 still
-    visibly moves faster than mode 1 — and the factor is shown on the plot.
-    """
-
-    MAX_DISPLAY_HZ = 1.2   # comfortable sway rate on screen
-
-    def __init__(self) -> None:
-        super().__init__()
-        _style_plot(self)
-        self.getAxis("left").setStyle(showValues=False)
-        self.getAxis("bottom").setStyle(showValues=False)
-        self.setMouseEnabled(False, False)
-        self.setMenuEnabled(False)
-        self._left = self.plot(pen=pg.mkPen(DIM, width=3))
-        self._right = self.plot(pen=pg.mkPen(DIM, width=3))
-        self._floors = [self.plot(pen=pg.mkPen(FG, width=6)) for _ in range(6)]
-        self._ghost = [self.plot(pen=pg.mkPen(QColor(90, 200, 250, 60), width=2))
-                       for _ in range(6)]
-        self._dots = pg.ScatterPlotItem(size=12)
-        self.addItem(self._dots)
-        self._ground = self.plot(pen=pg.mkPen(DIM, width=4))
-        self._ground.setData([-1.25, 1.25], [0, 0])
-        self._note = pg.TextItem("", color=DIM, anchor=(0.5, 0))
-        self._note.setFont(QFont("", 7))
-        self.addItem(self._note)
-        self._phase = np.zeros(4)
-        self._amp = np.zeros(4)
-        self._slow = 1.0
-        self._ref = 1e-3
-        self._n = 0
-
-    def update_frame(self, viz: VizFrame) -> None:
-        freqs = np.asarray(viz.modal.frequencies_hz, dtype=float).ravel()
-        be = np.asarray(viz.frame.band_energy, dtype=float).ravel()
-        env = np.asarray(viz.frame.env_floor, dtype=float).ravel()
-        n_floors = int(env.size) or 3
-        shapes = viz.modal.shapes
-        if freqs.size == 0:
-            return
-        k = min(freqs.size, self._phase.size)
-
-        dt = DRAIN_MS / 1000.0
-        self._phase[:k] = (self._phase[:k]
-                           + 2 * np.pi * freqs[:k] * self._slow * dt) % (2 * np.pi)
-        # amplitude follows excitation, smoothed so it breathes rather than jumps
-        tgt = np.zeros(4)
-        tgt[:k] = be[:k] if be.size >= k else 0.0
-        self._amp += 0.25 * (tgt - self._amp)
-
-        # One shared slow-motion factor, keyed to the DOMINANT mode so the main
-        # sway is comfortable to watch. Keying it to the fastest mode instead
-        # made everything crawl. Relative speeds stay true either way.
-        dom = int(np.argmax(self._amp[:k])) if k and self._amp[:k].any() else 0
-        f_dom = float(freqs[min(dom, k - 1)]) if k else 1.0
-        self._slow = float(np.clip(self.MAX_DISPLAY_HZ / max(f_dom, 1e-6), 0.04, 1.0))
-
-        # modal superposition -> per-floor lateral displacement
-        disp = np.zeros(n_floors)
-        for m in range(k):
-            if shapes is not None and shapes.ndim == 2 and shapes.shape[1] > m \
-                    and shapes.shape[0] >= n_floors:
-                col = np.asarray(shapes[:n_floors, m], dtype=float)
-                denom = max(np.abs(col).max(), 1e-9)
-                col = col / denom
-            else:                      # no shapes yet: assume a first-mode-like sway
-                col = np.linspace(0.35, 1.0, n_floors) ** (m + 1)
-            disp += col * self._amp[m] * np.sin(self._phase[m])
-        # Normalise against a DECAYING PEAK, never against this frame's own max:
-        # per-frame normalisation would rescale the shape to full deflection
-        # every frame and cancel the oscillation entirely (it did).
-        peak = float(np.abs(disp).max())
-        self._ref = max(self._ref * 0.992, peak, 1e-3)
-        disp = disp * (0.55 / self._ref)
-        if not np.all(np.isfinite(disp)):
-            return
-
-        ys = np.arange(n_floors + 1, dtype=float)
-        xl = np.concatenate([[-0.8], -0.8 + disp])
-        xr = np.concatenate([[0.8], 0.8 + disp])
-        self._left.setData(xl, ys)
-        self._right.setData(xr, ys)
-        spots = []
-        for i in range(min(n_floors, len(self._floors))):
-            self._floors[i].setData([xl[i + 1], xr[i + 1]], [i + 1, i + 1])
-            self._ghost[i].setData([-0.8, 0.8], [i + 1, i + 1])   # rest position
-            colour = MODE_COLORS[i % len(MODE_COLORS)]
-            mag = float(env[i] / max(env.max(), 1e-12)) if env.size > i else 0.5
-            spots.append({"pos": (xr[i + 1], i + 1), "size": 9 + 20 * mag,
-                          "brush": pg.mkBrush(colour)})
-        for j in range(n_floors, len(self._floors)):
-            self._floors[j].setData([], [])
-            self._ghost[j].setData([], [])
-        self._dots.setData(spots)
-        self._note.setText(f"live motion · display-scaled"
-                           + (f" · slowed ×{1/self._slow:.0f}" if self._slow < 0.95 else ""))
-        self._note.setPos(0.0, -0.32)
-        self.setXRange(-1.5, 1.5)
-        self.setYRange(-0.45, n_floors + 0.6)
-
-
 class _LegendPanel(QLabel):
     """⑥ What am I hearing?"""
 
@@ -565,12 +475,20 @@ class _LegendPanel(QLabel):
             for k in ("lead", "chorus", "resonance", "torsion", "ambient"))
         self.setText(
             f"<table style='border-collapse:collapse'>{rows}</table>"
+            f"<div style='color:#5ac8fa;font-size:10px;font-weight:bold;"
+            f"padding-top:6px'>CHANNELS</div>"
+            f"<div style='color:{DIM};font-size:9px'>driven axis → the modes and their "
+            f"leads · other axis → the supporting chorus swells and widens · az → "
+            f"ambient bed density · gx/gy → a rocking floor sings the drift voice · "
+            f"gz → torsion. The shaker's own sensor is the excitation reference, "
+            f"never a voice.</div>"
             f"<div style='color:#ff9f43;font-size:10px;font-weight:bold;"
             f"padding-top:6px'>STRUCTURAL CHANGE</div>"
-            f"<div style='color:{DIM};font-size:9px'>If the structure softens its "
-            f"frequencies drop, the target carriers drop, and the cast changes "
-            f"species. Roughly 25% stiffness loss turns the katydids into frogs, "
-            f"so the species composition is itself a readout.</div>")
+            f"<div style='color:{DIM};font-size:9px'>Each mode sings as the animal "
+            f"type you chose, and inside that type the mode's frequency picks the "
+            f"species. If the structure softens its frequencies drop and the lead "
+            f"moves to a lower-pitched species of the same type, so the species "
+            f"composition is itself a readout.</div>")
         self.setStyleSheet(f"background:{PANEL};padding:6px;")
 
 
@@ -631,10 +549,8 @@ class BioacousticChorusTab(QWidget):
         self._btn_snapshot.clicked.connect(self._on_snapshot)
         # SOLO: the fastest way to learn which animal belongs to which mode
         self._solo_buttons = []
-        # One button per mode the identification can return (the spinbox allows
-        # up to 4, and four sensors support four); mode 4 could be heard but
-        # never soloed.
-        for i, label in enumerate(("All", "1", "2", "3", "4")):
+        # One button per eigenfrequency.
+        for i, label in enumerate(("All",) + tuple(f"f{k + 1}" for k in range(N_FREQS))):
             b = QPushButton(label)
             b.setCheckable(True)
             b.setMaximumWidth(46)
@@ -684,6 +600,8 @@ class BioacousticChorusTab(QWidget):
         mbl.setContentsMargins(4, 4, 4, 4)
         mbl.addWidget(self._map_summary)
         lay.addWidget(map_box)
+
+        lay.addWidget(self._build_cast_box())
 
         for group, knobs in _KNOBS_MAIN.items():
             lay.addWidget(self._knob_box(group, knobs))
@@ -747,14 +665,13 @@ class BioacousticChorusTab(QWidget):
             self._rows[attr] = row
             bl.addWidget(row)
         if True:
-            if group == "Casting map":
+            if group == "Frequency map":
                 self._chk_autofit = QCheckBox("auto-fit to this structure")
                 self._chk_autofit.setChecked(self._cfg.autofit)
                 self._chk_autofit.setStyleSheet(f"color:{FG};font-size:10px;")
                 self._chk_autofit.setToolTip(
-                    "Match the two ranges to each other: the frequency ends are "
-                    "fitted to the structure's own modes and the carrier ends to "
-                    "the catalog, so the modes use the whole species palette.\n"
+                    "Fit the frequency ends to the structure's own modes, so each "
+                    "animal type's whole species palette is used.\n"
                     "The fit is taken once at baseline and then held, so later "
                     "frequency drift still recasts the meadow.")
                 self._chk_autofit.toggled.connect(
@@ -765,16 +682,99 @@ class BioacousticChorusTab(QWidget):
                 bl.addWidget(self._btn_refit)
         return box
 
+    def _build_cast_box(self) -> QGroupBox:
+        """Who sings what: one animal type per mode, one per structural case.
+
+        The choice is made here, before Start, and can be changed live. Inside
+        each type the species is still chosen by the structure's frequency, so
+        the damage readout survives any combination the user picks.
+        """
+        box = QGroupBox("Cast — who sings what")
+        box.setStyleSheet(self._group_css())
+        grid = QGridLayout(box)
+        grid.setContentsMargins(4, 4, 4, 4)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(2)
+        try:
+            from ...sonification.chorus.catalog import available_types
+            keys = list(available_types()) or list(TYPE_ORDER)
+        except Exception:
+            keys = list(TYPE_ORDER)
+        self._type_keys = keys
+
+        def combo(extra: tuple = ()) -> QComboBox:
+            c = QComboBox()
+            for k in extra:
+                c.addItem(k, k)
+            for k in keys:
+                c.addItem(TYPES[k][0], k)
+                c.setItemData(c.count() - 1, TYPES[k][2], Qt.ToolTipRole)
+            c.setStyleSheet(f"font-size:10px;color:{FG};")
+            return c
+
+        def select(c: QComboBox, key: str) -> None:
+            i = c.findData(key)
+            if i < 0 and c.count():
+                i = 0
+            c.blockSignals(True)
+            c.setCurrentIndex(max(i, 0))
+            c.blockSignals(False)
+
+        self._mode_type_combos: list[QComboBox] = []
+        types = tuple(self._cfg.type_of_mode)
+        for m in range(N_FREQS):
+            lbl = QLabel(f"f{m + 1}")
+            lbl.setToolTip(f"Eigenfrequency {m + 1}: which animal type sings it. The "
+                           f"frequency itself picks the species inside the type.")
+            lbl.setStyleSheet(f"color:{MODE_COLORS[m]};font-size:10px;font-weight:bold;")
+            c = combo()
+            select(c, types[min(m, len(types) - 1)] if types else keys[0])
+            c.currentIndexChanged.connect(lambda _i, k=m: self._on_mode_type(k))
+            grid.addWidget(lbl, m, 0)
+            grid.addWidget(c, m, 1)
+            self._mode_type_combos.append(c)
+
+        self._case_type_combos: dict[str, QComboBox] = {}
+        for r, (attr, label, tip) in enumerate(_CASE_SLOTS, start=N_FREQS):
+            lbl = QLabel(label)
+            lbl.setStyleSheet(f"color:{ROLE_COLORS.get(attr.split('_')[0], DIM)};"
+                              f"font-size:10px;")
+            lbl.setToolTip(tip)
+            c = combo(extra=("auto",) if attr == "ambient_type" else ())
+            c.setToolTip(tip)
+            select(c, str(getattr(self._cfg, attr)))
+            c.currentIndexChanged.connect(lambda _i, a=attr: self._on_case_type(a))
+            grid.addWidget(lbl, r, 0)
+            grid.addWidget(c, r, 1)
+            self._case_type_combos[attr] = c
+        grid.setColumnStretch(1, 1)
+        self._refresh_mode_type_rows()
+        return box
+
+    def _refresh_mode_type_rows(self) -> None:
+        """Only as many mode rows as the identification can return."""
+        n = int(self._cfg.n_modes)
+        for m, c in enumerate(getattr(self, "_mode_type_combos", [])):
+            c.setEnabled(m < n)
+
+    def _on_mode_type(self, _m: int) -> None:
+        types = tuple(str(c.currentData()) for c in self._mode_type_combos)
+        self._on_knob("type_of_mode", types)
+
+    def _on_case_type(self, attr: str) -> None:
+        c = self._case_type_combos.get(attr)
+        if c is not None:
+            self._on_knob(attr, str(c.currentData()))
+
     def _build_identification_box(self) -> QGroupBox:
         ident = QGroupBox("Identification")
         ident.setStyleSheet(self._group_css())
         il = QGridLayout(ident)
         il.setContentsMargins(4, 4, 4, 4)
         self._spin_modes = QSpinBox()
-        self._spin_modes.setRange(1, 4)
-        self._spin_modes.setValue(self._cfg.n_modes)
-        self._spin_modes.valueChanged.connect(
-            lambda v: self._on_knob("n_modes", float(v)))
+        self._spin_modes.setRange(1, N_FREQS)
+        self._spin_modes.setValue(min(int(self._cfg.n_modes), N_FREQS))
+        self._spin_modes.valueChanged.connect(self._on_n_modes)
         self._spin_reid = QDoubleSpinBox()
         self._spin_reid.setRange(2.0, 60.0)
         self._spin_reid.setValue(self._cfg.reid_interval_s)
@@ -796,7 +796,11 @@ class BioacousticChorusTab(QWidget):
         grid.setSpacing(6)
         self._cast_panel = _CastPanel()
         self._radar = _RadarPanel()
-        self._structure = _StructurePanel()
+        # ⑤ is the same live wireframe the Digital Twin and Model Updating use:
+        # per-floor pose rebuilt from ax/ay/az/gz, rendered off the GUI thread.
+        # It reads the controller itself, so it needs no frames from the worker.
+        self._structure = LiveStructureView(interval_ms=250)
+        self._structure.set_controller(self._controller)
         self._waterfall = _WaterfallPanel()
         self._score = _ScorePanel()
         self._legend = _LegendPanel()
@@ -804,7 +808,8 @@ class BioacousticChorusTab(QWidget):
                                "①", self._cast_panel), 0, 0)
         grid.addWidget(_titled("RESONANCE RADAR — where the energy is",
                                "②", self._radar), 0, 1)
-        grid.addWidget(_titled("STRUCTURE", "⑤", self._structure), 0, 2)
+        grid.addWidget(_titled("STRUCTURE — live wireframe (ax ay az gz)", "⑤",
+                               self._structure), 0, 2)
         grid.addWidget(_titled("FREQUENCY INTERACTION — time × frequency × energy",
                                "③", self._waterfall), 1, 0)
         grid.addWidget(_titled("CHORUS SCORE — who is singing, and when",
@@ -821,6 +826,10 @@ class BioacousticChorusTab(QWidget):
     # ---------------------------------------------------------------- control
     @Slot(str, object)
     @Slot(bool)
+    def _on_n_modes(self, v: int) -> None:
+        self._on_knob("n_modes", float(v))
+        self._refresh_mode_type_rows()
+
     def _on_advanced_toggled(self, on: bool) -> None:
         self._advanced.setVisible(bool(on))
         self._btn_advanced.setText(("▾  Advanced" if on else "▸  Advanced"))
@@ -860,6 +869,8 @@ class BioacousticChorusTab(QWidget):
         mapping = dict(mapping) if isinstance(mapping, dict) else None
         self._sensor_mapping = mapping
         self._on_knob("sensor_map", mapping)
+        if hasattr(self, "_structure"):
+            self._structure.apply_sensor_map(mapping)
         layout = slayout.layout_from_mapping(mapping)
         # Listen on the axis the structure is actually being shaken along.
         self._on_knob("axis", layout.channel)
@@ -885,13 +896,19 @@ class BioacousticChorusTab(QWidget):
             bits.append(f"S{layout.base_sensor_id} is the shaker — excluded from "
                         f"identification, so it cannot be heard as a mode")
         bits.append("plan column → stereo position · floor → distance")
+        other = "ay" if layout.channel == "ax" else "ax"
+        bits.append(f"{layout.channel} → modes · {other} → cross-axis chorus · "
+                    f"az → ambient bed · gx/gy → rocking (drift) · gz → torsion")
         label.setText(" · ".join(bits))
 
     def _on_knob(self, attr: str, value) -> None:
-        try:
-            setattr(self._cfg, attr, type(getattr(self._cfg, attr))(value))
-        except Exception:
-            setattr(self._cfg, attr, value)
+        if isinstance(value, (tuple, list)):
+            setattr(self._cfg, attr, tuple(value))
+        else:
+            try:
+                setattr(self._cfg, attr, type(getattr(self._cfg, attr))(value))
+            except Exception:
+                setattr(self._cfg, attr, value)
         if self._worker is not None:
             self._req_option.emit(attr, getattr(self._cfg, attr))
 
@@ -990,6 +1007,7 @@ class BioacousticChorusTab(QWidget):
         finally:
             self._thread = None
             self._drain.stop()
+            self._structure.stop()
             self._btn_capture.blockSignals(True)
             self._btn_capture.setChecked(False)
             self._btn_capture.blockSignals(False)
@@ -1004,6 +1022,7 @@ class BioacousticChorusTab(QWidget):
     @Slot()
     def _on_worker_started(self) -> None:
         self._status.setText("listening — identifying modes…")
+        self._structure.start()
         self._update_enabled()
 
     @Slot()
@@ -1023,7 +1042,7 @@ class BioacousticChorusTab(QWidget):
         # reflect the auto-fitted casting map back into the sliders, otherwise
         # they show defaults while the engine is using fitted values
         mapping = payload.get("map") or {}
-        for attr in ("f_lo", "f_hi", "c_lo", "c_hi"):
+        for attr in ("f_lo", "f_hi"):
             if attr not in mapping:
                 continue
             value = float(mapping[attr])
@@ -1079,7 +1098,6 @@ class BioacousticChorusTab(QWidget):
             self._radar.update_frame(latest)
             self._waterfall.update_frame(latest)
             self._score.update_frame(latest)
-            self._structure.update_frame(latest)
         except Exception:
             logger.debug("chorus: panel update failed", exc_info=True)
         extra = getattr(self, "_status_extra", {})
@@ -1094,6 +1112,9 @@ class BioacousticChorusTab(QWidget):
                 bits.append(f"⚠ {extra['underruns']} underruns")
             if extra.get("capturing"):
                 bits.append(f"● {extra.get('capture_s', 0):.0f}s")
+            ch = extra.get("channels") or ()
+            if ch:
+                bits.append("+" + " ".join(ch))
         self._status.setText("  ·  ".join(bits))
 
     def closeEvent(self, event) -> None:      # noqa: N802 (Qt naming)
