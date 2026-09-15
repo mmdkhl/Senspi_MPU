@@ -181,8 +181,8 @@ class TestTabLifecycle(unittest.TestCase):
         self.assertAlmostEqual(tab._cfg.master, 0.5)
         tab._on_start()
         self._pump(400)
-        for v in np.linspace(300.0, 2000.0, 15):
-            tab._on_knob("c_lo", float(v))   # simulates a slider drag
+        for v in np.linspace(0.2, 3.0, 15):
+            tab._on_knob("f_lo", float(v))   # simulates a slider drag
         self._pump(300)
         tab._on_stop()
         self._pump(200)

@@ -25,7 +25,8 @@ WIN = 600
 _FIELD_STUB = {"species": "test", "group": "cricket", "carrier": 2000.0,
                "echeme_rate": 3.0, "pulse_rate": 60.0, "unit_s": 0.010,
                "snr": 12.0, "flat": 0.2, "license": "CC0",
-               "observer": "test", "observation": "test", "common": "Test"}
+               "observer": "test", "observation": "test", "common": "Test",
+               "type": "crickets"}
 
 MAP = {"n_floors": 3, "axis": "x", "placements": [
     {"sensor_id": 1, "floor": 0, "cell": "B2"},      # base / shaker

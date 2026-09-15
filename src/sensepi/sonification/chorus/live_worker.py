@@ -50,10 +50,13 @@ class ChorusWorker(QObject):
         self._rate_hz = 0.0
         self._silent = False
         self._running = False
-        # the accumulator only carries gyro on builds that store it; without it
-        # the torsion voice would silently be driven by ax (it used to be)
+        # Which channels the accumulator actually stores. Only those are
+        # requested: asking for an unknown axis would silently be answered
+        # with ax (it used to be, and the torsion voice was reading ax).
         buf = getattr(controller, "_modal_buffer", None)
-        self._has_gyro = "gz" in getattr(type(buf), "_AXIS_COLUMNS", {})
+        cols = getattr(type(buf), "_AXIS_COLUMNS", None) or {}
+        self._axes = tuple(a for a in ("ax", "ay", "az", "gx", "gy", "gz") if a in cols)
+        self._has_gyro = "gz" in self._axes
 
     # ------------------------------------------------------------------ start
     @Slot(object)
@@ -196,7 +199,19 @@ class ChorusWorker(QObject):
                         axis="gz", last_seconds=cfg.fast_window_s)
                 except Exception:
                     gz_snap = None
-            viz = engine.tick(t, ax_snap, gz_snap, rate_hz=self._rate_hz)
+            # every other channel the buffer has: the cross axis, az, gx, gy
+            channels: dict = {}
+            main = str(cfg.axis).lower()
+            for a in self._axes:
+                if a in (main, "gz"):
+                    continue
+                try:
+                    channels[a] = self._controller.snapshot_modal_capture(
+                        axis=a, last_seconds=cfg.fast_window_s)
+                except Exception:
+                    continue
+            viz = engine.tick(t, ax_snap, gz_snap, rate_hz=self._rate_hz,
+                              channels=channels or None)
             engine.schedule_ahead()
             if self._silent:
                 # no device: still advance the renderer so views and capture work
@@ -225,14 +240,14 @@ class ChorusWorker(QObject):
         cfg = engine.cfg
         self.status.emit({
             # the fitted casting map, so the tab's sliders can stop lying
-            "map": {"f_lo": cfg.f_lo, "f_hi": cfg.f_hi,
-                    "c_lo": cfg.c_lo, "c_hi": cfg.c_hi, "autofit": cfg.autofit},
+            "map": {"f_lo": cfg.f_lo, "f_hi": cfg.f_hi, "autofit": cfg.autofit},
             "silent": self._silent,
             "buffer_s": round(engine.buffered_seconds, 3),
             "underruns": self._audio.underruns if self._audio else 0,
             "rate_hz": self._rate_hz,
             "capture_s": round(self._capture.seconds, 1) if self._capture.active else 0.0,
             "capturing": self._capture.active,
+            "channels": tuple(getattr(engine._frame, "channels", ())),
             "grains": engine.renderer.grains_written,
             "thinned": engine.renderer.thinned,
             "modal_ok": engine.modal.ok,
