@@ -91,14 +91,16 @@ class ModalCaptureBuffer:
     Separate from the GUI's 6 s ``StreamingDataBuffer`` (guardrail G3/G5 keep
     that one small). Written on the GUI thread in ``_on_samples_batch`` and read
     by the Mode B worker thread via :meth:`snapshot`; a ``threading.Lock``
-    serializes the two so the deques are never mutated mid-read. Stores only
-    ``(t_seconds, ax, ay, az)`` — enough for X/Y modal identification.
+    serializes the two so the deques are never mutated mid-read. Stores every
+    channel, ``(t_seconds, ax, ay, az, gx, gy, gz)``: modal identification
+    reads one horizontal axis, the sonification reads all six (cross-axis
+    chorus, vertical bed, rocking, torsion) and the wireframe four.
     """
 
     def __init__(self, window_seconds: float = 120.0) -> None:
         self._window_s = max(1.0, float(window_seconds))
         self._lock = threading.Lock()
-        self._buf: Dict[int, Deque[Tuple[float, float, float, float]]] = {}
+        self._buf: Dict[int, Deque[Tuple[float, ...]]] = {}
 
     def set_window(self, window_seconds: float) -> None:
         with self._lock:
@@ -119,7 +121,8 @@ class ModalCaptureBuffer:
                 if dq is None:
                     dq = deque()
                     self._buf[sid] = dq
-                dq.append((t, float(s.ax), float(s.ay), float(s.az), float(s.gz)))
+                dq.append((t, float(s.ax), float(s.ay), float(s.az),
+                           float(s.gx), float(s.gy), float(s.gz)))
             self._trim_locked()
 
     def _trim_locked(self) -> None:
@@ -139,7 +142,12 @@ class ModalCaptureBuffer:
             spans = [dq[-1][0] - dq[0][0] for dq in self._buf.values() if len(dq) > 1]
         return min(spans) if spans else 0.0
 
-    _AXIS_COLUMNS = {"ax": 1, "ay": 2, "az": 3, "gz": 4}
+    _AXIS_COLUMNS = {"ax": 1, "ay": 2, "az": 3, "gx": 4, "gy": 5, "gz": 6}
+
+    @classmethod
+    def axes(cls) -> tuple[str, ...]:
+        """The channels a snapshot can be taken on."""
+        return tuple(cls._AXIS_COLUMNS)
 
     def snapshot_series(self, axis: str) -> Dict[int, list[Tuple[float, float]]]:
         """Return a copied {sensor_id: [(t, axis_value), ...]} (thread-safe).

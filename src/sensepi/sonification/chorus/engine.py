@@ -58,15 +58,20 @@ class ChorusEngine:
         self.features.cfg = self.cfg
         self.tracker.cfg = self.cfg
         self.renderer.set_config(self.cfg)
-        if key in ("f_lo", "f_hi", "c_lo", "c_hi"):
+        if key in ("f_lo", "f_hi"):
             self.cfg.autofit = False        # the user is driving the map now
+        if key == "type_of_mode":
+            # arrives as a list from the tab; keep the config hashable/stable
+            self.cfg.type_of_mode = tuple(str(t) for t in (value or ()))
         if key in ("sensor_map", "axis", "n_modes"):
             # The placement decides which rows are responses and how many modes
             # may be claimed: re-identify on the next tick rather than singing
             # from the old identification for up to reid_interval_s.
             self.tracker._last_t = -1e9
-        if key in ("f_lo", "f_hi", "c_lo", "c_hi", "n_chorus", "n_ambient",
-                   "enabled_roles", "chorus_size", "pitch_rise", "depth"):
+        if key in ("f_lo", "f_hi", "n_chorus", "n_ambient",
+                   "enabled_roles", "chorus_size", "pitch_rise", "depth",
+                   "type_of_mode", "resonance_type", "torsion_type",
+                   "alarm_type", "drift_type", "ambient_type"):
             # Do NOT recast here. A slider emits on every pixel of drag, and a
             # recast rebuilds every voice's pitch-variant banks (resampling every
             # grain). Mark it dirty and let the next tick do it once.
@@ -86,9 +91,7 @@ class ChorusEngine:
         freqs = np.asarray(self.tracker.state.frequencies_hz, dtype=float).ravel()
         if freqs.size == 0:
             return
-        f_lo, f_hi, c_lo, c_hi = fit_casting_map(freqs, self.cfg)
-        self.cfg.f_lo, self.cfg.f_hi = f_lo, f_hi
-        self.cfg.c_lo, self.cfg.c_hi = c_lo, c_hi
+        self.cfg.f_lo, self.cfg.f_hi = fit_casting_map(freqs, self.cfg)
         self._map_fitted = True
         self._recast(force=True)
 
@@ -99,9 +102,7 @@ class ChorusEngine:
             return
         # fit the two ranges to each other ONCE, on the first good identification
         if self.cfg.autofit and not self._map_fitted and state.ok:
-            f_lo, f_hi, c_lo, c_hi = fit_casting_map(freqs, self.cfg)
-            self.cfg.f_lo, self.cfg.f_hi = f_lo, f_hi
-            self.cfg.c_lo, self.cfg.c_hi = c_lo, c_hi
+            self.cfg.f_lo, self.cfg.f_hi = fit_casting_map(freqs, self.cfg)
             self._map_fitted = True
             force = True
         cast = cast_meadow(freqs, self.cfg, previous=self._cast)
@@ -122,11 +123,17 @@ class ChorusEngine:
         return state
 
     def tick(self, t: float, ax_snapshot, gz_snapshot=None,
-             rate_hz: float = 0.0) -> VizFrame:
-        """Advance the control layer by one step and return a GUI frame."""
+             rate_hz: float = 0.0, channels: dict | None = None) -> VizFrame:
+        """Advance the control layer by one step and return a GUI frame.
+
+        ``channels`` optionally carries the other sensor channels as
+        ``{"ay": snapshot, "az": ..., "gx": ..., "gy": ...}`` (whichever the
+        buffer has); each is read into the frame by the feature extractor.
+        """
         self._t = float(t)
         state = self.tracker.state
-        frame = self.features.update(ax_snapshot, gz_snapshot, state, t, rate_hz)
+        frame = self.features.update(ax_snapshot, gz_snapshot, state, t, rate_hz,
+                                     channels=channels)
         self._frame = frame
         self.renderer.update_frame(frame)
         if self._recast_pending:
@@ -181,9 +188,13 @@ class ChorusEngine:
 
 
 def run_offline(ax_session, gz_session=None, cfg: ChorusConfig | None = None,
-                duration_s: float | None = None, seed: int = 23):
+                duration_s: float | None = None, seed: int = 23,
+                channels: dict | None = None):
     """Render a recorded session through the identical live path.
 
+    ``channels`` may carry further sessions keyed by axis (``"ay"``, ``"az"``,
+    ``"gx"``, ``"gy"``), sampled like ``ax_session``; they are windowed the
+    same way and reach the feature extractor exactly as in the live path.
     Returns ``(audio (n,2) float32, frames list[VizFrame], engine)``.
     """
     cfg = (cfg or ChorusConfig()).clamped()
@@ -199,6 +210,13 @@ def run_offline(ax_session, gz_session=None, cfg: ChorusConfig | None = None,
         if gz_session is not None else None
     if gz is not None and gz.ndim == 1:
         gz = gz[None, :]
+    extra: dict[str, np.ndarray] = {}
+    for key, sess in (channels or {}).items():
+        arr = np.asarray(getattr(sess, "data", sess), dtype=float)
+        if arr.ndim == 1:
+            arr = arr[None, :]
+        if arr.size:
+            extra[str(key)] = arr
 
     # Carries sensor_ids so the offline path honours the placement map exactly
     # as the live path does — otherwise a rendered recording would treat the
@@ -229,7 +247,8 @@ def run_offline(ax_session, gz_session=None, cfg: ChorusConfig | None = None,
                 engine.reidentify(_Snap(data[:, lo:c], fs), t)
         ax_snap = _Snap(data[:, a:b], fs)
         gz_snap = _Snap(gz[:, a:b], fs) if gz is not None else None
-        frames.append(engine.tick(t, ax_snap, gz_snap, rate_hz=fs))
+        ch = {k: _Snap(v[:, a:b], fs) for k, v in extra.items()} or None
+        frames.append(engine.tick(t, ax_snap, gz_snap, rate_hz=fs, channels=ch))
         # the play head is advanced by render_block alone; schedule_ahead keeps
         # the rings filled a pre-roll beyond it, exactly as in the live path
         engine.schedule_ahead()

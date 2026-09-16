@@ -81,6 +81,9 @@ class FeatureExtractor:
         self._rate_hist: deque = deque(maxlen=200)
         self._beat_hist: deque = deque(maxlen=600)   # 30 s of short-term envelope
         self._exc_hist: deque = deque(maxlen=80)     # 4 s of excitation frequency
+        self._cross_hist: deque = deque(maxlen=400)  # other horizontal axis, per mode
+        self._vert_hist: deque = deque(maxlen=400)   # az
+        self._rock_hist: deque = deque(maxlen=400)   # gx/gy per row
         self._n_modes = 0
 
     def reset_modes(self, n_modes: int) -> None:
@@ -132,7 +135,10 @@ class FeatureExtractor:
         return np.clip((np.atleast_1d(value) - lo) / span, 0.0, 1.0)
 
     def update(self, ax_snapshot, gz_snapshot, modal: ModalState,
-               t: float, rate_hz: float = 0.0) -> ControlFrame:
+               t: float, rate_hz: float = 0.0, channels: dict | None = None) -> ControlFrame:
+        """One control frame from the driven axis, the gyro yaw, and — when
+        ``channels`` carries them — the other horizontal axis, ``az`` and
+        ``gx``/``gy`` (see :meth:`_extra_channels`)."""
         cfg = self.cfg
         frame = ControlFrame(t=float(t), rate_hz=float(rate_hz))
         data, fs = _as_array(ax_snapshot)
@@ -154,8 +160,30 @@ class FeatureExtractor:
         frame.env_global = float(np.sqrt(np.mean(data ** 2)))
         self._env_hist.append(frame.env_global)
 
-        # excitation tracker: upper floors carry the sway
-        ref = data[1:].mean(axis=0) if data.shape[0] > 1 else data[0]
+        # Which rows are responses and which is the shaker, from the placement.
+        ids = getattr(ax_snapshot, "sensor_ids", None)
+        if ids is None:
+            ids = list(range(1, data.shape[0] + 1))
+        ids = list(ids)[:data.shape[0]]
+        layout = _layout_of(cfg)
+        resp_rows = list(range(data.shape[0]))
+        base_row = -1
+        if layout.is_valid and ids:
+            try:
+                rr = list(layout.response_rows(ids))
+            except Exception:
+                rr = []
+            if rr and len(rr) < len(ids):
+                resp_rows = rr
+                base_row = next(i for i in range(len(ids)) if i not in rr)
+
+        # excitation tracker. With a base sensor the INPUT itself says what
+        # frequency the table is driving at, which is exact; without one the
+        # upper floors' sway is the best proxy.
+        if base_row >= 0:
+            ref = data[base_row]
+        else:
+            ref = data[1:].mean(axis=0) if data.shape[0] > 1 else data[0]
         if ref.size >= 32:
             win = np.hanning(ref.size)
             spec = np.abs(np.fft.rfft(ref * win, n=_FFT_N))
@@ -343,12 +371,96 @@ class FeatureExtractor:
         frame.motion = data[:, -1].astype(float) if data.shape[1] else np.zeros(data.shape[0])
 
         # Where each row sits, so the renderer can place its voices like the rig.
-        ids = getattr(ax_snapshot, "sensor_ids", None)
-        if ids is None:
-            ids = list(range(1, data.shape[0] + 1))
-        frame.floor_of, frame.pan_of = _row_geometry(
-            _layout_of(self.cfg), list(ids)[:data.shape[0]])
+        frame.floor_of, frame.pan_of = _row_geometry(layout, ids)
+
+        # The other channels of the same sensors.
+        self._extra_channels(frame, channels, data, fs, freqs, resp_rows)
         return frame
+
+    def _extra_channels(self, frame: ControlFrame, channels: dict | None,
+                        data: np.ndarray, fs: float, freqs: np.ndarray,
+                        resp_rows: list) -> None:
+        """Read the rest of the sensor into the frame.
+
+        * the **other horizontal axis** → ``cross_energy`` per mode and
+          ``cross_ratio``: how much the structure moves across the driven
+          direction (a 2-D rig has cross modes; a 1-D one has almost none)
+        * ``az`` → ``vertical``: vertical bounce / table pumping
+        * ``gx``/``gy`` → ``rock_floor`` per row: a floor tilting, which the
+          driven-axis difference between floors cannot separate from the
+          mode shape itself
+
+        Every value is a rolling-percentile rank (0..1), like the driven-axis
+        features, so an unstreamed channel (all zeros) reads as 0 rather than
+        as noise. Rows follow the driven snapshot's row order; the shaker row
+        is excluded from the cross and vertical averages because it measures
+        the input, not the response.
+        """
+        chan = channels or {}
+        seen: list = []
+        cfg = self.cfg
+        n_rows = data.shape[0]
+        rows = [r for r in resp_rows if r < n_rows] or list(range(n_rows))
+        main_rms = float(np.sqrt(np.mean(data[rows] ** 2))) if rows else 0.0
+
+        def prep(key: str):
+            arr, cfs = _as_array(chan.get(key))
+            if arr.size == 0 or not np.isfinite(cfs) or cfs <= 1.0:
+                return None
+            arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+            arr = arr - arr.mean(axis=1, keepdims=True)
+            if not np.any(np.abs(arr) > 1e-12):
+                return None                      # not streamed
+            seen.append(key)
+            return arr
+
+        # --- cross axis -----------------------------------------------------
+        other = "ay" if str(cfg.axis).lower() == "ax" else "ax"
+        cr = prep(other)
+        if cr is not None and freqs.size:
+            crows = [r for r in rows if r < cr.shape[0]] or list(range(cr.shape[0]))
+            ref = cr[crows].mean(axis=0)
+            if ref.size >= 32:
+                win = np.hanning(ref.size)
+                spec = np.abs(np.fft.rfft(ref * win, n=_FFT_N))
+                fx = np.fft.rfftfreq(_FFT_N, 1.0 / fs)
+                raw = np.array([_band_peak(spec, fx, float(fm)) for fm in freqs])
+                self._push(self._cross_hist, raw)
+                frame.cross_energy = np.asarray(
+                    self._normalise(self._cross_hist, raw), dtype=float).ravel()
+            cross_rms = float(np.sqrt(np.mean(cr[crows] ** 2)))
+            frame.cross_ratio = float(np.clip(cross_rms / (main_rms + cross_rms + 1e-12)
+                                              * 2.0, 0.0, 1.0))
+
+        # --- vertical -------------------------------------------------------
+        vz = prep("az")
+        if vz is not None:
+            vrows = [r for r in rows if r < vz.shape[0]] or list(range(vz.shape[0]))
+            raw_v = float(np.sqrt(np.mean(vz[vrows] ** 2)))
+            self._vert_hist.append(raw_v)
+            frame.vertical = float(np.asarray(
+                self._normalise(self._vert_hist, raw_v), dtype=float).ravel()[0])
+
+        # --- rocking (gx, gy) -----------------------------------------------
+        gx, gy = prep("gx"), prep("gy")
+        if gx is not None or gy is not None:
+            parts = [g ** 2 for g in (gx, gy) if g is not None]
+            m = min(p.shape[0] for p in parts)
+            n = min(p.shape[1] for p in parts)
+            mag = np.sqrt(sum(p[:m, :n] for p in parts))
+            raw_r = np.sqrt(np.mean(mag ** 2, axis=1))
+            self._push(self._rock_hist, raw_r)
+            rel = np.asarray(self._normalise(self._rock_hist, raw_r), dtype=float).ravel()
+            hist = list(self._rock_hist)
+            med = (np.median(np.asarray(hist), axis=0)
+                   if len(hist) > 8 and np.shape(hist[-1]) == raw_r.shape
+                   else np.zeros_like(raw_r))
+            ratio = raw_r / np.maximum(med, 1e-12)
+            gate = np.clip((ratio - 1.0) / 0.8, 0.0, 1.0)
+            gate = np.where(med <= 1e-9, (raw_r > 1e-9).astype(float), gate)
+            frame.rock_floor = rel * gate
+
+        frame.channels = tuple(seen)
 
 
 class ModalTracker:
