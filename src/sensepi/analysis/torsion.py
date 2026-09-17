@@ -76,6 +76,15 @@ class FloorTorsion:
     #: Perpendicular lever arm in grid units. 0 means the pair is blind to
     #: torsion in the measured direction. Unused for the gyroscope.
     lever_arm_cells: float = 0.0
+    #: Perpendicular lever arm in METRES, once the plan dimensions are known.
+    #: 0 when they are not, in which case the angles below stay empty.
+    lever_arm_metres: float = 0.0
+    #: Twist amplitude in radians at each identified mode -- an actual rotation,
+    #: not a ratio. Empty unless the plan dimensions were supplied.
+    angle_rad_per_mode: list = field(default_factory=list)
+    #: Broadband noise of the same quantity, in radians, at each mode. An angle
+    #: near or below this is indistinguishable from a still structure.
+    noise_angle_rad_per_mode: list = field(default_factory=list)
     usable: bool = True
     note: str = ""
 
@@ -144,6 +153,26 @@ def lever_arm_cells(cell_a: str, cell_b: str, channel: str) -> float:
     return float(ay_b - ay_a)          # u_x = -theta * y, hence the reversal
 
 
+def lever_arm_m(cell_a: str, cell_b: str, channel: str,
+                plan_lx_m: float, plan_ly_m: float) -> float:
+    """Perpendicular separation of a pair in **metres**.
+
+    The 3x3 plan grid spans the slab, so adjacent cells are half a plan
+    dimension apart. Rotation moves a point along x in proportion to its y
+    offset, so the span that matters for ``ax`` is ``Ly`` and for ``ay`` it is
+    ``Lx`` -- the same reversal :func:`lever_arm_cells` makes.
+
+    This is what turns the relative indicators in this module into a real
+    rotation. Plan dimensions are not part of the sensor placement; they come
+    from the model definition, so the caller supplies them.
+    """
+    arm_cells = lever_arm_cells(cell_a, cell_b, channel)
+    span = float(plan_lx_m) if str(channel).lower() == "ay" else float(plan_ly_m)
+    if not math.isfinite(span) or span <= 0.0:
+        return 0.0
+    return float(arm_cells) * (span / float(len(ROWS) - 1))
+
+
 def _hann_spectrum(rows: np.ndarray, fs: float):
     """One-sided Hann FFT amplitudes, zero-padded for finer peak location."""
     rows = np.atleast_2d(np.asarray(rows, dtype=float))
@@ -159,6 +188,22 @@ def _hann_spectrum(rows: np.ndarray, fs: float):
         x = signal.detrend(np.asarray(row, dtype=float), type="linear")
         out[i] = np.abs(np.fft.rfft(x * window, n=n_fft)) / float(n)
     return freqs, out
+
+
+def amplitude_scale(n: int) -> float:
+    """Factor turning a :func:`_hann_spectrum` value into a real amplitude.
+
+    That function divides by the sample count, which is not the window's
+    coherent gain, so its output is a fixed fraction of the true amplitude
+    (exactly a quarter for a periodic Hann window). Every existing use is a
+    RATIO of two of its outputs, where the factor cancels -- which is why it
+    never mattered before. An absolute rotation is not a ratio, so it does.
+    """
+    n = int(n)
+    if n < 4:
+        return 0.0
+    total = float(np.sum(signal.windows.hann(n, sym=False)))
+    return (2.0 * float(n) / total) if total > 0.0 else 0.0
 
 
 def _amplitude_at(freqs: np.ndarray, amps: np.ndarray, f_target: float) -> float:
@@ -182,11 +227,21 @@ def pair_torsion(
     channel: str = "ax",
     floor: int = 0,
     sensors: tuple = (),
+    arm_m: float = 0.0,
 ) -> FloorTorsion:
-    """Twist-to-sway ratio for one floor from a differenced sensor pair."""
+    """Twist-to-sway ratio for one floor from a differenced sensor pair.
+
+    With ``arm_m`` (the lever arm in metres, from :func:`lever_arm_m`) the
+    reading is additionally converted to an actual rotation: the differential
+    acceleration at a mode divided by the arm is the angular acceleration, and
+    dividing by ``(2*pi*f)^2`` turns that into an angle. This is done in the
+    frequency domain on purpose -- integrating the difference in the time domain
+    instead was measured at 12x more noise at 1 Hz on this rig, because noise is
+    spread over every frequency while the signal sits at one.
+    """
     arm = lever_arm_cells(cell_a, cell_b, channel)
     out = FloorTorsion(floor=int(floor), source="pair", sensors=tuple(sensors),
-                       lever_arm_cells=arm)
+                       lever_arm_cells=arm, lever_arm_metres=float(arm_m or 0.0))
 
     if arm == 0.0:
         perpendicular = "y" if str(channel).lower() != "ay" else "x"
@@ -222,6 +277,12 @@ def pair_torsion(
 
     diff_amp, common_amp = amps[0], amps[1]
     common_floor = float(np.max(common_amp)) * MIN_COMMON_FRACTION
+    # Typical differential amplitude away from any peak: the measurement's own
+    # noise, carried through the same conversion so it can be compared with the
+    # angles directly.
+    noise_amp = float(np.median(diff_amp)) if diff_amp.size else 0.0
+    amp_scale = amplitude_scale(n)
+    usable_arm = math.isfinite(out.lever_arm_metres) and abs(out.lever_arm_metres) > 1e-9
     for f_k in frequencies_hz:
         d = _amplitude_at(freqs, diff_amp, f_k)
         c = _amplitude_at(freqs, common_amp, f_k)
@@ -230,6 +291,14 @@ def pair_torsion(
             out.per_mode.append(float("nan"))
         else:
             out.per_mode.append(float(abs(d / c) / abs(arm)))
+        if usable_arm and float(f_k) > 0.0 and np.isfinite(d):
+            omega_sq = (2.0 * math.pi * float(f_k)) ** 2
+            divisor = abs(out.lever_arm_metres) * omega_sq
+            out.angle_rad_per_mode.append(float(abs(d) * amp_scale / divisor))
+            out.noise_angle_rad_per_mode.append(float(noise_amp * amp_scale / divisor))
+        else:
+            out.angle_rad_per_mode.append(float("nan"))
+            out.noise_angle_rad_per_mode.append(float("nan"))
     return out
 
 
@@ -266,6 +335,22 @@ def gyro_torsion(
 
     raw = np.array([[_amplitude_at(freqs, amps[i], f_k) for f_k in freqs_list]
                     for i in range(len(floors))], dtype=float)
+    # Real angles BEFORE the profile is normalised. gz is a rate in deg/s, so
+    # one division by omega gives the angle -- not two, and not in radians/s.
+    gyro_scale = amplitude_scale(gz_rows.shape[1])
+    for i, r in enumerate(results):
+        noise_amp = float(np.median(amps[i])) if amps[i].size else 0.0
+        for k, f_k in enumerate(freqs_list):
+            omega = 2.0 * math.pi * float(f_k)
+            value = raw[i, k]
+            if omega > 0.0 and np.isfinite(value):
+                r.angle_rad_per_mode.append(
+                    float(math.radians(abs(value) * gyro_scale) / omega))
+                r.noise_angle_rad_per_mode.append(
+                    float(math.radians(noise_amp * gyro_scale) / omega))
+            else:
+                r.angle_rad_per_mode.append(float("nan"))
+                r.noise_angle_rad_per_mode.append(float("nan"))
     for k in range(raw.shape[1]):
         col = raw[:, k]
         peak = float(np.nanmax(np.abs(col))) if col.size else 0.0
@@ -285,6 +370,8 @@ def identify_torsion(
     pair_series=None,
     gyro_series=None,
     fs: float = 100.0,
+    plan_lx_m: float = 0.0,
+    plan_ly_m: float = 0.0,
 ) -> TorsionResult:
     """Assemble every torsion reading the placement makes available.
 
@@ -302,7 +389,8 @@ def identify_torsion(
         a, b, cell_a, cell_b, sids = (pair_series or {})[floor]
         out.floors.append(pair_torsion(
             a, b, fs, freqs_list, cell_a=cell_a, cell_b=cell_b,
-            channel=channel, floor=floor, sensors=sids))
+            channel=channel, floor=floor, sensors=sids,
+            arm_m=lever_arm_m(cell_a, cell_b, channel, plan_lx_m, plan_ly_m)))
 
     gyro = gyro_series or {}
     if gyro:
@@ -332,5 +420,14 @@ def identify_torsion(
         if blind:
             msg += (" · blind pair on floor(s) "
                     + ", ".join(str(f.floor) for f in blind))
+        # per_mode stays exactly what it was: a relative indicator. The
+        # angles are a separate field, so the caveat still applies to the
+        # ratio and the note below only reports what was ALSO computed.
         out.message = msg + " · relative indicator, not calibrated rotation"
+        rotating = [f for f in usable
+                    if any(math.isfinite(v) for v in (f.angle_rad_per_mode or []))]
+        if rotating:
+            out.message += (
+                " · true rotation available on floor(s) "
+                + ", ".join(str(f.floor) for f in sorted(rotating, key=lambda x: x.floor)))
     return out

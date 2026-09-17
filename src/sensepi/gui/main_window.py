@@ -120,6 +120,11 @@ class MainWindow(QMainWindow):
         # sensor-driven Continuous Update (Mode B). The tab never touches SSH;
         # it only reads thread-safe snapshots from the controller (guardrail G2).
         self.model_updating_tab.set_recorder_controller(self.recorder_tab)
+        # The Spectrum tab reports measured torsion as a real rotation, which
+        # needs the slab's plan dimensions. Those live in the model definition,
+        # not in the sensor placement, and the Spectrum tab is constructed
+        # before this one -- so it is handed over here rather than at build time.
+        self.fft_tab.set_model_updating_tab(self.model_updating_tab)
         # The Sonification tab hosts the sonification models as sub-tabs:
         # "Bioacoustic Chorus" (built) and "Team Model" (held for the
         # sonification team). Models pull thread-safe modal snapshots from the

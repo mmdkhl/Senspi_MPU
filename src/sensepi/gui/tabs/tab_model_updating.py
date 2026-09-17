@@ -3423,6 +3423,18 @@ class ModelUpdatingTab(QWidget):
             return None
         return copy.deepcopy(state.calibrated_params)
 
+    def plan_dimensions_m(self) -> tuple[float, float]:
+        """The slab's plan dimensions ``(Lx, Ly)`` in metres, as defined here.
+
+        Deliberately tolerant and never raises: a caller uses this to put a
+        measurement into real units, and a half-finished model should leave
+        that caller without units rather than break its view.
+        """
+        try:
+            return float(self._lx.value()), float(self._ly.value())
+        except Exception:
+            return 0.0, 0.0
+
     def model_definition_snapshot(self) -> dict[str, Any]:
         """A self-contained copy of the model as currently defined here.
 
