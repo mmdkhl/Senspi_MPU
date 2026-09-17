@@ -166,6 +166,12 @@ class _TwinPlotsCanvas(FigureCanvas):
         self._physical_fft_line = None
         self._numerical_fft_line = None
         self._response_story: int | None = None
+        # Blitting state: a cached picture of the axes furniture, reused while
+        # only the curves change.  See _blit_draw.
+        self._backgrounds: dict | None = None
+        self._bg_stale = True
+        self._blit_ok = True
+        self._last_limits: tuple | None = None
         self._duration = 1.0
         self._time_ymax = 1.0e-6
         self._fft_ymax = 1.0e-6
@@ -193,6 +199,7 @@ class _TwinPlotsCanvas(FigureCanvas):
         self._time_ymax = max(2.0 * base_peak, 1.0e-6)
         self._fft_ymax = 1.0e-6
         self._response_story = None
+        self._bg_stale = True
         self._configure_response(story=1)
         self.draw_idle()
 
@@ -210,11 +217,16 @@ class _TwinPlotsCanvas(FigureCanvas):
                 self._ground_t, self._ground_a, self._MAX_PLOT_POINTS
             )
             self._input_full_line.set_data(gt, ga)
+        # The four curves below are redrawn every frame, so they are marked
+        # animated and kept OUT of the cached background.  The base-excitation
+        # line is not: it never changes, and leaving it in the background is
+        # what keeps it on screen after Arm, before any frame has arrived.
         self._physical_line, = self.ax_input.plot(
-            [], [], linewidth=1.4, label="Physical model", zorder=3
+            [], [], linewidth=1.4, label="Physical model", zorder=3, animated=True
         )
         self._numerical_line, = self.ax_input.plot(
-            [], [], linewidth=1.5, color="red", label="Numerical model (OpenSees)", zorder=4
+            [], [], linewidth=1.5, color="red", label="Numerical model (OpenSees)",
+            zorder=4, animated=True
         )
         self.ax_input.set_title(
             f"Story {story} — Base excitation and model response"
@@ -227,10 +239,11 @@ class _TwinPlotsCanvas(FigureCanvas):
         self.ax_input.legend(loc="upper right", fontsize=9)
 
         self._physical_fft_line, = self.ax_response.plot(
-            [], [], linewidth=1.4, label="Physical model"
+            [], [], linewidth=1.4, label="Physical model", animated=True
         )
         self._numerical_fft_line, = self.ax_response.plot(
-            [], [], linewidth=1.5, color="red", label="Numerical model (OpenSees)"
+            [], [], linewidth=1.5, color="red", label="Numerical model (OpenSees)",
+            animated=True
         )
         self.ax_response.set_title(f"Story {story} — FFT comparison")
         self.ax_response.set_xlabel("Frequency (Hz)")
@@ -241,6 +254,7 @@ class _TwinPlotsCanvas(FigureCanvas):
         self.ax_response.legend(loc="upper right", fontsize=9)
 
         self.fig.tight_layout(pad=1.5)
+        self._bg_stale = True
 
     def update_comparison(
         self,
@@ -299,8 +313,56 @@ class _TwinPlotsCanvas(FigureCanvas):
                 self._fft_ymax = max(fft_ymax * 1.15, 1.0e-6)
             self.ax_response.set_ylim(0.0, self._fft_ymax)
 
+        # A limit change invalidates the cached picture; nothing else does.
+        limits = (self.ax_input.get_xlim(), self.ax_input.get_ylim(),
+                  self.ax_response.get_xlim(), self.ax_response.get_ylim())
+        if limits != self._last_limits:
+            self._last_limits = limits
+            self._bg_stale = True
+
         # No clear(), no tight_layout(), and no artist recreation here.
-        self.draw_idle()
+        self._blit_draw()
+
+    def resizeEvent(self, event):  # noqa: N802  (Qt naming)
+        self._bg_stale = True
+        super().resizeEvent(event)
+
+    def _blit_draw(self) -> None:
+        """Redraw only the curves, over a cached picture of the axes.
+
+        A full redraw of this figure costs about 85 ms -- more than the 20 fps
+        frame budget on its own, which is what made the traces judder and stole
+        the time the 3D model needed to animate smoothly.  The grid, ticks,
+        labels and legend do not change between frames, so they are rendered
+        once and reused; only the four data curves are redrawn, at about 5 ms.
+
+        Any backend that refuses to blit falls back to a normal redraw, so the
+        picture is always correct even if it is slow.
+        """
+        artists = [a for a in (self._physical_line, self._numerical_line,
+                               self._physical_fft_line, self._numerical_fft_line)
+                   if a is not None]
+        if not self._blit_ok or not artists:
+            self.draw_idle()
+            return
+        axes = (self.ax_input, self.ax_response)
+        try:
+            if self._bg_stale or self._backgrounds is None:
+                # draw() skips animated artists, so the cached background holds
+                # the furniture and the static base-excitation line only.
+                self.draw()
+                self._backgrounds = {ax: self.copy_from_bbox(ax.bbox) for ax in axes}
+                self._bg_stale = False
+            for ax in axes:
+                self.restore_region(self._backgrounds[ax])
+            for artist in artists:
+                artist.axes.draw_artist(artist)
+            for ax in axes:
+                self.blit(ax.bbox)
+        except Exception:
+            self._blit_ok = False
+            self._backgrounds = None
+            self.draw_idle()
 
 
 class _CalibrationWorker(QObject):
@@ -957,6 +1019,14 @@ class DigitalTwinExperimentTab(QWidget):
         self._sensor_t0 = origin
         self._baseline = {}
         self._baseline_noise = {}
+        # Amplitude of the excitation being run, so the trigger level follows
+        # the experiment instead of a fixed number.  Read from the canvas,
+        # which already holds the ground motion from Arm.
+        ground_a = getattr(self._plots, "_ground_a", None)
+        ga = (np.asarray(ground_a, dtype=float).reshape(-1)
+              if ground_a is not None else np.zeros(0, dtype=float))
+        ga = ga[np.isfinite(ga)]
+        self._input_rms = float(np.sqrt(np.mean(ga * ga))) if ga.size else 0.0
 
         # Use a longer pre-start window than before and retain its robust noise
         # level.  Auto-sync compares post-Start motion against this baseline, so
@@ -970,12 +1040,16 @@ class DigitalTwinExperimentTab(QWidget):
             if vals.size == 0:
                 vals = np.asarray([float(pairs[-1][1])], dtype=float)
             center = float(np.median(vals))
-            mad = float(np.median(np.abs(vals - center))) if vals.size > 1 else 0.0
-            sigma = 1.4826 * mad
-            if not np.isfinite(sigma) or sigma <= 0.0:
-                sigma = float(np.std(vals)) if vals.size > 1 else 0.0
+            # Keep the quiet-window RMS: that is what the onset test compares
+            # against.  The old 4-sigma spike test assumed Gaussian background,
+            # but this rig's background carries short bursts far above 4 sigma
+            # and those were firing the trigger on a still structure.
+            resid = vals - center
+            rms = float(np.sqrt(np.mean(resid * resid))) if resid.size else 0.0
+            if not np.isfinite(rms):
+                rms = 0.0
             self._baseline[sid] = center
-            self._baseline_noise[sid] = max(float(sigma), 1.0e-6)
+            self._baseline_noise[sid] = max(rms, 1.0e-9)
 
     def _detect_shaker_onset(self) -> tuple[float, float] | None:
         """Return ``(sensor_onset_timestamp, detection_delay_s)`` when motion is clear.
@@ -1028,13 +1102,28 @@ class DigitalTwinExperimentTab(QWidget):
             if dt_values.size == 0:
                 continue
             dt = float(np.median(dt_values))
-            run = max(3, int(round(0.05 / max(dt, 1.0e-6))))
-            noise = float(self._baseline_noise.get(sid, 1.0e-6))
-            threshold = max(4.0 * noise, 0.003)
-            active = np.abs(y) >= threshold
-            if active.size < run:
+            # Tuned on 170 recorded runs from this rig: with the structure still
+            # the 0.5 s moving RMS never reached 0.23 m/s2, while real shaking
+            # never fell below 0.88, so the trigger sits between the two.
+            window_s, hold_s, background_factor, input_fraction = 0.5, 0.25, 6.0, 0.45
+            win = max(4, int(round(window_s / max(dt, 1.0e-6))))
+            hold = max(2, int(round(hold_s / max(dt, 1.0e-6))))
+            if y.size < win + hold:
                 continue
-            sustained = np.convolve(active.astype(int), np.ones(run, dtype=int), mode="valid") >= run
+            # Sustained ENERGY, not one excursion: a shaker keeps feeding the
+            # structure, while a knock or a footstep is gone within the window.
+            energy = np.convolve(y * y, np.ones(win) / win, mode="valid")
+            rms = np.sqrt(np.maximum(energy, 0.0))
+            threshold = max(
+                background_factor * float(self._baseline_noise.get(sid, 0.0)),
+                input_fraction * float(getattr(self, "_input_rms", 0.0)),
+            )
+            if not np.isfinite(threshold) or threshold <= 0.0:
+                continue
+            active = (rms >= threshold).astype(int)
+            if active.size < hold:
+                continue
+            sustained = np.convolve(active, np.ones(hold, dtype=int), mode="valid") >= hold
             idx = np.flatnonzero(sustained)
             if idx.size:
                 candidates.append(float(t[int(idx[0])]))
