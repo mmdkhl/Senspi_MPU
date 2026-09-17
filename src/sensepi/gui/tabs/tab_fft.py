@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
 import time
 from typing import Dict, Optional, Sequence, Tuple, TYPE_CHECKING
 
 import numpy as np
 import pyqtgraph as pg
-from PySide6.QtCore import QObject, QThread, QTimer, Qt, Signal, Slot
+from PySide6.QtCore import QObject, QPointF, QThread, QTimer, Qt, Signal, Slot
+from PySide6.QtGui import QBrush, QColor, QPen, QPolygonF
 from PySide6.QtWidgets import (
+    QGraphicsPolygonItem,
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
@@ -112,7 +115,8 @@ class _EigenFreqWorker(QObject):
     finished = Signal()
 
     def __init__(self, capture_fn, fs, method, f_min, f_max, n_modes, batch_s,
-                 layout=None, channel="ax", damping_sensor_id=3):
+                 layout=None, channel="ax", damping_sensor_id=3,
+                 plan_lx_m=0.0, plan_ly_m=0.0):
         super().__init__()
         self._capture_fn = capture_fn
         self._fs = fs
@@ -126,6 +130,9 @@ class _EigenFreqWorker(QObject):
         self._layout = layout
         self._channel = str(channel)
         self._damping_sensor_id = int(damping_sensor_id)
+        # Plain floats, so the worker thread still holds no widget (G1).
+        self._plan_lx_m = float(plan_lx_m or 0.0)
+        self._plan_ly_m = float(plan_ly_m or 0.0)
 
     def _compute_torsion(self, layout, data, sensor_ids, session, frequencies):
         """Torsion indicators from the placement's pairs and from the gyroscope.
@@ -139,6 +146,7 @@ class _EigenFreqWorker(QObject):
             index = {int(sid): i for i, sid in enumerate(sensor_ids)}
 
             pair_series = {}
+            pair_cells: dict = {}
             for floor, (sid_a, sid_b) in (layout.torsion_pairs or {}).items():
                 if sid_a in index and sid_b in index:
                     pair_series[int(floor)] = (
@@ -147,6 +155,9 @@ class _EigenFreqWorker(QObject):
                         layout.cell_map.get(sid_a, torsion_id.COLS[1] + torsion_id.ROWS[1]),
                         layout.cell_map.get(sid_b, torsion_id.COLS[1] + torsion_id.ROWS[1]),
                         (int(sid_a), int(sid_b)))
+                    pair_cells[int(floor)] = (
+                        layout.cell_map.get(sid_a, torsion_id.COLS[1] + torsion_id.ROWS[1]),
+                        layout.cell_map.get(sid_b, torsion_id.COLS[1] + torsion_id.ROWS[1]))
 
             gyro_series = {}
             try:
@@ -171,10 +182,19 @@ class _EigenFreqWorker(QObject):
 
             result = torsion_id.identify_torsion(
                 frequencies, channel=self._channel, fs=float(session.fs),
-                pair_series=pair_series or None, gyro_series=gyro_series or None)
+                pair_series=pair_series or None, gyro_series=gyro_series or None,
+                plan_lx_m=self._plan_lx_m, plan_ly_m=self._plan_ly_m)
             return {
                 "frequencies": [float(f) for f in result.frequencies_hz],
                 "channel": result.channel,
+                "plan_lx_m": float(self._plan_lx_m),
+                "plan_ly_m": float(self._plan_ly_m),
+                # Every floor of the structure, so the view can draw a stable
+                # set of slabs instead of only the ones that happened to
+                # produce a reading in this batch.
+                "n_floors": int(getattr(layout, "n_floors", 0) or 0),
+                "pair_cells": {int(k): [str(v[0]), str(v[1])]
+                               for k, v in pair_cells.items()},
                 "success": bool(result.success),
                 "message": result.message,
                 "floors": [
@@ -182,6 +202,10 @@ class _EigenFreqWorker(QObject):
                      "sensors": [int(x) for x in f.sensors],
                      "per_mode": [float(v) for v in f.per_mode],
                      "lever_arm_cells": float(f.lever_arm_cells),
+                     "lever_arm_metres": float(f.lever_arm_metres),
+                     "angle_rad_per_mode": [float(v) for v in f.angle_rad_per_mode],
+                     "noise_angle_rad_per_mode": [
+                         float(v) for v in f.noise_angle_rad_per_mode],
                      "usable": bool(f.usable), "note": f.note}
                     for f in result.floors],
             }
@@ -444,14 +468,24 @@ class FftTab(QWidget):
         self._torsion_glw = pg.GraphicsLayoutWidget()
         self._torsion_glw.setBackground("k")
         self._torsion_plot = self._torsion_glw.addPlot()
-        self._torsion_plot.setLabel("bottom", "Torsion indicator (relative)")
-        self._torsion_plot.setLabel("left", "Floor")
-        self._torsion_plot.showGrid(x=True, y=True, alpha=0.3)
-        self._torsion_plot.addLine(x=0.0, pen=pg.mkPen("#888", width=1.0))
-        self._torsion_legend = self._torsion_plot.addLegend(offset=(10, 10))
-        self._style_legend_box(self._torsion_legend)
+        # A plan (top) view of the slab, not an XY chart: the axes carry no
+        # readable quantity, and a locked aspect ratio is what makes the
+        # rectangle the real shape of the floor rather than a stretched one.
+        self._torsion_plot.setLabel("bottom", "")
+        self._torsion_plot.setLabel("left", "")
+        self._torsion_plot.showGrid(x=False, y=False)
+        self._torsion_plot.setAspectLocked(True)
+        self._torsion_plot.hideAxis("bottom")
+        self._torsion_plot.hideAxis("left")
+        self._torsion_plot.setMouseEnabled(x=False, y=False)
+        # No legend: each slab is labelled under itself, and an empty legend
+        # box floating over a plan view just reads as a stray artefact.
+        self._torsion_legend = None
         self._torsion_items: list = []
         self._last_torsion_data: dict | None = None
+        #: Floor count the selector was last built for, so it is only rebuilt
+        #: when the placement actually changes.
+        self._torsion_floor_count = 0
 
         # Window 2 (alt view): damping ratio from one selected sensor response.
         self._damping_glw = pg.GraphicsLayoutWidget()
@@ -474,6 +508,9 @@ class FftTab(QWidget):
         # apply_sensor_map(). Until Settings emits its first map this is an empty
         # layout, which every consumer detects via ``is_valid`` and reports.
         self._sensor_mapping: dict | None = None
+        # Set by MainWindow after construction: the source of the slab's plan
+        # dimensions, which turn the torsion reading into a real rotation.
+        self._model_updating_tab = None
         self._layout = slayout.layout_from_mapping(None)
         # Which horizontal axis is being analysed. ``None`` = follow the map's
         # excitation axis; the combo can override it for one session without
@@ -642,6 +679,13 @@ class FftTab(QWidget):
         self._right_view_combo.setToolTip(
             "Choose what the right Spectrum panel displays.")
         self._right_view_combo.currentTextChanged.connect(self._on_view_changed)
+        self._torsion_floor_label = QLabel("Floor:")
+        self._torsion_floor_combo = QComboBox()
+        self._torsion_floor_combo.setToolTip(
+            "Which floor's slab to show in the torsion view. "
+            "'All floors' draws every floor of the structure side by side.")
+        self._torsion_floor_combo.currentIndexChanged.connect(
+            self._on_torsion_floor_changed)
         self._damping_sensor_label = QLabel("Damping sensor:")
         self._damping_sensor_combo = QComboBox()
         # Filled from the placement map (structural sensors only, highest floor
@@ -658,6 +702,8 @@ class FftTab(QWidget):
         # every time the view changes. With this order the "Show" combo is the
         # rightmost item and never moves; the damping selector expands into the
         # stretch instead.
+        view_row.addWidget(self._torsion_floor_label)
+        view_row.addWidget(self._torsion_floor_combo)
         view_row.addWidget(self._damping_sensor_label)
         view_row.addWidget(self._damping_sensor_combo)
         view_row.addSpacing(10)
@@ -693,6 +739,8 @@ class FftTab(QWidget):
         self._final_panel.setVisible(False)
         self._damping_sensor_label.setVisible(False)
         self._damping_sensor_combo.setVisible(False)
+        self._torsion_floor_label.setVisible(False)
+        self._torsion_floor_combo.setVisible(False)
         right_v.addWidget(self._eig_status)
         windows.addWidget(left_panel)
         windows.addWidget(right_panel)
@@ -1014,6 +1062,8 @@ class FftTab(QWidget):
             layout=self._layout,
             channel=self._analysis_channel(),
             damping_sensor_id=self._selected_damping_sensor_id(),
+            plan_lx_m=self._plan_dimensions_m()[0],
+            plan_ly_m=self._plan_dimensions_m()[1],
         )
         thread = QThread(self)
         worker.moveToThread(thread)
@@ -1185,6 +1235,25 @@ class FftTab(QWidget):
         self._last_shape_data = None
         self._last_torsion_data = None
         self._launch_eigen_compute()
+
+    def set_model_updating_tab(self, tab) -> None:
+        """Where the slab's plan dimensions come from (set by MainWindow)."""
+        self._model_updating_tab = tab
+
+    def _plan_dimensions_m(self) -> tuple:
+        """``(Lx, Ly)`` in metres, or ``(0, 0)`` when the model is not usable.
+
+        Zeros are a valid answer, not a failure: torsion then falls back to the
+        relative indicator instead of claiming degrees it cannot justify.
+        """
+        getter = getattr(self._model_updating_tab, "plan_dimensions_m", None)
+        if not callable(getter):
+            return 0.0, 0.0
+        try:
+            lx, ly = getter()
+            return float(lx), float(ly)
+        except Exception:
+            return 0.0, 0.0
 
     def current_layout(self):
         """The layout in force, with the mode count capped by the sensor count."""
@@ -1454,6 +1523,8 @@ class FftTab(QWidget):
             layout=self._layout,
             channel=self._analysis_channel(),
             damping_sensor_id=self._selected_damping_sensor_id(),
+            plan_lx_m=self._plan_dimensions_m()[0],
+            plan_ly_m=self._plan_dimensions_m()[1],
         )
         thread = QThread(self)
         worker.moveToThread(thread)
@@ -1741,6 +1812,13 @@ class FftTab(QWidget):
         self._damping_glw.setVisible(show_damping)
         self._eig_glw.setVisible(view == "frequencies")
         self._final_panel.setVisible(show_final)
+        if show_torsion:
+            # Fill the selector from the placement, so it is usable the moment
+            # the view opens rather than only after the first identification.
+            self._refresh_torsion_floor_choices(
+                int(getattr(self._layout, "n_floors", 0) or 0))
+        self._torsion_floor_label.setVisible(show_torsion)
+        self._torsion_floor_combo.setVisible(show_torsion)
         self._damping_sensor_label.setVisible(show_damping or show_final)
         self._damping_sensor_combo.setVisible(show_damping or show_final)
         splitter = getattr(self, "_spectrum_splitter", None)
@@ -1792,20 +1870,80 @@ class FftTab(QWidget):
                 pass
         items.clear()
 
-    def _render_torsion(self, data) -> None:
-        """Per-floor torsion indicators, one profile per identified mode.
+    #: Tilt drawn for the largest twist on screen, in degrees. Real twists are
+    #: far smaller, so the picture is exaggerated and the factor is stated.
+    _TORSION_VIEW_DEG = 14.0
 
-        Two sources are drawn together and kept visually distinct: a differenced
-        sensor pair (solid) and the gyroscope (dashed). They measure the same
-        thing by different physics, so agreement between them is the useful
-        signal — and neither is a calibrated rotation, which the status line says
-        outright so the numbers are not read as rad/s.
+    #: How far above its own noise estimate a reading must sit to be called
+    #: real. Measured on 20 quiet records from this rig: with the structure
+    #: still the reading never exceeded 9.3x its noise estimate, while a
+    #: genuine 0.20 deg twist buried in that same noise scored 17.8x at its
+    #: weakest (1 Hz). 12x sits between the two.
+    _TORSION_SIGNIFICANCE = 12.0
+
+    #: Muted per-floor shades, readable on the dark plot without shouting.
+    #: Indexed by floor, so a floor keeps its colour between updates.
+    _TORSION_FLOOR_COLORS = ("#7fa8d9", "#7fc9b8", "#d9bb7f", "#c9a0c4",
+                             "#9fd0a8", "#d9a08f")
+    _TORSION_QUIET = "#5f6670"
+    #: The dashed rest outline. It is the reference the rotation is read
+    #: against, so it has to stay readable THROUGH the fill.
+    _TORSION_REST = "#6f7883"
+    #: Slab fill, 0-255. A quarter opacity reads as the floor's colour while
+    #: leaving the dashed rest outline visible underneath.
+    _TORSION_FILL_ALPHA = 64
+
+    @staticmethod
+    def _cell_xy(cell: str, lx: float, ly: float) -> tuple:
+        """Plan position of a 3x3 grid cell, in metres from the slab centre."""
+        i, j = torsion_id.cell_offsets(cell)
+        return ((float(i) - 1.0) * lx / 2.0, (float(j) - 1.0) * ly / 2.0)
+
+    @staticmethod
+    def _rotated_outline(lx: float, ly: float, theta_rad: float, cx: float):
+        """Closed slab outline, rotated about its own centre, shifted to ``cx``."""
+        hx, hy = lx / 2.0, ly / 2.0
+        corners = [(-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy), (-hx, -hy)]
+        c, sn = math.cos(theta_rad), math.sin(theta_rad)
+        xs = [cx + x * c - y * sn for x, y in corners]
+        ys = [y * c + x * sn for x, y in corners]
+        return xs, ys
+
+    def _refresh_torsion_floor_choices(self, n_floors: int) -> None:
+        """Rebuild the floor selector, keeping the user's choice if it survives."""
+        n_floors = max(0, int(n_floors))
+        if n_floors == self._torsion_floor_count:
+            return
+        self._torsion_floor_count = n_floors
+        previous = self._torsion_floor_combo.currentData()
+        self._torsion_floor_combo.blockSignals(True)
+        self._torsion_floor_combo.clear()
+        self._torsion_floor_combo.addItem("All floors", userData=0)
+        for floor in range(1, n_floors + 1):
+            self._torsion_floor_combo.addItem(f"Floor {floor}", userData=floor)
+        index = self._torsion_floor_combo.findData(previous)
+        self._torsion_floor_combo.setCurrentIndex(max(0, index))
+        self._torsion_floor_combo.blockSignals(False)
+
+    @Slot()
+    def _on_torsion_floor_changed(self, *_: object) -> None:
+        if self._current_right_view() == "torsion":
+            self._render_torsion(self._last_torsion_data)
+
+    def _render_torsion(self, data) -> None:
+        """Top view of the floors, each twisted by the rotation just measured.
+
+        A still picture, refreshed once per identification batch, exactly like
+        the frequency and mode-shape views beside it -- an animation invited the
+        eye to read motion into a number that only updates every few seconds.
+
+        Every floor of the structure is drawn, whether or not it produced a
+        reading, so the row of slabs does not change length between updates.
+        A floor with no torsion source, or whose twist sits below the
+        measurement's own noise, is drawn at rest and said to be so: the scale
+        is never stretched to make noise fill the screen.
         """
         self._clear_plot_items(self._torsion_plot, self._torsion_items)
-        try:
-            self._torsion_legend.clear()
-        except Exception:
-            pass
 
         if not data:
             self._eig_status.setText(
@@ -1817,54 +1955,138 @@ class FftTab(QWidget):
             return
 
         freqs = [float(f) for f in data.get("frequencies", [])]
-        floors = [f for f in data.get("floors", []) if f.get("usable")]
-        if not floors:
+        n_floors = int(data.get("n_floors") or 0)
+        rows = [f for f in data.get("floors", []) if f.get("usable")]
+        if not n_floors:
+            n_floors = max([int(f.get("floor", 0)) for f in rows] or [0])
+        if not n_floors:
             self._eig_status.setText(f"Torsion: {data.get('message') or 'no usable floor'}")
             return
+        self._refresh_torsion_floor_choices(n_floors)
 
-        max_floor, max_val = 1, 0.0
-        for source, dash in (("pair", Qt.SolidLine), ("gyro", Qt.DashLine)):
-            rows = sorted((f for f in floors if f.get("source") == source),
-                          key=lambda f: int(f["floor"]))
-            if not rows:
+        lx = float(data.get("plan_lx_m") or 0.0)
+        ly = float(data.get("plan_ly_m") or 0.0)
+        real_units = lx > 0.0 and ly > 0.0
+        if not real_units:
+            lx = ly = 1.0
+        pair_cells = {int(k): v for k, v in (data.get("pair_cells") or {}).items()}
+
+        # Best reading per floor: the mode that twists it most.
+        best: dict = {}
+        for row in rows:
+            angles = [float(v) for v in (row.get("angle_rad_per_mode") or [])]
+            noise = [float(v) for v in (row.get("noise_angle_rad_per_mode") or [])]
+            index, peak = -1, 0.0
+            for i, value in enumerate(angles):
+                if np.isfinite(value) and abs(value) > peak:
+                    index, peak = i, abs(value)
+            if index < 0:
                 continue
-            for mode_i in range(len(freqs)):
-                xs, ys = [], []
-                for row in rows:
-                    per = row.get("per_mode") or []
-                    if mode_i >= len(per):
-                        continue
-                    value = float(per[mode_i])
-                    if not np.isfinite(value):
-                        continue
-                    xs.append(value)
-                    ys.append(int(row["floor"]))
-                if not xs:
-                    continue
-                max_floor = max(max_floor, max(ys))
-                max_val = max(max_val, max(xs))
-                colour = _EIGEN_COLORS[mode_i % len(_EIGEN_COLORS)]
-                curve = self._torsion_plot.plot(
-                    xs, ys, pen=pg.mkPen(colour, width=2.0, style=dash),
-                    symbol="o" if source == "pair" else "t",
-                    symbolBrush=colour, symbolSize=8)
-                label = (f"Mode {mode_i + 1}"
-                         + (f", f={freqs[mode_i]:.2f} Hz" if mode_i < len(freqs) else "")
-                         + f" · {source}")
-                try:
-                    self._torsion_legend.addItem(curve, label)
-                except Exception:
-                    pass
-                self._torsion_items.append(curve)
-                for value, floor in zip(xs, ys):
-                    text = pg.TextItem(f"{value:.2f}", color=colour, anchor=(0.0, 0.5))
-                    text.setPos(float(value), float(floor))
-                    self._torsion_plot.addItem(text)
-                    self._torsion_items.append(text)
+            floor = int(row["floor"])
+            limit = (noise[index] * self._TORSION_SIGNIFICANCE
+                     if index < len(noise) and np.isfinite(noise[index]) else float("inf"))
+            entry = {"angle": peak, "mode": index, "limit": limit,
+                     "source": row.get("source", ""), "real": peak > limit}
+            # Prefer whichever source actually resolved something on this floor.
+            if floor not in best or (entry["real"] and not best[floor]["real"]):
+                best[floor] = entry
 
-        self._torsion_plot.setXRange(0.0, max(0.25, max_val * 1.25), padding=0.02)
-        self._torsion_plot.setYRange(0, max_floor, padding=0.35)
-        self._eig_status.setText(f"Live torsion — {data.get('message') or ''}")
+        chosen = int(self._torsion_floor_combo.currentData() or 0)
+        floors = [chosen] if chosen else list(range(1, n_floors + 1))
+
+        # One scale for every slab, so a floor twisting twice as much is drawn
+        # twice as far over. Anchored to the largest REAL twist -- never to
+        # noise, which is what used to spin a motionless structure at full tilt.
+        real_angles = [best[f]["angle"] for f in floors if f in best and best[f]["real"]]
+        scale = (math.radians(self._TORSION_VIEW_DEG) / max(real_angles)) if real_angles else 0.0
+
+        pitch = lx * 1.9
+        for k, floor in enumerate(floors):
+            cx = k * pitch
+            entry = best.get(floor)
+            colour = self._TORSION_FLOOR_COLORS[(floor - 1) % len(self._TORSION_FLOOR_COLORS)]
+
+            xs, ys = self._rotated_outline(lx, ly, 0.0, cx)
+            rest = self._torsion_plot.plot(
+                xs, ys, pen=pg.mkPen(self._TORSION_REST, width=1.3, style=Qt.DashLine))
+            self._torsion_items.append(rest)
+
+            if entry is None:
+                shown, sub, pen_colour, theta = "no sensor pair", "", self._TORSION_QUIET, 0.0
+            elif not entry["real"]:
+                # Still drawn at rest -- an untrusted number must not move the
+                # picture -- but the number itself is shown, with what it would
+                # have to beat. Hiding it just raises the question "how close?".
+                measured = math.degrees(entry["angle"])
+                shown = f"{measured:.3f}° (noise)"
+                sub = (f"needs {math.degrees(entry['limit']):.3f}° to count"
+                       if np.isfinite(entry["limit"]) else "below noise")
+                pen_colour, theta = self._TORSION_QUIET, 0.0
+            else:
+                deg = math.degrees(entry["angle"])
+                shown = f"{deg:.3f}°" if (real_units or entry["source"] == "gyro") else "no plan size"
+                f_txt = (f"{freqs[entry['mode']]:.2f} Hz" if entry["mode"] < len(freqs)
+                         else f"mode {entry['mode'] + 1}")
+                sub = f"{f_txt}  ·  {entry['source']}"
+                pen_colour, theta = colour, entry["angle"] * scale
+
+            xs, ys = self._rotated_outline(lx, ly, theta, cx)
+            # Filled first and pushed behind everything, so the dashed rest
+            # outline and the sensor dots still read on top of it. A floor with
+            # nothing to report is filled at half strength, so "quiet" still
+            # looks quieter than "twisting" at a glance.
+            fill = QColor(pen_colour)
+            fill.setAlpha(self._TORSION_FILL_ALPHA if (entry and entry.get("real"))
+                          else max(10, self._TORSION_FILL_ALPHA // 2))
+            patch = QGraphicsPolygonItem(
+                QPolygonF([QPointF(x, y) for x, y in zip(xs[:-1], ys[:-1])]))
+            patch.setBrush(QBrush(fill))
+            patch.setPen(QPen(Qt.NoPen))
+            patch.setZValue(-10)
+            self._torsion_plot.addItem(patch)
+            self._torsion_items.append(patch)
+
+            live = self._torsion_plot.plot(xs, ys, pen=pg.mkPen(pen_colour, width=2.2))
+            self._torsion_items.append(live)
+
+            cells = pair_cells.get(floor) if (entry and entry["source"] == "pair") else None
+            if cells and real_units:
+                c, sn = math.cos(theta), math.sin(theta)
+                pts = [self._cell_xy(str(cell), lx, ly) for cell in cells]
+                dots = self._torsion_plot.plot(
+                    [cx + x * c - y * sn for x, y in pts],
+                    [y * c + x * sn for x, y in pts],
+                    pen=None, symbol="o", symbolBrush=pen_colour, symbolSize=7)
+                self._torsion_items.append(dots)
+
+            label = pg.TextItem(f"Floor {floor}  ·  {shown}" + (f"\n{sub}" if sub else ""),
+                                color=pen_colour, anchor=(0.5, 0.0))
+            label.setPos(cx, -ly * 0.78)
+            self._torsion_plot.addItem(label)
+            self._torsion_items.append(label)
+
+        # ONE setRange, not setXRange followed by setYRange. With the aspect
+        # ratio locked the second call wins and the first is cropped to match --
+        # which cropped every slab but the middle one off the sides. Given both
+        # ranges at once, the view box expands whichever axis is short instead.
+        last = (len(floors) - 1) * pitch
+        self._torsion_plot.setRange(
+            xRange=(-lx * 0.8, last + lx * 0.8),
+            yRange=(-ly * 1.45, ly * 0.85),
+            padding=0.0)
+
+        bits = []
+        if real_angles:
+            bits.append(f"Torsion · largest {math.degrees(max(real_angles)):.3f}°, "
+                        f"drawn at {self._TORSION_VIEW_DEG:.0f}° "
+                        f"({scale:.0f}x) · all floors share this scale")
+        else:
+            bits.append(f"Torsion · no floor is twisting above the measurement noise "
+                        f"· all slabs shown at rest")
+        bits.append(f"slab {lx:.3f} x {ly:.3f} m from the model" if real_units
+                    else "plan size unknown - set Lx/Ly in Model Updating for degrees")
+        bits.append(data.get("message") or "")
+        self._eig_status.setText(f"  ·  ".join(b for b in bits if b))
 
     def _render_mode_shapes(self, shape_data: dict) -> None:
         """Draw normalized per-floor mode shapes with legend and value labels.
