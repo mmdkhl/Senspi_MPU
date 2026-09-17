@@ -1039,6 +1039,7 @@ def _make_calibration_signature(params: dict[str, Any]) -> str:
         "load_type",
         "cyclic_frequency_hz",
         "cyclic_amplitude_ms2",
+        "cyclic_duration_s",
         "gmFactor",
         "gmFile",
         "dtGM",
@@ -2058,6 +2059,13 @@ class ModelUpdatingTab(QWidget):
             "Peak acceleration amplitude of the sinusoidal base excitation "
             "in m/s². For example, 0.981 m/s² = 0.1 g."
         )
+        self._cyclic_duration_s = self._double_spin(0.1, 3600.0, 20.0, 2)
+        self._cyclic_duration_s.setSingleStep(1.0)
+        self._cyclic_duration_s.setToolTip(
+            "How long the sinusoidal base excitation runs, in seconds. This is "
+            "the length of the generated record, and therefore how long the "
+            "Digital Twin experiment runs for."
+        )
 
         # The time step is used for both generated cyclic loading and
         # earthquake records.
@@ -2087,6 +2095,7 @@ class ModelUpdatingTab(QWidget):
         form.addRow("Applied load:", self._load_type)
         form.addRow("Cyclic frequency (Hz):", self._cyclic_frequency_hz)
         form.addRow("Cyclic amplitude (m/s²):", self._cyclic_amplitude_ms2)
+        form.addRow("Cyclic duration (s):", self._cyclic_duration_s)
         form.addRow("Ground-motion dt (s):", self._dt_gm)
         form.addRow("Earthquake scale factor:", self._gm_factor)
         form.addRow("Earthquake file:", gm_widget)
@@ -2641,6 +2650,7 @@ class ModelUpdatingTab(QWidget):
 
         self._cyclic_frequency_hz.setEnabled(cyclic)
         self._cyclic_amplitude_ms2.setEnabled(cyclic)
+        self._cyclic_duration_s.setEnabled(cyclic)
 
         self._gm_factor.setEnabled(not cyclic)
         self._gm_file_edit.setEnabled(not cyclic)
@@ -2773,6 +2783,7 @@ class ModelUpdatingTab(QWidget):
         self._load_type.setCurrentIndex(0)
         self._cyclic_frequency_hz.setValue(1.0)
         self._cyclic_amplitude_ms2.setValue(0.981)
+        self._cyclic_duration_s.setValue(20.0)
 
         # An earthquake file is only required when earthquake loading is selected.
         self._gm_file_edit.clear()
@@ -3025,10 +3036,12 @@ class ModelUpdatingTab(QWidget):
         dt_gm = float(self._dt_gm.value())
         cyclic_frequency_hz = None
         cyclic_amplitude_ms2 = None
+        cyclic_duration_s = None
 
         if load_type == "cyclic":
             cyclic_frequency_hz = float(self._cyclic_frequency_hz.value())
             cyclic_amplitude_ms2 = float(self._cyclic_amplitude_ms2.value())
+            cyclic_duration_s = float(self._cyclic_duration_s.value())
 
             # Prevent undersampling of the requested sinusoidal excitation.
             nyquist_hz = 0.5 / dt_gm
@@ -3040,8 +3053,8 @@ class ModelUpdatingTab(QWidget):
                     "Use a smaller ground-motion dt."
                 )
 
-            # Keep the same 20-second duration used by the existing sine presets.
-            cyclic_duration_s = 20.0
+            # Duration comes from the Analysis form; it defaults to the 20 s
+            # the sine presets always used, so an existing setup is unchanged.
             n_steps = max(1, int(round(cyclic_duration_s / dt_gm)))
             time_values = np.arange(n_steps + 1, dtype=float) * dt_gm
             accel_values = cyclic_amplitude_ms2 * np.sin(
@@ -3084,6 +3097,7 @@ class ModelUpdatingTab(QWidget):
             "load_type": load_type,
             "cyclic_frequency_hz": cyclic_frequency_hz,
             "cyclic_amplitude_ms2": cyclic_amplitude_ms2,
+            "cyclic_duration_s": cyclic_duration_s,
             "gmFactor": gm_factor,
             "gmFile": str(gm_file),
             "dtGM": dt_gm,
