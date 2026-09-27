@@ -1,208 +1,247 @@
-# SensePi (GUI) — Raspberry Pi MPU6050 recording + live view
+# SensePi — ProTELC Science Camp
 
-SensePi is a desktop GUI (PySide6) that connects to a Raspberry Pi over SSH, starts the MPU6050 logger, shows live plots, and (optionally) records logs on the Pi and downloads them to your PC.
+SensePi is a desktop app for measuring how a model structure vibrates. It connects over the network to a
+Raspberry Pi that has **four MPU6050 motion sensors** attached. You can watch the signals live, record
+them, look at their frequency content, and compare them with a computer model of the structure.
 
-This README is for **operators/users** who just want to run the GUI.
+This page shows you how to get the app running on **your own computer** for the first time. It takes
+about 15 minutes, and most of that is waiting for downloads.
 
----
-
-## What you need
-
-### On your PC
-- Windows 10/11 (or Linux/macOS) with **Python 3.9+**
-- Network access to the Raspberry Pi (same LAN)
-- The SensePi project folder (clone or unzip)
-
-### On the Raspberry Pi
-- Raspberry Pi OS
-- MPU6050 wired and **I2C enabled**
-- SSH access (username + password)
-
-> If the Pi already has the SensePi scripts in place, you can skip the “Deploy to Pi” section.
+> **At the camp, the Raspberry Pis are already set up for you.** All you need is the app on your laptop
+> and the connection details (IP address, username, password) your instructor gives you. To talk to
+> a Pi, your laptop must be connected to the **`MissionControl`** Wi-Fi network.
 
 ---
 
-## Install on the PC (GUI)
+## Quick start
 
-From the project root:
+### Step 1: Install the tools (one time only)
 
-```bat
+You need two free programs:
+
+| Program | Where to get it | Notes |
+|---|---|---|
+| **Python 3.11** | https://www.python.org/downloads/release/python-3119/ | On Windows, tick **"Add python.exe to PATH"** on the first installer screen. |
+| **Git** | https://git-scm.com/downloads | The default options are fine. |
+
+Use **Python 3.11** so that every tab works. Newer versions can still start the app, but the
+*Model Updating* tab needs a package that is only built for 3.11 on Windows.
+
+To check that both are installed, open a **new** terminal (Windows: press the Start key and type
+`PowerShell`; macOS: open *Terminal*) and run:
+
+```bash
+python --version
+git --version
+```
+
+The first command should print `Python 3.11.x`. On macOS/Linux, use `python3` in place of `python`.
+
+### Step 2: Download the app
+
+The commands below download only the parts of the project the app needs, so the download stays small:
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/mmdkhl/Senspi_MPU.git
+cd Senspi_MPU
+git sparse-checkout set src
+```
+
+This creates a folder called `Senspi_MPU` inside whatever folder your terminal was in (usually your
+user folder). The rest of this guide runs commands **from inside that folder**.
+
+<details>
+<summary>No Git? Download a ZIP instead</summary>
+
+Open https://github.com/mmdkhl/Senspi_MPU and click **Code → Download ZIP**. Unzip it, then open a
+terminal in the unzipped folder. You get the whole project this way, which is fine but a bigger download.
+</details>
+
+### Step 3: Install the app
+
+Create a private Python environment for the app so it doesn't interfere with anything else on your
+computer, then install the app into it.
+
+**Windows (PowerShell):**
+
+```powershell
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -e .
-```
-
-Run the GUI:
-
-```bat
-sensepi-gui
-```
-
-Alternative: run directly from the project root:
-
-```bat
-python main.py
-```
-
----
-
-## Configure your Raspberry Pi in the GUI
-
-1. Start the GUI
-2. Go to **Settings**
-3. Add / edit your Pi in the **Raspberry Pi hosts** list
-4. Save
-
-The host list is stored in:
-
-- `src/sensepi/config/hosts.local.yaml` for your real local settings
-- `src/sensepi/config/hosts.yaml` as the sanitized repo template
-- Public template: `src/sensepi/config/hosts.example.yaml`
-
-Typical fields:
-- `name`: friendly name (shown in the GUI)
-- `host`: IP/hostname
-- `user` / `password`
-- `base_path`: where the Pi scripts live (example: `/home/pi/sensor`)
-- `data_dir`: where logs should be written (example: `/home/pi/logs`)
-- `pi_config_path`: where the GUI uploads `pi_config.yaml` (usually `<base_path>/pi_config.yaml`)
-
----
-
-## Deploy to the Pi (only if needed)
-
-If your Pi does **not** already have the scripts, use the provided Windows deploy script:
-
-### 1) Prerequisites
-- Install **PuTTY** (you need `plink.exe` + `pscp.exe`)
-
-### 2) Edit `deploy_pi.bat`
-Open `deploy_pi.bat` and update:
-- `PUTTY_DIR` (where plink/pscp live)
-- `LOCAL_ROOT` (your repo path)
-- `PI_USER`, `PI_HOST`, `PI_PASS`
-- `REMOTE_DIR` (where files will be copied)
-
-For GitHub/public sharing, treat `deploy_pi.bat` as a template. Keep your real credentials in an untracked copy such as `deploy_pi.local.bat`.
-
-⚠️ **Important:** the script **wipes** the remote directory before copying. Read it before running.
-
-### 3) Run it
-Double-click `deploy_pi.bat` (or run it from a terminal).
-
-### 4) Install Pi Python dependencies
-On the Pi (SSH):
-
-```bash
-sudo apt-get update
-sudo apt-get install -y python3 python3-pip python3-venv python3-smbus i2c-tools
-# If requirements-pi.txt is not on the Pi yet, copy it from the repo root (or install the packages manually).
-# Option A: use the requirements file
-pip3 install --user -r requirements-pi.txt
-# Option B (manual): pip3 install --user numpy smbus2 PyYAML RPi.GPIO
-mkdir -p ~/logs/mpu
-```
-
-### 5) Enable I2C (if you haven’t already)
-On the Pi:
-
-```bash
-sudo raspi-config
-# Interface Options -> I2C -> Enable
-```
-
----
-
-## Using the GUI (basic workflow)
-
-1. Go to **Live Signals**
-2. Pick your Pi host
-3. Click **Sync config to Pi** (in Settings) after you change sensors/rates
-4. Click **Start** to begin live streaming
-5. Enable **Recording** (if you want the Pi to write `.csv`/`.jsonl` files)
-6. Click **Stop** when done
-7. Click **Sync logs** to download new logs to your PC
-
-The **Model Updating** tab provides native PySide controls for the bundled OpenSees model-updating project in:
-
-```text
-opensees-model-updating/opensees-model-updating
-```
-
-Use a Python environment that has `openseespy`, `numpy`, `scipy`, `matplotlib`, and `opsvis` installed. The tab reuses the bundled OpenSees computational modules for modal analysis, calibration, reporting, and transient analysis.
-
-If SensePi is installed as an editable package, the OpenSees-specific packages can be installed with:
-
-```bat
 pip install -e ".[model-updating]"
 ```
 
-On Windows this pins the OpenSeesPy Windows binary to a version that imports correctly with Python 3.11.
+**macOS / Linux:**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -e ".[model-updating]"
+```
+
+When the environment is active, your prompt starts with `(.venv)`. The install downloads a few hundred MB
+and can take several minutes.
+
+> **Windows: "running scripts is disabled on this system"?** Run this once, then try
+> `Activate.ps1` again:
+> ```powershell
+> Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+> ```
+
+### Step 4: Start the app
+
+```bash
+sensepi-gui
+```
+
+The SensePi window opens.
+
+### Step 5: Connect to your Raspberry Pi
+
+> **Connect your laptop to the `MissionControl` Wi-Fi network first.** The Raspberry Pis are only
+> reachable on `MissionControl`, so the app can't find them from any other network. Do Steps 1–3 on a
+> network with internet access, because `MissionControl` may not have any.
+
+1. Open the **Settings** tab.
+2. Under **Raspberry Pi hosts**, fill in the example entry like this:
+
+   | Field | Value |
+   |---|---|
+   | **Name** | any name you like, for example `Pi-1` |
+   | **Host / IP** | the Pi's IP address, from your instructor (the Pi's small screen also shows it) |
+   | **User** | `verwalter` |
+   | **SSH port** | `22` |
+   | **Password** | from your instructor |
+   | **Scripts base path** | `/home/verwalter/sensor4` |
+   | **Data directory** | `/home/verwalter/logs` |
+   | **Pi config path** | `/home/verwalter/sensor4/pi_config.yaml` |
+
+   Type the paths exactly as shown. They point to the **4-sensor** scripts on the camp Pis.
+3. Click **Save host config**.
+4. Check that **Number of sensors** is set to **4 sensors**. This is the default.
+5. In the **sensor map**, set the floor and position of each sensor to match your structure. Every other
+   tab uses this map, so get it right here. Then click **Save sensors.yaml**.
+6. Click **Sync Pi defaults (pi_config.yaml)** to send these settings to the Pi.
+
+### Step 6: Measure!
+
+1. Go to **Live Signals** and click **Start**. Tap the structure and watch the signals move.
+2. Click **Stop** when you're done.
+3. To keep a measurement, set the recording length and click **Smart Record**. The app checks the real
+   sampling rate for a few seconds, then records for the length you chose.
 
 ---
 
-## Where your data goes
+## Starting the app again later
 
-- **On the Pi:** `<data_dir>/mpu/...`
-- **On the PC (after Sync):** `data/raw/...`
+You only do Steps 1–3 once. After that, open a terminal and run:
 
-(You can override the PC folders using environment variables: `SENSEPI_DATA_ROOT` and `SENSEPI_LOG_DIR`.)
+**Windows:**
+```powershell
+cd Senspi_MPU
+.venv\Scripts\Activate.ps1
+sensepi-gui
+```
+
+**macOS / Linux:**
+```bash
+cd Senspi_MPU
+source .venv/bin/activate
+sensepi-gui
+```
+
+To get the latest version of the app (for example when your instructor announces an update), run this in
+the `Senspi_MPU` folder:
+
+```bash
+git pull
+```
+
+---
+
+## What's in the app
+
+| Tab | What it does |
+|---|---|
+| **Live Signals** | Streams the four sensors live and records measurements |
+| **Spectrum** | Shows which frequencies the structure vibrates at (its natural frequencies and mode shapes) |
+| **Model Updating** | Tunes a computer (OpenSees) model of the structure so it matches your measurements |
+| **Sonification** | Turns the vibrations into sound |
+| **Digital Twin Experiment** | Runs the computer model alongside the real structure and compares the two |
+| **Settings** | Raspberry Pi connection, number of sensors, sensor positions and sampling rate |
+
+### Where your data is saved
+
+Everything the app produces goes into the `output/` folder inside `Senspi_MPU`:
+
+```text
+output/
+  sensor_recordings/   your recorded measurements (one folder per recording)
+  model/               computer-model files
+  digital_twin/        Digital Twin experiment runs
+  sonification/        audio you captured
+```
 
 ---
 
 ## Troubleshooting
 
-**SSH connection fails**
-- Check the IP/hostname in Settings
-- Make sure SSH is enabled on the Pi
-- Confirm username/password
+**`python` or `git` is "not recognized" / "command not found"**
+Close the terminal and open a new one. If it still fails, reinstall Python and make sure **"Add
+python.exe to PATH"** is ticked. On macOS/Linux, try `python3`.
 
-**No sensor data**
-- Confirm I2C is enabled
-- Check wiring and address (`i2cdetect -y 1`)
-- Try running the logger directly on the Pi:
-  ```bash
-  cd <base_path>
-  python3 mpu6050_multi_logger.py --list
-  ```
+**`sensepi-gui` is not recognized**
+The environment isn't active. Run the `Activate` line from Step 3 (your prompt should show `(.venv)`).
+You can also start the app with `python main.py` from the `Senspi_MPU` folder.
 
-**Plots are laggy**
-- Reduce the sample rate in Settings
-- Reduce the number of sensors/channels being streamed
+**Can't connect to the Pi**
+- Is your laptop connected to the **`MissionControl`** Wi-Fi? (Laptops sometimes switch back to another
+  saved network on their own.)
+- Check the IP address, username and password in **Settings**.
+- Ask your instructor whether the Pi is switched on. Its small screen shows its IP address.
 
----
+**No signal / a sensor is missing**
+- Check that **Number of sensors** is set to 4 and click **Sync Pi defaults (pi_config.yaml)** again.
+- Check that the sensor cables are firmly connected, then tell your instructor.
 
-## GitHub / public repo note
-
-This repository is prepared for public sharing:
-- `src/sensepi/config/hosts.yaml` contains sanitized example values
-- `src/sensepi/config/hosts.example.yaml` is a copyable template
-- `deploy_pi.bat` / `deploy_pi.example.bat` contain placeholder values only
-- The GUI saves real host edits to `src/sensepi/config/hosts.local.yaml`
-
-Do not commit real hostnames, passwords, or private deployment paths. Keep real local values in untracked files such as:
-- `src/sensepi/config/hosts.local.yaml`
-- `deploy_pi.local.bat`
+**Plots are slow or jerky**
+Lower the sample rate in **Settings**, or close other heavy programs.
 
 ---
 
-## Sonification (merged from your structural-response workflow)
+## For instructors: preparing a Raspberry Pi
 
-The repo now includes a sonification module for structural CSV data (header row + units row + data rows).
+The Pi-side scripts for the 4-sensor setup (four MPU6050s on I2C buses 0 and 1, plus an OLED status
+display) are in [`raspberrypi_scripts_4_sensor/`](raspberrypi_scripts_4_sensor/). Its
+[`README_rpi.md`](raspberrypi_scripts_4_sensor/README_rpi.md) covers wiring, copying the scripts to the
+Pi, installing dependencies (offline wheels included) and checking the sensors.
 
-Run via module:
+A student clone made with Step 2 doesn't include that folder. To get it, run
+`git sparse-checkout add raspberrypi_scripts_4_sensor`, or clone the full repository.
 
-```bash
-python -m sensepi.sonification.cli --input path/to/data.csv --out out.wav --mode melody --joint 28 --measurement U1
-```
+Notes:
+- The camp Pis use the user `verwalter`, with the 4-sensor scripts copied to `/home/verwalter/sensor4`.
+  The student setup (Step 5) depends on these paths, so keep them the same on every Pi.
+- `output_dir` in `pi_config.yaml` must be `/home/verwalter/logs/mpu` (inside the `verwalter` home
+  directory).
+- `deploy_pi.bat` / `deploy_pi.example.bat` deploy the older **3-sensor** folder
+  (`raspberrypi_scripts/`). Don't use them for the camp setup.
 
-Or after editable install:
+### Keeping credentials out of Git
+
+The GUI saves real host details to `src/sensepi/config/hosts.local.yaml`, which Git ignores. The tracked
+`hosts.yaml` / `hosts.example.yaml` contain placeholder values only. Never commit real IP addresses or
+passwords.
+
+---
+
+## For developers
+
+See [`docs/DEVELOPERS.md`](docs/DEVELOPERS.md) for the architecture, config files and tests.
+
+The sonification engine can also run from the command line on structural CSV data:
 
 ```bash
 sensepi-sonify --input path/to/data.csv --out out.wav --mode harmonic --joint 28 --r1-measurement R1 --u1-measurement U1
 ```
-
-Modes:
-- `melody`: maps one measurement (default `U1`) to MIDI-note-like tones
-- `harmonic`: additive synthesis where `R1` modulates harmonic spacing and `U1` modulates base frequency

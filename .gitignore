@@ -56,3 +56,6 @@ deploy_pi.local.bat
 # bioacoustic dataset build inputs/outputs (regenerable; see chorus/dataset/README.md)
 data/raw/bioacoustics/
 data/processed/sonification_chorus/
+
+# Hardware design files (not needed to run the GUI)
+hardware/
