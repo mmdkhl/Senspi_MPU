@@ -9,7 +9,6 @@ project layout, how the pieces connect, and how to extend the package.
 
 ```
 opensees-model-updating/
-├── .claude/                    # AI-agent planning docs — do not delete
 ├── docs/
 │   ├── pipeline.md             # Data flow + integration points (start here)
 │   └── developer_guide.md     # This file

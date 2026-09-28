@@ -33,10 +33,6 @@ Thumbs.db
 .vscode/
 *.swp
 
-# AI / scratch
-.ai/
-.claude/
-
 # Build / packaging
 *.egg-info/
 .dist/

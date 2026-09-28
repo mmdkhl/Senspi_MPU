@@ -276,7 +276,6 @@ All files are written to `output/` relative to the working directory. The folder
 
 ```
 opensees-model-updating/
-├── .claude/                         # AI-agent planning documents (do not delete)
 ├── docs/
 │   ├── pipeline.md                  # Data-flow reference + automation guide
 │   ├── developer_guide.md           # Architecture, call graph, extension guide

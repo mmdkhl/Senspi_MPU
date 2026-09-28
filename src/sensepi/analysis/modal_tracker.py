@@ -4,8 +4,7 @@
 This is the **new** piece of the Mode-B redesign (Option B, two-stage). The old
 continuous loop fed each single noisy identification window straight into the
 model calibration and then tried to suppress the resulting jumpiness with a hard
-gate that *stopped the loop* (diagnosis D1-D4 in
-``.claude/model_updating_continuous_redesign.md``). The fix moves the accumulation
+gate that *stopped the loop*. The fix moves the accumulation
 into **measurement space**, where the noise actually lives:
 
     per window:  raw peaks (f_j, phi_j)  ──▶  ModalStateTracker  ──▶  consolidated
