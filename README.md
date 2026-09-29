@@ -21,11 +21,11 @@ You need two free programs:
 
 | Program | Where to get it | Notes |
 |---|---|---|
-| **Python 3.11** | https://www.python.org/downloads/release/python-3119/ | On Windows, tick **"Add python.exe to PATH"** on the first installer screen. |
+| **Python** (3.11 or newer) | https://www.python.org/downloads/ | On Windows, tick **"Add python.exe to PATH"** on the first installer screen. |
 | **Git** | https://git-scm.com/downloads | The default options are fine. |
 
-Use **Python 3.11** so that every tab works. Newer versions can still start the app, but the
-*Model Updating* tab needs a package that is only built for 3.11 on Windows.
+Any Python from **3.11 onwards** works, and every tab works on all of them. If you already have a
+recent Python, you can use it.
 
 To check that both are installed, open a **new** terminal (Windows: press the Start key and type
 `PowerShell`; macOS: open *Terminal*) and run:
@@ -35,7 +35,8 @@ python --version
 git --version
 ```
 
-The first command should print `Python 3.11.x`. On macOS/Linux, use `python3` in place of `python`.
+The first command should print `Python 3.11` or higher. On macOS/Linux, use `python3` in place of
+`python`.
 
 ### Step 2: Download the app
 
@@ -68,7 +69,7 @@ computer, then install the app into it.
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -e ".[model-updating]"
+pip install -r requirements.txt
 ```
 
 **macOS / Linux:**
@@ -77,8 +78,11 @@ pip install -e ".[model-updating]"
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-pip install -e ".[model-updating]"
+pip install -r requirements.txt
 ```
+
+`requirements.txt` installs **everything** — every tab works after this, including *Spectrum*,
+*Model Updating* and the sound in *Sonification*. There is nothing else to add later.
 
 When the environment is active, your prompt starts with `(.venv)`. The install downloads a few hundred MB
 and can take several minutes.
@@ -92,10 +96,10 @@ and can take several minutes.
 ### Step 4: Start the app
 
 ```bash
-sensepi-gui
+python main.py
 ```
 
-The SensePi window opens.
+The SensePi window opens. (On macOS/Linux use `python3` if `python` is not found.)
 
 ### Step 5: Connect to your Raspberry Pi
 
@@ -141,14 +145,14 @@ You only do Steps 1–3 once. After that, open a terminal and run:
 ```powershell
 cd Senspi_MPU
 .venv\Scripts\Activate.ps1
-sensepi-gui
+python main.py
 ```
 
 **macOS / Linux:**
 ```bash
 cd Senspi_MPU
 source .venv/bin/activate
-sensepi-gui
+python main.py
 ```
 
 To get the latest version of the app (for example when your instructor announces an update), run this in
@@ -191,9 +195,13 @@ output/
 Close the terminal and open a new one. If it still fails, reinstall Python and make sure **"Add
 python.exe to PATH"** is ticked. On macOS/Linux, try `python3`.
 
-**`sensepi-gui` is not recognized**
-The environment isn't active. Run the `Activate` line from Step 3 (your prompt should show `(.venv)`).
-You can also start the app with `python main.py` from the `Senspi_MPU` folder.
+**`No module named 'PySide6'` (or another package) when starting the app**
+The environment isn't active. Run the `Activate` line from Step 3 — your prompt should show `(.venv)` —
+then `python main.py` again. Run `python main.py` from inside the `Senspi_MPU` folder.
+
+**The *Model Updating* tab says OpenSees is missing, or *Sonification* has no sound**
+The dependencies didn't all install. With the environment active, run
+`pip install -r requirements.txt` again and read the output for errors.
 
 **Can't connect to the Pi**
 - Is your laptop connected to the **`MissionControl`** Wi-Fi? (Laptops sometimes switch back to another
@@ -240,8 +248,14 @@ passwords.
 
 See [`docs/DEVELOPERS.md`](docs/DEVELOPERS.md) for the architecture, config files and tests.
 
-The sonification engine can also run from the command line on structural CSV data:
+`requirements.txt` is the complete dependency set and keeps step with `[project].dependencies` plus the
+`model-updating` extra in `pyproject.toml`. OpenSees stays an extra in the package metadata (guardrail
+G8) so `sensepi` can be imported as a library without it; `requirements.txt` installs it anyway, so the
+app is always complete.
+
+Installing the package itself adds the console commands:
 
 ```bash
+pip install -e .          # adds sensepi-gui, sensepi-sonify, opensees-calibrate
 sensepi-sonify --input path/to/data.csv --out out.wav --mode harmonic --joint 28 --r1-measurement R1 --u1-measurement U1
 ```
