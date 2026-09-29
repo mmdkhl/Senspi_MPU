@@ -1,12 +1,37 @@
+# SensePi — complete dependency set.
+#
+# Installing this file gives you a FULLY working app: every tab does everything
+# it is meant to do, including Spectrum, Model Updating (OpenSees) and the
+# Sonification audio. Nothing here is optional.
+#
+#     python -m pip install -r requirements.txt
+#     python main.py
+#
+# Python 3.11 or newer. (`main.py` puts `src` on the import path, so a separate
+# `pip install -e .` is not required — though it still works if you prefer it.)
+
+# --- GUI, plotting, data ----------------------------------------------------
 PySide6>=6.6
+pyqtgraph>=0.13
+matplotlib>=3.8
 numpy>=1.25
 scipy>=1.11
-matplotlib>=3.8
+
+# --- Raspberry Pi connection, config, diagnostics ---------------------------
 paramiko>=3.3
 PyYAML>=6.0
 psutil>=5.9
-pyqtgraph>=0.13
-# Optional for the Model Updating tab:
-# openseespy==3.5.1.3
-# openseespywin==3.5.1.12
-# opsvis>=1.0
+
+# --- Sonification audio out -------------------------------------------------
+# Without this the Sonification tab still draws its panels but stays silent.
+sounddevice>=0.4
+
+# --- Model Updating (OpenSees) ----------------------------------------------
+# Do NOT pin these to an exact version. openseespy is a meta-package that pulls
+# the build for your platform, and on Windows each openseespywin release
+# supports exactly ONE Python minor version (3.5.1.12-3.7.0.3 are 3.11-only,
+# 3.7.0.3.1-3.7.1.2 are 3.12-only, 3.8.0.0 is >=3.12). An exact pin therefore
+# installs on one Python and hard-fails on every other. A floor lets pip pick
+# the build that matches whatever Python you have.
+openseespy>=3.7
+opsvis>=1.0

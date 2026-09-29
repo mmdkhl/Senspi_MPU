@@ -17,16 +17,25 @@ dependencies = [
   "PyYAML>=6.0",
   "psutil>=5.9",
   "pyqtgraph>=0.13",
+  # Audio output for the Sonification tab. A base dependency, not an extra:
+  # it is small and pure-Python-installable everywhere, and as an extra it was
+  # simply never installed, so every fresh install ran the tab in silent mode.
+  "sounddevice>=0.4",
 ]
 
 [project.optional-dependencies]
-sonification = [
-  "sounddevice>=0.4",
-]
+# Kept so `pip install -e ".[sonification]"` still works; sounddevice moved
+# into the base dependencies above.
+sonification = []
 model-updating = [
-  "openseespy==3.5.1.3; platform_system == 'Windows'",
-  "openseespywin==3.5.1.12; platform_system == 'Windows'",
-  "openseespy>=3.7; platform_system != 'Windows'",
+  # Do NOT pin exact versions here. openseespy is a meta-package that pulls a
+  # platform build, and on Windows each openseespywin release supports exactly
+  # ONE Python minor version (3.5.1.12-3.7.0.3 are 3.11-only, 3.7.0.3.1-3.7.1.2
+  # are 3.12-only, 3.8.0.0 is >=3.12). An exact pin therefore installs on one
+  # Python and hard-fails on every other, which also aborts the base install
+  # when both are requested in a single pip command. A floor lets pip pick the
+  # build that matches whatever Python the user has.
+  "openseespy>=3.7",
   "opsvis>=1.0",
 ]
 
