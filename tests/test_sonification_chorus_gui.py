@@ -215,12 +215,17 @@ class TestMainWindowIntegration(unittest.TestCase):
         self.assertNotIn("Bioacoustic Chorus", titles)
         son = w.sonification_tab
         subs = [son._tabs.tabText(i) for i in range(son._tabs.count())]
-        self.assertEqual(subs, ["Bioacoustic Chorus", "Team Model"])
+        self.assertEqual(subs, ["Bioacoustic Chorus", "Structure Pulse"])
         self.assertIsNotNone(son.chorus_tab._controller)
         self.assertTrue(hasattr(son, "shutdown"))
-        self.assertTrue(hasattr(son.team_tab, "shutdown"))
-        w.close()
-        self.app.processEvents()
+        # every model must be stoppable the same way, whatever it is
+        for model in son.models:
+            self.assertTrue(hasattr(model, "shutdown"), type(model).__name__)
+        try:
+            son.shutdown()
+            w.close()
+        finally:
+            self.app.processEvents()
 
 
 if __name__ == "__main__":
