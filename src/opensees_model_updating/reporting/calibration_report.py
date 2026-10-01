@@ -18,7 +18,7 @@ from ..utils.formatters import (
     column_orientation_layout_to_text,
     additional_masses_to_text,
 )
-from ..utils.math_utils import align_mode_sign, safe_percent_error
+from ..utils.math_utils import safe_percent_error
 
 
 # ── Partial-coverage mode-shape helpers (T8.3 / B1) ───────────────────────────
@@ -86,7 +86,7 @@ def make_modal_comparison_report(exp_data, modal_before, modal_after,
         Original model parameters.
     final_params : dict
         Calibrated model parameters.
-    calib_result : scipy OptimizeResult or None
+    calib_result : scipy OptimizeResult, BayesianResult or None
 
     Returns
     -------
@@ -162,14 +162,22 @@ def make_modal_comparison_report(exp_data, modal_before, modal_after,
     report["mode_shape_comparison"] = mode_shape_comparison
 
     if calib_result is not None:
+        # scipy's OptimizeResult carries the solution as ``x``; the Bayesian
+        # engine's BayesianResult carries the posterior ``mean`` and ``sigma``.
+        x = getattr(calib_result, "x", None)
+        if x is None:
+            x = calib_result.mean
         report["optimizer"] = {
             "success": bool(calib_result.success),
             "status": int(calib_result.status),
             "message": str(calib_result.message),
             "nfev": int(calib_result.nfev),
             "cost": float(calib_result.cost),
-            "x": np.asarray(calib_result.x, dtype=float).tolist(),
+            "x": np.asarray(x, dtype=float).tolist(),
         }
+        sigma = getattr(calib_result, "sigma", None)
+        if sigma is not None:
+            report["optimizer"]["sigma"] = np.asarray(sigma, dtype=float).tolist()
 
     return report
 

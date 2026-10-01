@@ -58,7 +58,7 @@ def _import_gui_main():
             [
                 "",
                 "Fix options:",
-                "  1. Recreate .venv with a working Python 3.11+ installation.",
+                "  1. Recreate .venv with a working Python 3.12 installation.",
                 "  2. Install project dependencies:",
                 "     python -m pip install -r requirements.txt",
                 "     or",

@@ -135,7 +135,7 @@ def _summarize_file(path: Path, explicit_sensor_id: Optional[int] = None) -> Non
     elif suffix.endswith(".jsonl"):
         rows = _load_rows_jsonl(path)
     else:
-        print(f"\n=== Sample rate check ===")
+        print("\n=== Sample rate check ===")
         print(f"File: {path}")
         print(f"  WARNING: unsupported extension {path.suffix!r}; skipping.")
         return

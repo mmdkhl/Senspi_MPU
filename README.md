@@ -21,11 +21,12 @@ You need two free programs:
 
 | Program | Where to get it | Notes |
 |---|---|---|
-| **Python** (3.11 or newer) | https://www.python.org/downloads/ | On Windows, tick **"Add python.exe to PATH"** on the first installer screen. |
+| **Python 3.12** | https://www.python.org/downloads/release/python-31210/ | On Windows, tick **"Add python.exe to PATH"** on the first installer screen. |
 | **Git** | https://git-scm.com/downloads | The default options are fine. |
 
-Any Python from **3.11 onwards** works, and every tab works on all of them. If you already have a
-recent Python, you can use it.
+Use **Python 3.12**. Newer versions (3.13, 3.14) install without errors, but on Windows the *Model
+Updating* tab then fails, because its OpenSees engine is only built for 3.12. If you already have a
+different Python, install 3.12 next to it.
 
 To check that both are installed, open a **new** terminal (Windows: press the Start key and type
 `PowerShell`; macOS: open *Terminal*) and run:
@@ -35,7 +36,7 @@ python --version
 git --version
 ```
 
-The first command should print `Python 3.11` or higher. On macOS/Linux, use `python3` in place of
+The first command should print `Python 3.12.x`. On macOS/Linux, use `python3.12` in place of
 `python`.
 
 ### Step 2: Download the app
@@ -233,8 +234,9 @@ Notes:
   The student setup (Step 5) depends on these paths, so keep them the same on every Pi.
 - `output_dir` in `pi_config.yaml` must be `/home/verwalter/logs/mpu` (inside the `verwalter` home
   directory).
-- `deploy_pi.bat` / `deploy_pi.example.bat` deploy the older **3-sensor** folder
-  (`raspberrypi_scripts/`). Don't use them for the camp setup.
+- `deploy_pi.bat` / `deploy_pi.example.bat` copy the 4-sensor folder to the Pi. Set `REMOTE_DIR`
+  (and the matching "Refusing to wipe" guard line) to the Pi's real folder first, for example
+  `/home/verwalter/sensor4`: the script empties that folder before copying.
 
 ### Keeping credentials out of Git
 

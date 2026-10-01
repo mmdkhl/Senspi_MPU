@@ -43,8 +43,10 @@ python -m unittest discover -s tests
 - `src/sensepi/remote/`  
   SSH + remote process control + log sync
 
-- `raspberrypi_scripts/`  
-  The scripts copied to the Raspberry Pi (e.g. `mpu6050_multi_logger.py`)
+- `raspberrypi_scripts_4_sensor/`  
+  The scripts copied to the Raspberry Pi (e.g. `mpu6050_multi_logger.py`) for the
+  current 4-sensor + OLED rig. `raspberrypi_scripts/` is the older 3-sensor
+  version; its logger only accepts sensors 1–3.
 
 - `src/sensepi/config/`  
   YAML + dataclasses for hosts/sensors/sampling and shared path conventions
@@ -165,7 +167,7 @@ Key points:
 
 The default sensor is the MPU6050 logger:
 
-- `raspberrypi_scripts/mpu6050_multi_logger.py`
+- `raspberrypi_scripts_4_sensor/mpu6050_multi_logger.py`
 
 The desktop starts it over SSH roughly like:
 
@@ -177,8 +179,9 @@ python3 <base_path>/mpu6050_multi_logger.py --config <pi_config.yaml> ... --stre
 
 ### Pi deployment helper
 `deploy_pi.bat` copies:
-- `raspberrypi_scripts/*` → `<REMOTE_DIR>/`
-- `src/sensepi/config/*` + `src/sensepi/__init__.py` → `<REMOTE_DIR>/sensepi/`
+- `raspberrypi_scripts_4_sensor/*` → `<REMOTE_DIR>/` (default `/home/pi/sensor4`)
+- `src/sensepi/config/*.py` + `src/sensepi/__init__.py` → `<REMOTE_DIR>/sensepi/`
+  (the Python modules only, so `hosts.local.yaml` and its passwords stay on the PC)
 
 This “mini sensepi package” on the Pi exists because the Pi scripts import shared helpers
 like `sensepi.config.log_paths`.
@@ -216,7 +219,7 @@ The GUI uses the host’s `data_dir` and the sensor prefix (e.g. `mpu`) to decid
 
 ### C) Add a new sensor type
 You typically need:
-1. A Pi-side logger script under `raspberrypi_scripts/`
+1. A Pi-side logger script under `raspberrypi_scripts_4_sensor/`
 2. A desktop-side parser under `src/sensepi/sensors/`
 3. A config entry in `sensors.yaml` + a `PiLoggerConfig` update
 4. A way for `PiRecorder` / `RecorderController` to select the correct script + prefix

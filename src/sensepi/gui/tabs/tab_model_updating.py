@@ -5,7 +5,6 @@ import contextlib
 import importlib.util
 import io
 import json
-import os
 import time
 import traceback
 from dataclasses import dataclass
@@ -67,6 +66,10 @@ REQUIRED_MODULES = ("openseespy", "opsvis")
 # map, so an unassigned sensor never enters the calculation.
 # Retained: the manual mode-shape table still offers "not measured" cells.
 UNASSIGNED_STORY = "—"
+
+# Shortest gap between two redraws of Run Analysis's live plots (see
+# ModelUpdatingTab._on_animation_frame).
+LIVE_FRAME_INTERVAL_MS = 250
 
 # Input files bundled with the opensees_model_updating package
 _OPENSEES_INPUT_DIR = Path(__file__).resolve().parents[3] / "opensees_model_updating" / "input"
@@ -1388,8 +1391,7 @@ class _IdentifyWorker(QObject):
                 self.log.emit(f"    Mode {m + 1}:  f = {f:6.3f} Hz   T = {period:6.3f} s   "
                               f"ζ = n/a (use Spectrum → damping ratio)\n")
 
-            shape_kind = "magnitude" if result.method == "fft" else "signed"
-            self.log.emit(f"\n  Per-sensor mode shapes ({shape_kind}, |max| = 1):\n")
+            self.log.emit("\n  Per-sensor mode shapes (signed, |max| = 1):\n")
             for m, shape in enumerate(result.mode_shapes_sensor):
                 cells = "   ".join(
                     f"S{session.sensor_ids[i]}: {v:+.3f}"
@@ -1814,6 +1816,15 @@ class ModelUpdatingTab(QWidget):
         self._recorder_controller = None
         self._continuous_thread: QThread | None = None
         self._continuous_worker: _ContinuousUpdateWorker | None = None
+        # (thread, worker) pairs kept alive until the thread has finished.
+        self._continuous_refs: list[tuple[QThread, _ContinuousUpdateWorker]] = []
+        # Live Run Analysis frames are coalesced: each carries the whole history
+        # so far, so only the latest needs drawing, at most every interval.
+        self._pending_frame: dict[str, Any] | None = None
+        self._frame_timer = QTimer(self)
+        self._frame_timer.setSingleShot(True)
+        self._frame_timer.setInterval(LIVE_FRAME_INTERVAL_MS)
+        self._frame_timer.timeout.connect(self._flush_pending_frame)
         self._latest_continuous_calibration: dict[str, Any] | None = None
         self._latest_continuous_signature: str | None = None
         self._continuous_handoff_selected = False
@@ -3006,6 +3017,11 @@ class ModelUpdatingTab(QWidget):
 
     def _collect_params(self) -> dict[str, Any]:
         project_dir = Path(self._project_dir_edit.text().strip())
+        # The default workspace is not in the repository, so create it on first
+        # use. A folder the user typed is not created: a missing one is more
+        # likely a typo than a request for a new folder.
+        if not project_dir.is_dir() and project_dir == _default_workspace_dir():
+            project_dir.mkdir(parents=True, exist_ok=True)
         if not project_dir.is_dir():
             raise ValueError(f"Output workspace folder does not exist: {project_dir}")
 
@@ -3191,6 +3207,8 @@ class ModelUpdatingTab(QWidget):
     def _on_animation_frame(self, frame: dict[str, Any]) -> None:
         kind = frame.get("kind")
         if kind == "init":
+            self._frame_timer.stop()
+            self._pending_frame = None
             self._fig1_label.hide()
             self._fig2_label.hide()
             self._live_response_canvas.show()
@@ -3202,6 +3220,30 @@ class ModelUpdatingTab(QWidget):
             )
             return
 
+        # The worker emits ~10 frames/s and redrawing both canvases for each
+        # kept the GUI thread busy for most of a run, freezing it for up to
+        # ~1.5 s while it competed with the worker for the GIL. Draw the first
+        # frame at once, then at most one (the latest) per interval; the final
+        # frame is always drawn immediately.
+        if kind == "final":
+            self._frame_timer.stop()
+            self._pending_frame = None
+            self._draw_frame(frame)
+            return
+        if self._frame_timer.isActive():
+            self._pending_frame = frame
+            return
+        self._draw_frame(frame)
+        self._frame_timer.start()
+
+    @Slot()
+    def _flush_pending_frame(self) -> None:
+        frame, self._pending_frame = self._pending_frame, None
+        if frame is not None:
+            self._draw_frame(frame)
+            self._frame_timer.start()
+
+    def _draw_frame(self, frame: dict[str, Any]) -> None:
         self._live_response_canvas.update_frame(frame)
         self._live_3d_canvas.update_frame(frame)
 
@@ -3246,8 +3288,10 @@ class ModelUpdatingTab(QWidget):
         worker.finished.connect(self._on_worker_finished)
         worker.error.connect(self._on_worker_error)
         thread.started.connect(worker.run)
-        worker.finished.connect(thread.quit)
-        worker.error.connect(thread.quit)
+        # DirectConnection: shutdown() waits for this thread on the GUI thread,
+        # where a queued quit() could never be delivered.
+        worker.finished.connect(thread.quit, Qt.DirectConnection)
+        worker.error.connect(thread.quit, Qt.DirectConnection)
         worker.finished.connect(worker.deleteLater)
         worker.error.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
@@ -3545,8 +3589,9 @@ class ModelUpdatingTab(QWidget):
         worker.finished.connect(self._on_identify_finished)
         worker.error.connect(self._on_identify_error)
         thread.started.connect(worker.run)
-        worker.finished.connect(thread.quit)
-        worker.error.connect(thread.quit)
+        # DirectConnection: see _start_worker.
+        worker.finished.connect(thread.quit, Qt.DirectConnection)
+        worker.error.connect(thread.quit, Qt.DirectConnection)
         worker.finished.connect(worker.deleteLater)
         worker.error.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
@@ -3709,6 +3754,10 @@ class ModelUpdatingTab(QWidget):
         self._twin_live_view.set_controller(ctrl)
         self._twin_live_view.apply_sensor_map(self._sensor_mapping)
         self._twin_live_view.start()
+        self._launch_continuous(worker)
+
+    def _launch_continuous(self, worker: "_ContinuousUpdateWorker") -> None:
+        """Run ``worker`` on its own thread as the tab's continuous update."""
         thread = QThread(self)
         worker.moveToThread(thread)
         worker.log.connect(self._append_log)
@@ -3716,9 +3765,17 @@ class ModelUpdatingTab(QWidget):
         worker.error.connect(self._on_continuous_error)
         worker.finished.connect(self._on_continuous_finished)
         thread.started.connect(worker.run)
-        worker.finished.connect(thread.quit)
+        # DirectConnection: shutdown() waits for this thread on the GUI thread,
+        # where a queued quit() could never be delivered. QThread.quit() is
+        # thread-safe.
+        worker.finished.connect(thread.quit, Qt.DirectConnection)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
+        # The worker has no Qt parent, so Python owns it. Hold it until its
+        # thread has finished: _on_continuous_finished clears the tab's own
+        # reference, possibly while the thread is still unwinding.
+        self._continuous_refs.append((thread, worker))
+        thread.finished.connect(self._release_finished_continuous)
 
         self._continuous_worker = worker
         self._continuous_thread = thread
@@ -3892,3 +3949,40 @@ class ModelUpdatingTab(QWidget):
             )
         else:
             self._set_busy(False, "Continuous update stopped.")
+
+    @Slot()
+    def _release_finished_continuous(self) -> None:
+        """Drop the references held for continuous threads that have finished."""
+        alive = []
+        for thread, worker in self._continuous_refs:
+            try:
+                running = thread.isRunning()
+            except RuntimeError:  # its deleteLater already ran: it finished
+                running = False
+            if running:
+                alive.append((thread, worker))
+        self._continuous_refs = alive
+
+    def shutdown(self, wait_ms: int = 10000) -> bool:
+        """Stop background work before the window closes.
+
+        Called by MainWindow on application close. Continuous Update stops
+        within a moment unless a calibration is mid-flight; a one-shot
+        Calibrate / Run Analysis cannot be interrupted, so both are waited for
+        up to ``wait_ms`` rather than destroyed while running.
+
+        Returns True when no thread is left running. False means a job is still
+        in OpenSees; the caller must not destroy the tab until it finishes.
+        """
+        if self._continuous_worker is not None:
+            self._continuous_worker.stop()
+        all_stopped = True
+        for thread in (self._continuous_thread, self._thread):
+            if thread is None:
+                continue
+            try:
+                if not thread.wait(max(0, int(wait_ms))):
+                    all_stopped = False
+            except RuntimeError:  # already finished and deleted
+                pass
+        return all_stopped

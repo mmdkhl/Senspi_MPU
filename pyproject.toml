@@ -7,7 +7,7 @@ name = "sensepi"
 version = "0.1.0"
 description = "SensePi MPU"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11,<3.13"
 dependencies = [
   "PySide6>=6.6",
   "numpy>=1.25",
@@ -28,14 +28,13 @@ dependencies = [
 # into the base dependencies above.
 sonification = []
 model-updating = [
-  # Do NOT pin exact versions here. openseespy is a meta-package that pulls a
-  # platform build, and on Windows each openseespywin release supports exactly
-  # ONE Python minor version (3.5.1.12-3.7.0.3 are 3.11-only, 3.7.0.3.1-3.7.1.2
-  # are 3.12-only, 3.8.0.0 is >=3.12). An exact pin therefore installs on one
-  # Python and hard-fails on every other, which also aborts the base install
-  # when both are requested in a single pip command. A floor lets pip pick the
-  # build that matches whatever Python the user has.
-  "openseespy>=3.7",
+  # Same rule as requirements.txt (see the comment there). Use Python 3.12: on
+  # Windows the current OpenSees build links python312.dll, so it fails to
+  # import on 3.13+; on Windows + 3.11 the last working build (3.5.1.12) is
+  # selected instead.
+  'openseespy>=3.7; sys_platform != "win32" or python_version != "3.11"',
+  'openseespy==3.5.1.3; sys_platform == "win32" and python_version == "3.11"',
+  'openseespywin==3.5.1.12; sys_platform == "win32" and python_version == "3.11"',
   "opsvis>=1.0",
 ]
 

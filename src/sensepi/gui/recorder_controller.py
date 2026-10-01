@@ -149,8 +149,20 @@ class ModalCaptureBuffer:
         """The channels a snapshot can be taken on."""
         return tuple(cls._AXIS_COLUMNS)
 
-    def snapshot_series(self, axis: str) -> Dict[int, list[Tuple[float, float]]]:
+    #: Extra history kept in a bounded snapshot, so the aligner still has a
+    #: sample either side of the window it cuts.
+    _WINDOW_MARGIN_S = 1.0
+
+    def snapshot_series(
+        self, axis: str, last_seconds: float | None = None
+    ) -> Dict[int, list[Tuple[float, float]]]:
         """Return a copied {sensor_id: [(t, axis_value), ...]} (thread-safe).
+
+        With ``last_seconds``, only the rows the aligner will use are copied:
+        the window ends where ``align_per_sensor_series`` ends it (the earliest
+        of the sensors' newest samples), plus a small margin. Copying the whole
+        buffer under the lock for a few seconds of data made every chorus tick
+        cost more than its own interval.
 
         An unknown axis used to fall back to ``ax`` silently, which let callers
         believe they were reading a channel they were not. Unknown names now
@@ -163,11 +175,29 @@ class ModalCaptureBuffer:
                 "ModalCaptureBuffer: unknown axis %r, falling back to 'ax'", axis)
             col = 1
         with self._lock:
-            return {
-                sid: [(row[0], row[col]) for row in dq]
-                for sid, dq in self._buf.items()
-                if dq
-            }
+            if last_seconds is None or last_seconds <= 0:
+                return {
+                    sid: [(row[0], row[col]) for row in dq]
+                    for sid, dq in self._buf.items()
+                    if dq
+                }
+            ends = [dq[-1][0] for dq in self._buf.values() if dq]
+            if not ends:
+                return {}
+            threshold = min(ends) - float(last_seconds) - self._WINDOW_MARGIN_S
+            out: Dict[int, list[Tuple[float, float]]] = {}
+            for sid, dq in self._buf.items():
+                if not dq:
+                    continue
+                rows = []
+                for row in reversed(dq):
+                    if row[0] < threshold:
+                        rows.append((row[0], row[col]))  # one sample before the window
+                        break
+                    rows.append((row[0], row[col]))
+                rows.reverse()
+                out[sid] = rows
+            return out
 
 
 class RecorderController(QObject):
@@ -205,6 +235,11 @@ class RecorderController(QObject):
 
         self._ingest_thread: Optional[QThread] = None
         self._ingest_worker: Optional[SensorIngestWorker] = None
+        # Strong references to every ingest (thread, worker) pair until that
+        # thread has finished. The worker has no Qt parent, so Python owns it:
+        # clearing _ingest_worker on Stop used to destroy it from the GUI thread
+        # while its own thread was starting or still running it.
+        self._ingest_refs: list[tuple[QThread, SensorIngestWorker]] = []
         self._rate_controllers: Dict[str, RateController] = {
             "mpu6050": RateController(window_size=500, default_hz=0.0),
         }
@@ -351,7 +386,7 @@ class RecorderController(QObject):
         """
         from ..dataio.modal_session_loader import align_per_sensor_series
 
-        series = self._modal_buffer.snapshot_series(axis)
+        series = self._modal_buffer.snapshot_series(axis, last_seconds=last_seconds)
         return align_per_sensor_series(
             series, last_seconds=last_seconds, target_fs=target_fs, source="live capture"
         )
@@ -472,7 +507,10 @@ class RecorderController(QObject):
             self.recording_stopped.emit()
             self._close_active_stream()
         else:
-            self._stop_requested = False
+            # _stop_requested is NOT reset here: a previous Stop's queued
+            # _on_ingest_finished may still be pending, and clearing the flag
+            # made it report "Live stream stopped unexpectedly". It is reset by
+            # _on_ingest_finished and when the next stream starts.
             self._close_active_stream()
             if self._pi_recorder is not None:
                 try:
@@ -660,6 +698,12 @@ class RecorderController(QObject):
 
         self._close_active_stream()
         self._clear_sample_queue()
+        # The Pi restarts t_s at 0 on every run, so samples left over from the
+        # previous stream would share timestamps with the new ones -- and the
+        # "last N seconds" window, anchored at the newest timestamp, would keep
+        # returning the previous run. Cleared on start (not stop) so the last
+        # run stays available for analysis after Stop.
+        self._modal_buffer.clear()
 
         recorder = self._create_pi_recorder_for_host(host_cfg)
         if recording_enabled or record_only:
@@ -714,8 +758,16 @@ class RecorderController(QObject):
         worker.error.connect(self._on_ingest_error)
         worker.finished.connect(self._on_ingest_finished)
         worker.finished.connect(worker.deleteLater)
-        worker.finished.connect(thread.quit)
+        # DirectConnection is required: stop_live_stream(wait=True) blocks the
+        # GUI thread in thread.wait(), so a queued quit() would never be
+        # delivered and every Stop would sit out the full timeout.
+        # QThread.quit() is thread-safe.
+        worker.finished.connect(thread.quit, Qt.DirectConnection)
         thread.finished.connect(thread.deleteLater)
+        # Queued to the GUI thread, so the last reference is dropped there, and
+        # only once the thread is done with the worker.
+        self._ingest_refs.append((thread, worker))
+        thread.finished.connect(self._release_finished_ingest)
         thread.start()
 
         self._ingest_thread = thread
@@ -724,6 +776,19 @@ class RecorderController(QObject):
         self.recording_started.emit()
         self.streaming_started.emit()
         self.stream_started.emit()
+
+    @Slot()
+    def _release_finished_ingest(self) -> None:
+        """Drop the references held for ingest threads that have finished."""
+        alive = []
+        for thread, worker in self._ingest_refs:
+            try:
+                running = thread.isRunning()
+            except RuntimeError:  # its deleteLater already ran: it finished
+                running = False
+            if running:
+                alive.append((thread, worker))
+        self._ingest_refs = alive
 
     def _close_active_stream(self) -> None:
         stream = self._active_stream
