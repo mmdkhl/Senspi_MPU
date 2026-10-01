@@ -34,6 +34,11 @@ FFT_PROMINENCE_RATIO = 0.02
 MIN_FFT_PEAK_SEPARATION_HZ = 0.25
 MIN_PEAK_FRACTION_FOR_DAMPING = 0.08
 MIN_NUMBER_OF_DECAY_PEAKS = 8
+#: The log-decrement fit only means something on a free decay. Free decays fit
+#: with R^2 >= 0.99; steady shaking or ambient motion, whose peaks do not decay,
+#: still produced a plausible-looking zeta at R^2 0.4-0.8. Below this the
+#: estimate is reported but flagged unreliable.
+MIN_DAMPING_FIT_R2 = 0.9
 
 
 @dataclass
@@ -618,6 +623,8 @@ def estimate_damping_first_mode_real_response(*args, min_peak_fraction: float = 
         "damping_percent": float(100.0 * zeta) if np.isfinite(zeta) else float("nan"),
         "decay_rate_beta_1_per_s": float(beta),
         "fit_R2": float(fit_r2),
+        "reliable": bool(np.isfinite(zeta) and np.isfinite(fit_r2)
+                         and fit_r2 >= MIN_DAMPING_FIT_R2),
         "n_peaks_used": int(peak_times.size),
         "time": t,
         "real_detrended_response": x_real,

@@ -58,7 +58,6 @@ from PySide6.QtWidgets import (
 
 from ...config.app_config import (
     AppConfig,
-    HostConfig,
     HostInventory,
     SensorDefaults,
     build_pi_config_for_host,

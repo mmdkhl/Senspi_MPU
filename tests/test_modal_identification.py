@@ -88,13 +88,13 @@ class TestIdentifyModesFFT(unittest.TestCase):
         for got, expected in zip(result.frequencies_hz, TRUE_FREQS):
             self.assertAlmostEqual(got, expected, delta=0.2)
 
-    def test_shapes_are_magnitude(self):
-        # FFT recovers magnitude only (sign unknown), so compare against |truth|.
+    def test_shapes_are_signed(self):
+        # The FFT path phase-aligns each peak's spectrum to a real vector, so the
+        # relative signs between sensors survive (MAC ignores the global sign).
         x, fs = _synthetic()
         result = modal.identify_modes(x, fs, n_modes=3, method="fft")
         for got, expected in zip(result.mode_shapes_sensor, TRUE_SHAPES):
-            self.assertGreater(_mac(got, np.abs(expected)), 0.9)
-            self.assertTrue(all(v >= 0 for v in got))
+            self.assertGreater(_mac(got, expected), 0.95)
 
     def test_shapes_normalized_maxabs_one(self):
         x, fs = _synthetic()

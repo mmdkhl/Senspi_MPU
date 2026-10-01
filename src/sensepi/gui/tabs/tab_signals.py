@@ -1540,6 +1540,7 @@ class SignalsTab(QWidget):
         The device sampling rate (cfg.sampling.device_rate_hz) is the single
         source of truth for the SignalsTab x-axis. Stream rate measurements
         are only used for display and refresh timing, not for the x-axis.
+        are only used for display and refresh timing, not for the x-axis.
         """
 
         self._current_gui_acquisition_config = cfg

@@ -8,5 +8,8 @@
 *.txt text eol=lf
 *.svg text eol=lf
 *.mmd text eol=lf
+# Shell scripts run on the Raspberry Pi: with CRLF, bash stops at the first
+# "set -euo pipefail" ("set: pipefail\r: invalid option name").
+*.sh text eol=lf
 
 *.bat text eol=crlf

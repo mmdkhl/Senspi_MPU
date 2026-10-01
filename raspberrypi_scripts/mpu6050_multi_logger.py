@@ -103,7 +103,7 @@ from sensepi.config.log_paths import (
 
 try:
     from smbus2 import SMBus
-except Exception as e:
+except Exception:
     print("ERROR: smbus2 is required. Install with: pip3 install smbus2", file=sys.stderr)
     raise
 

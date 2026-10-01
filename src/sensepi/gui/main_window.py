@@ -64,6 +64,12 @@ class MainWindow(QMainWindow):
         self._log_sync_worker: _LogSyncTask | None = None
         self._auto_stop_timer = QTimer(self)
         self._auto_stop_timer.setSingleShot(True)
+        # How long a close waits for Model Updating before postponing itself,
+        # and the poll that completes a postponed close once the job is done.
+        self._shutdown_wait_ms = 10000
+        self._close_retry_timer = QTimer(self)
+        self._close_retry_timer.setInterval(250)
+        self._close_retry_timer.timeout.connect(self._retry_close_when_idle)
 
         # Authoritative sensor placement, owned by Settings. Consumers read it
         # from here rather than each keeping their own picker.
@@ -94,6 +100,26 @@ class MainWindow(QMainWindow):
             self.recorder_tab.report_error(
                 f"Failed to stop sonification on close: {exc!r}"
             )
+        # Model Updating's workers (Continuous Update, Calibrate, Run Analysis,
+        # Identify) run on their own threads; closing without waiting for them
+        # destroyed a running QThread and crashed the process. A one-shot job
+        # cannot be interrupted mid-OpenSees, so if it outlasts the wait the
+        # close is postponed and completes by itself when the job is done.
+        try:
+            idle = self.model_updating_tab.shutdown(wait_ms=self._shutdown_wait_ms)
+        except Exception as exc:  # pragma: no cover - best-effort shutdown
+            idle = True
+            self.recorder_tab.report_error(
+                f"Failed to stop Model Updating on close: {exc!r}"
+            )
+        if not idle:
+            event.ignore()
+            self.statusBar().showMessage(
+                "Waiting for the running Model Updating job to finish; "
+                "SensePi will close by itself when it is done.")
+            self._close_retry_timer.start()
+            return
+        self._close_retry_timer.stop()
         try:
             self.recorder_tab.stop_live_stream(wait=True)
         except Exception as exc:  # pragma: no cover - best-effort shutdown
@@ -101,6 +127,13 @@ class MainWindow(QMainWindow):
                 f"Failed to stop stream on close: {exc!r}"
             )
         super().closeEvent(event)
+
+    @Slot()
+    def _retry_close_when_idle(self) -> None:
+        """Complete a close that was postponed for a running Model Updating job."""
+        if not self.model_updating_tab.is_busy():
+            self._close_retry_timer.stop()
+            self.close()
 
     def _build_tabs(self) -> None:
         """Create and register all main workflow tabs."""

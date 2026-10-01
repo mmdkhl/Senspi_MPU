@@ -17,7 +17,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDoubleSpinBox,
-    QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QMessageBox,
@@ -26,7 +25,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpinBox,
     QProgressBar,
-    QTextEdit,
     QSplitter,
     QVBoxLayout,
     QWidget,
@@ -48,7 +46,7 @@ from ...data import StreamingDataBuffer
 # (eigen capture now uses RecorderController.snapshot_modal_capture, which aligns
 # internally — no direct align_per_sensor_series call here.)
 from ...tools.debug import debug_enabled
-from . import LayoutSignature, SampleKey
+from . import SampleKey
 
 if TYPE_CHECKING:  # pragma: no cover - circular import guard
     from ..recorder_controller import RecorderController
@@ -95,6 +93,26 @@ _EIGEN_COLORS = ("#ff5252", "#448aff", "#69f0ae")
 # pickers in the app, and two of them could disagree about the same rig.
 
 logger = logging.getLogger(__name__)
+
+
+def damping_for_model_updating(damping: dict) -> float | None:
+    """The damping ratio to hand to Model Updating, or None.
+
+    Only a reliable log-decrement fit (a free decay) is passed on. On steady
+    shaking the fit still yields a plausible-looking zeta, which used to be
+    copied into the model without comment.
+    """
+    if not damping or damping.get("reliable") is not True:
+        return None
+    zeta = damping.get("zeta")
+    return float(zeta) if zeta is not None else None
+
+
+def _damping_warning(damping: dict) -> str:
+    """One line to show under a damping value that cannot be trusted."""
+    if damping.get("reliable") is True:
+        return ""
+    return "\nunreliable: not a free decay (not sent to Model Updating)"
 
 
 class _EigenFreqWorker(QObject):
@@ -347,6 +365,7 @@ class _EigenFreqWorker(QObject):
                             "zeta": float(damping["zeta"]),
                             "damping_percent": float(damping["damping_percent"]),
                             "fit_R2": float(damping["fit_R2"]),
+                            "reliable": bool(damping["reliable"]),
                             "n_peaks_used": int(damping["n_peaks_used"]),
                         }
                     except Exception as exc:
@@ -545,10 +564,11 @@ class FftTab(QWidget):
         # Row 1 — method selector + eigen-identification params (Window 2).
         self.method_combo = QComboBox()
         self.method_combo.addItem("FDD", "fdd")     # FDD default (M2)
-        # DEBT-7: the FFT branch's mode shapes are known-wrong (MAC 0.002 vs
-        # truth). Its frequencies are fine, so it stays — labelled honestly, and
-        # the shape views blank themselves for it.
-        self.method_combo.addItem("FFT (frequencies only)", "fft")
+        # FFT shapes are phase-aligned and signed; on randomly excited frames they
+        # match the true shapes as closely as FDD's (tests/test_fft_mode_shapes).
+        # The old "known-wrong" verdict came from a test that compared them
+        # against unsigned truth.
+        self.method_combo.addItem("FFT", "fft")
         # Enabled only when the map places a sensor on floor 0 — without the
         # input there is nothing to reference against.
         self.method_combo.addItem("Base-referenced (FRF)", "base_ref")
@@ -810,7 +830,8 @@ class FftTab(QWidget):
         """
         hints = {
             "fdd": "SVD of the cross-spectral-density matrix — signed mode shapes.",
-            "fft": "Sensor-averaged Hann FFT peaks. Mode shapes NOT available (DEBT-7).",
+            "fft": ("Sensor-averaged Hann FFT peaks — phase-aligned signed mode shapes. "
+                    "Closely spaced modes blur together; FDD separates them."),
             "base_ref": "H1 transmissibility vs the floor-0 sensor, coherence-gated.",
         }
         text = hints.get(self._selected_method(), "")
@@ -1571,7 +1592,7 @@ class FftTab(QWidget):
             return
 
         damping = payload.get("damping") or {}
-        damping_ratio = damping.get("zeta")
+        damping_ratio = damping_for_model_updating(damping)
 
         coverage = [int(c) for c in payload.get("coverage_stories", [])]
         method = str(payload.get("method") or self._selected_method()).upper()
@@ -1640,7 +1661,6 @@ class FftTab(QWidget):
 
     def _render_final_values(self, payload: dict) -> None:
         method = str(payload.get("method") or self._selected_method()).upper()
-        duration = float(payload.get("duration_s", FINAL_VALUES_BATCH_S))
         freqs = [float(f) for f in payload.get("freqs", [])]
         shapes = payload.get("mode_shapes_ux") or {}
         coverage = [int(s) for s in payload.get("coverage_stories", [])]
@@ -1705,6 +1725,7 @@ class FftTab(QWidget):
                 f"ζ = {zeta:.5f} ({damp_pct:.2f}%)\n"
                 f"peaks = {n_peaks}\n"
                 f"R² = {r2:.3f}"
+                f"{_damping_warning(damping)}"
             )
         else:
             damping_info = f"Damping\n{str(payload.get('damping_error') or 'No result available.')}"
@@ -2081,12 +2102,12 @@ class FftTab(QWidget):
                         f"drawn at {self._TORSION_VIEW_DEG:.0f}° "
                         f"({scale:.0f}x) · all floors share this scale")
         else:
-            bits.append(f"Torsion · no floor is twisting above the measurement noise "
-                        f"· all slabs shown at rest")
+            bits.append("Torsion · no floor is twisting above the measurement noise "
+                        "· all slabs shown at rest")
         bits.append(f"slab {lx:.3f} x {ly:.3f} m from the model" if real_units
                     else "plan size unknown - set Lx/Ly in Model Updating for degrees")
         bits.append(data.get("message") or "")
-        self._eig_status.setText(f"  ·  ".join(b for b in bits if b))
+        self._eig_status.setText("  ·  ".join(b for b in bits if b))
 
     def _render_mode_shapes(self, shape_data: dict) -> None:
         """Draw normalized per-floor mode shapes with legend and value labels.
@@ -2100,14 +2121,8 @@ class FftTab(QWidget):
             self._shape_legend.clear()
         except Exception:
             pass
-        if str(shape_data.get("method", "")).lower() == "fft":
-            self._eig_status.setText(
-                "Mode shapes are not available for FFT (its shapes are known-wrong, "
-                "DEBT-7) — switch to FDD or base-referenced.")
-            return
         shapes = shape_data.get("mode_shapes_ux") or {}
         n_story = int(shape_data.get("n_story", 0))
-        signed = bool(shape_data.get("signed", True))
         full = bool(shape_data.get("full_coverage", False))
         freqs = [float(f) for f in shape_data.get("freqs", [])]
         coverage = [int(s) for s in shape_data.get("coverage_stories", [])]
@@ -2199,6 +2214,7 @@ class FftTab(QWidget):
             f"S{sensor_id}: ζ={zeta:.5f} ({damp_pct:.2f}%)\n"
             f"f1={f1:.2f} Hz, fd={fd:.2f} Hz\n"
             f"R²={r2:.3f}, peaks={n_peaks}"
+            f"{_damping_warning(damping)}"
         )
         text = pg.TextItem(info, color="w", anchor=(1.0, 1.0), fill=(0, 0, 0, 150))
         finite_x = x[np.isfinite(x)]
@@ -2491,6 +2507,12 @@ class FftTab(QWidget):
         return selected
 
     def _on_fft_timer(self) -> None:
+        # The live FFT only draws this tab's own plots. While another tab is
+        # showing it was still recomputed on the GUI thread, competing with
+        # (e.g.) a Model Updating run. Redraw in full once the tab is back.
+        if not self.isVisible():
+            self._force_next_update = True
+            return
         if not debug_enabled():
             self._update_fft()
             return

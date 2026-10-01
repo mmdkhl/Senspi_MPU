@@ -34,7 +34,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog
 
 from ...analysis import sensor_layout as slayout
 from ..widgets.wireframe import LiveStructureView
-from ...sonification.chorus.types import (CASE_MEANING, ROLE_COLORS, ROLE_MEANING,
+from ...sonification.chorus.types import (ROLE_COLORS, ROLE_MEANING,
                                           TYPE_ORDER, TYPES, ChorusConfig, VizFrame,
                                           type_label)
 

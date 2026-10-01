@@ -1,6 +1,5 @@
 
 import trimesh
-import numpy as np
 
 # ---------------- USER-ADJUSTABLE PARAMETERS (all in mm) ----------------
 BREAKOUT_HOLE_X = 58.0     # VERIFY: spacing between breakout mounting holes, X

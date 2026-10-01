@@ -24,10 +24,10 @@ is untouched; this one is safe to test independently.
 - `pi_logger_common.py` — shared helpers and configuration loading.
 - `pi_config.yaml` — configuration file for rates, channels, paths, and the
   enabled sensor list (now `1, 2, 3, 4`).
-- `install_pi_deps.sh` — installs Python dependencies, including the OLED's
-  (`requirements-oled.txt`).
-- `requirements-oled.txt` — `luma.oled` + `pillow`, kept separate from the
-  base `requirements-pi.txt` so the 3-sensor deployment is unaffected.
+- `install_pi_deps.sh` — installs Python dependencies from the two files
+  below, both read from this folder.
+- `requirements-pi.txt` — what the logger imports: `smbus2` and `PyYAML`.
+- `requirements-oled.txt` — the OLED display's `luma.oled` + `pillow`.
 - `run_all_sensors.sh` — launches the OLED display in the background, then
   the logger in the foreground; stopping the logger (Ctrl-C or a stop
   signal) also stops the OLED script.

@@ -1,0 +1,6 @@
+# Python packages the 4-sensor Pi scripts import (installed by install_pi_deps.sh).
+#   smbus2  - I2C access to the MPU6050s (mpu6050_multi_logger.py)
+#   PyYAML  - reads pi_config.yaml (pi_logger_common.py, sensepi.config)
+# The OLED display's packages are in requirements-oled.txt.
+smbus2
+PyYAML

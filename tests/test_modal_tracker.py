@@ -17,7 +17,6 @@ import numpy as np
 
 from sensepi.analysis.modal_tracker import (
     ModalStateTracker,
-    ReadingDiagnostic,
     _mac,
 )
 
