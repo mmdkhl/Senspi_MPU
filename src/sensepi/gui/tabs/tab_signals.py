@@ -7,7 +7,6 @@ import math
 import queue
 import time
 from dataclasses import asdict
-from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, TYPE_CHECKING
 
 from PySide6.QtCore import QSignalBlocker, QTimer, Qt, Signal, Slot
@@ -20,7 +19,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QSpinBox,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -1540,7 +1538,6 @@ class SignalsTab(QWidget):
         The device sampling rate (cfg.sampling.device_rate_hz) is the single
         source of truth for the SignalsTab x-axis. Stream rate measurements
         are only used for display and refresh timing, not for the x-axis.
-        are only used for display and refresh timing, not for the x-axis.
         """
 
         self._current_gui_acquisition_config = cfg
@@ -2487,7 +2484,6 @@ class SignalsTab(QWidget):
         label = getattr(self, "_perf_summary_label", None)
         if label is None:
             return
-        stream_hz = float(self._sampling_rate_hz or 0.0)
         redraw_ms = self._redraw_ema_ms if self._redraw_ema_ms > 0.0 else self._last_redraw_ms
         if redraw_ms <= 0.0:
             redraw_ms = 0.0

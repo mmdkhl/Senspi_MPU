@@ -121,6 +121,84 @@ class _CalibrationState:
     prior_mode_shapes: list[list[float]] | None = None
 
 
+_CALIBRATION_STATE_FILE = "calibration_state.json"
+
+
+def _calibration_state_path() -> Path:
+    """Where the last calibration survives an app restart.
+
+    It is only ever reused when its input signature still matches the current
+    model inputs (see the worker), so restoring a stale file is harmless.
+    """
+    return _default_workspace_dir() / _CALIBRATION_STATE_FILE
+
+
+def _to_jsonable(value: Any) -> Any:
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(k): _to_jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_jsonable(v) for v in value]
+    return value
+
+
+def _save_calibration_state(state: _CalibrationState) -> None:
+    path = _calibration_state_path()
+    if not state.available:
+        with contextlib.suppress(OSError):
+            path.unlink()
+        return
+    payload = _to_jsonable({
+        "version": 1,
+        "saved_at": datetime.now().isoformat(timespec="seconds"),
+        "available": True,
+        "input_signature": state.input_signature,
+        "calibrated_params": state.calibrated_params,
+        "uncalibrated_response": state.uncalibrated_response,
+        "prior_freqs": state.prior_freqs,
+        "prior_periods": state.prior_periods,
+        "prior_mode_shapes": state.prior_mode_shapes,
+    })
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _load_calibration_state() -> _CalibrationState:
+    path = _calibration_state_path()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return _CalibrationState()
+    if not isinstance(data, dict) or not data.get("available"):
+        return _CalibrationState()
+    params = data.get("calibrated_params")
+    if not isinstance(params, dict) or not isinstance(data.get("input_signature"), str):
+        return _CalibrationState()
+    response = data.get("uncalibrated_response")
+    if isinstance(response, dict):
+        # The live response canvas expects arrays, as the worker produced them.
+        response = {
+            k: (np.asarray(v, dtype=float) if k.endswith("_hist") else v)
+            for k, v in response.items()
+        }
+    else:
+        response = None
+    return _CalibrationState(
+        available=True,
+        input_signature=data["input_signature"],
+        calibrated_params=params,
+        uncalibrated_response=response,
+        prior_freqs=data.get("prior_freqs"),
+        prior_periods=data.get("prior_periods"),
+        prior_mode_shapes=data.get("prior_mode_shapes"),
+    )
+
+
 @dataclass
 class _WorkerRequest:
     action: str
@@ -1812,7 +1890,8 @@ class ModelUpdatingTab(QWidget):
         super().__init__(parent)
         self._thread: QThread | None = None
         self._worker: _ModelUpdatingWorker | None = None
-        self._calibration_state = _CalibrationState()
+        # Restored from disk so a calibration survives closing the app.
+        self._calibration_state = _load_calibration_state()
         self._recorder_controller = None
         self._continuous_thread: QThread | None = None
         self._continuous_worker: _ContinuousUpdateWorker | None = None
@@ -3347,6 +3426,7 @@ class ModelUpdatingTab(QWidget):
                 prior_periods=result.get("prior_periods"),
                 prior_mode_shapes=result.get("prior_mode_shapes"),
             )
+            self._persist_calibration_state()
             if result.get("report_text"):
                 self._append_log("\n\n" + result["report_text"])
             self._append_log("\n─── Calibration complete. Results shown above. ───\n")
@@ -3408,6 +3488,7 @@ class ModelUpdatingTab(QWidget):
 
         self._sensor_chain = []
         self._calibration_state = _CalibrationState()
+        self._persist_calibration_state()
         self._latest_continuous_calibration = None
         self._latest_continuous_signature = None
         self._continuous_handoff_selected = False
@@ -3455,6 +3536,12 @@ class ModelUpdatingTab(QWidget):
     def is_busy(self) -> bool:
         """True while a calibration, run or continuous update is in progress."""
         return self._thread is not None or self._continuous_thread is not None
+
+    def _persist_calibration_state(self) -> None:
+        try:
+            _save_calibration_state(self._calibration_state)
+        except Exception as exc:  # never let persistence break the workflow
+            self._append_log(f"\n(Could not save calibration state: {exc})\n")
 
     def calibration_snapshot(self) -> dict[str, Any] | None:
         """A deep copy of the last calibrated parameters, or ``None``.
@@ -3881,6 +3968,7 @@ class ModelUpdatingTab(QWidget):
             input_signature=signature,
             calibrated_params=copy.deepcopy(params),
         )
+        self._persist_calibration_state()
         self._continuous_handoff_selected = True
         self._continuous_dt_btn.setEnabled(False)
         self._append_log(

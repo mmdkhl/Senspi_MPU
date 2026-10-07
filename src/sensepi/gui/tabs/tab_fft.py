@@ -46,6 +46,7 @@ from ...data import StreamingDataBuffer
 # (eigen capture now uses RecorderController.snapshot_modal_capture, which aligns
 # internally — no direct align_per_sensor_series call here.)
 from ...tools.debug import debug_enabled
+from ..thread_retire import ThreadRetirer
 from . import SampleKey
 
 if TYPE_CHECKING:  # pragma: no cover - circular import guard
@@ -545,6 +546,7 @@ class FftTab(QWidget):
         self._eig_worker: _EigenFreqWorker | None = None
         self._final_thread: QThread | None = None
         self._final_worker: _EigenFreqWorker | None = None
+        self._thread_retirer = ThreadRetirer(self)
         self._final_collect_started_perf: float | None = None
         self._last_final_values_payload: dict | None = None
         self._final_countdown_timer = QTimer(self)
@@ -1040,6 +1042,24 @@ class FftTab(QWidget):
             self._eig_status.setText(
                 f"Live eigen-frequencies: collecting first {EIGEN_BATCH_S:.0f} s of data…")
 
+    def shutdown(self, wait_ms: int = 3000) -> None:
+        """Stop timers and let identification threads end before the app quits.
+
+        Destroying a QThread that is still running aborts the process
+        (0xc0000409), and this tab had no shutdown at all.
+        """
+        for name in ("_timer", "_eig_timer", "_final_countdown_timer"):
+            timer = getattr(self, name, None)
+            if timer is not None and timer.isActive():
+                timer.stop()
+        for t_attr, w_attr in (("_eig_thread", "_eig_worker"),
+                               ("_final_thread", "_final_worker")):
+            thread, worker = getattr(self, t_attr), getattr(self, w_attr)
+            setattr(self, t_attr, None)
+            setattr(self, w_attr, None)
+            self._thread_retirer.retire(thread, worker)
+        self._thread_retirer.wait_all(wait_ms)
+
     @Slot()
     def on_stream_stopped(self) -> None:
         logger.info("FftTab: on_stream_stopped")
@@ -1167,12 +1187,9 @@ class FftTab(QWidget):
         worker = self._eig_worker
         self._eig_worker = None
         self._eig_thread = None
-        if thread is not None:
-            thread.quit()
-            thread.wait()
-            thread.deleteLater()      # don't accumulate a QThread per 10 s cycle
-        if worker is not None:
-            worker.deleteLater()
+        # Runs every ~10 s. It used to quit()+wait() here with no timeout,
+        # blocking the GUI thread until the worker thread had exited.
+        self._thread_retirer.retire(thread, worker)
 
     def _render_eigen_frequencies(self, freqs: Sequence[float],
                                   spec_f=None, spec_v=None) -> None:
@@ -1649,12 +1666,7 @@ class FftTab(QWidget):
         worker = self._final_worker
         self._final_worker = None
         self._final_thread = None
-        if thread is not None:
-            thread.quit()
-            thread.wait()
-            thread.deleteLater()
-        if worker is not None:
-            worker.deleteLater()
+        self._thread_retirer.retire(thread, worker)
         if hasattr(self, "_final_start_btn"):
             self._final_start_btn.setEnabled(True)
             self._final_start_btn.setText("Start calculating final values")

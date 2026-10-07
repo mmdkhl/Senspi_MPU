@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import shiboken6
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
 from PySide6.QtWidgets import (QComboBox, QFormLayout, QGridLayout, QGroupBox,
@@ -500,7 +501,17 @@ class SensorMapWidget(QGroupBox):
 
     def _emit_now(self) -> None:
         self._emit_pending = False
-        smap = self.current_map()
+        # _emit queues this through QTimer.singleShot, which holds the bound
+        # method alive. If the widget is torn down before the queued call
+        # arrives — closing the window with a map edit still pending — the Python
+        # wrapper survives while the child combo boxes are already deleted on the
+        # C++ side, and reading them raises RuntimeError mid-teardown.
+        if not shiboken6.isValid(self):
+            return
+        try:
+            smap = self.current_map()
+        except RuntimeError:
+            return
         for sid in range(1, MAX_SENSORS + 1):
             pl = next((p for p in smap.placements if p.sensor_id == sid), None)
             role = pl.role if pl else "unused"

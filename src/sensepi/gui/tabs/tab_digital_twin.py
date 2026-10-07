@@ -45,6 +45,7 @@ from ...analysis import sensor_layout as slayout
 from ...digital_twin import decisions as twin_decisions
 from ..widgets.decision_panel import DecisionPanel
 from ..widgets.wireframe import LiveStructureView
+from ..thread_retire import ThreadRetirer
 from ...digital_twin.comparison import compute_comparison_metrics, fft_amplitude
 
 
@@ -524,6 +525,7 @@ class DigitalTwinExperimentTab(QWidget):
         self._setup: dict[str, Any] | None = None
         self._prepared = False
         self._running = False
+        self._stream_active = False  # True only while a live Pi stream is running
         self._sensor_t0: float | None = None
         self._sensor_start_click_t: float | None = None
         self._baseline: dict[int, float] = {}
@@ -548,16 +550,22 @@ class DigitalTwinExperimentTab(QWidget):
         self._sensor_mapping: dict | None = None
         self._calib_thread: QThread | None = None
         self._calib_worker = None
+        self._thread_retirer = ThreadRetirer(self)
         self._build_ui()
 
         # Render at a fixed GUI rate.  Worker frames are cheap to receive; if
         # several arrive while Matplotlib is busy, only the latest 3D state is
         # drawn.  Numerical integration remains independent of GUI speed.
+        # NOTE: timers are intentionally NOT started here — they are started in
+        # on_stream_started() and stopped in on_stream_stopped() so they do not
+        # waste CPU / block the GUI event loop when no stream is active.
+        # Previously they started unconditionally, causing "Python not responding"
+        # hangs after 2-3 minutes of idle (the 20 fps render + 2.5 fps wireframe
+        # combined were waking the GIL and blocking the Qt event loop).
         self._render_timer = QTimer(self)
         self._render_timer.setInterval(50)  # about 20 frames/s
         self._render_timer.timeout.connect(self._render_latest_frame)
-        self._render_timer.start()
-        self._live_view.start()
+        # _live_view and _render_timer are started by on_stream_started()
         self._update_controls()
 
     def _build_ui(self) -> None:
@@ -768,16 +776,6 @@ class DigitalTwinExperimentTab(QWidget):
             return current_widget()
         return getattr(self._sonification_tab, "chorus_tab", None)
 
-    @Slot()
-    def on_stream_started(self) -> None:
-        self._update_controls()
-
-    @Slot()
-    def on_stream_stopped(self) -> None:
-        if self._running or self._prepared:
-            self._stop_experiment()
-        self._update_controls()
-
     def _update_controls(self) -> None:
         streaming = False
         try:
@@ -907,12 +905,8 @@ class DigitalTwinExperimentTab(QWidget):
     def _clear_calibration_worker(self) -> None:
         thread, self._calib_thread = self._calib_thread, None
         worker, self._calib_worker = self._calib_worker, None
-        if thread is not None:
-            thread.quit()
-            thread.wait()
-            thread.deleteLater()
-        if worker is not None:
-            worker.deleteLater()
+        # No blocking wait on the GUI thread (it had no timeout).
+        self._thread_retirer.retire(thread, worker)
         self._calibrate_btn.setEnabled(True)
         self._update_controls()
 
@@ -1269,7 +1263,41 @@ class DigitalTwinExperimentTab(QWidget):
         self._frame_dirty = True
 
     @Slot()
+    def on_stream_started(self) -> None:
+        """Called by MainWindow when the live Pi stream starts.
+
+        Activates the render timer and wireframe view so they only consume
+        CPU/GPU while there is actually data arriving.
+        """
+        self._stream_active = True
+        if not self._render_timer.isActive():
+            self._render_timer.start()
+        self._live_view.start()
+        self._update_controls()
+
+    @Slot()
+    def on_stream_stopped(self) -> None:
+        """Called by MainWindow when the live Pi stream stops.
+
+        Stops the render timer and wireframe view to prevent idle CPU usage
+        that previously caused "Python not responding" hangs after 2-3 minutes.
+        Without live sensor data there is nothing to compare against, so an
+        armed/running experiment is asked to stop; its final frame is drawn
+        once in _on_finished.
+        """
+        self._stream_active = False
+        if self._running or self._prepared:
+            self._stop_experiment()
+        self._live_view.stop()
+        if not self._running and self._render_timer.isActive():
+            self._render_timer.stop()
+        self._update_controls()
+
+    @Slot()
     def _render_latest_frame(self) -> None:
+        # Guard: do nothing when idle (stream not active and no experiment running).
+        if not self._stream_active and not self._running:
+            return
         self._poll_shaker_trigger()
         frame = self._last_frame
         if not frame or not self._frame_dirty:
@@ -1352,6 +1380,7 @@ class DigitalTwinExperimentTab(QWidget):
                 self._status.setText(f"Experiment finished, but saving failed: {exc}")
         else:
             self._status.setText("Digital Twin experiment stopped.")
+        self._idle_render_timer_if_no_stream()
         self._update_controls()
 
     @Slot(str)
@@ -1359,9 +1388,25 @@ class DigitalTwinExperimentTab(QWidget):
         self._waiting_for_onset = False
         self._running = False
         self._prepared = False
+        self._idle_render_timer_if_no_stream()
         self._status.setText("Digital Twin experiment failed.")
         QMessageBox.critical(self, "Digital Twin experiment failed", message)
         self._update_controls()
+
+    def _idle_render_timer_if_no_stream(self) -> None:
+        # The render timer may have been kept alive past a stream stop only to
+        # finish an experiment. Draw the last pending frame once, then idle.
+        if self._stream_active:
+            return
+        if self._render_timer.isActive():
+            self._render_timer.stop()
+        if self._last_frame and self._frame_dirty:
+            self._frame_dirty = False
+            try:
+                self._model_3d.update_frame(self._last_frame)
+                self._refresh_plot()
+            except Exception:
+                pass
 
     def _clear_worker(self) -> None:
         self._thread = None
@@ -1544,3 +1589,4 @@ class DigitalTwinExperimentTab(QWidget):
         thread = self._thread
         if thread is not None and thread.isRunning():
             thread.wait(2500)
+        self._thread_retirer.wait_all(2500)

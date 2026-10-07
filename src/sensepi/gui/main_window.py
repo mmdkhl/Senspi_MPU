@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 
 from PySide6.QtCore import QObject, QThread, Signal, Slot, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget, QVBoxLayout, QWidget
 
-from ..config.app_config import AppConfig, HostInventory
+from ..config.app_config import AppConfig, AppPaths, HostInventory
 from ..config.sampling import SamplingConfig
 from ..remote.log_sync import SyncReport, sync_logs_from_pi
 from .config.acquisition_state import (
@@ -77,6 +79,7 @@ class MainWindow(QMainWindow):
 
         self._build_tabs()
         self._wire_signals()
+        self._restore_calibration_offsets()
 
         if isinstance(self._app_config.sampling_config, SamplingConfig):
             self._on_sampling_changed(self._app_config.sampling_config)
@@ -88,6 +91,13 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # pragma: no cover - best-effort shutdown
             self.recorder_tab.report_error(
                 f"Failed to stop Digital Twin experiment on close: {exc!r}"
+            )
+
+        try:
+            self.fft_tab.shutdown()
+        except Exception as exc:  # pragma: no cover - best-effort shutdown
+            self.recorder_tab.report_error(
+                f"Failed to stop Spectrum workers on close: {exc!r}"
             )
 
         # Stop the sonification workers FIRST. stop_live_stream(wait=True) blocks
@@ -121,11 +131,15 @@ class MainWindow(QMainWindow):
             return
         self._close_retry_timer.stop()
         try:
+            # On close we MUST wait: destroying a running QThread aborts Qt.
+            # This also covers threads from an earlier, non-blocking Stop.
             self.recorder_tab.stop_live_stream(wait=True)
+            self.recorder_tab.wait_for_ingest_threads(5000)
         except Exception as exc:  # pragma: no cover - best-effort shutdown
             self.recorder_tab.report_error(
                 f"Failed to stop stream on close: {exc!r}"
             )
+        self._save_calibration_offsets()
         super().closeEvent(event)
 
     @Slot()
@@ -375,12 +389,14 @@ class MainWindow(QMainWindow):
         if getattr(self.recorder_tab, "_recording_mode", False):
             self._log_recording_calibration("stopping")
         self._cancel_auto_stop_timer()
-        # Ensure the ingest worker thread has fully stopped before allowing a new Start.
-        self.recorder_tab.stop_live_stream(wait=True)
+        # Non-blocking: waiting here froze the GUI for up to 5 s while the
+        # ingest thread drained. The controller keeps the thread alive until it
+        # finishes, and the next Start waits for it if it is still running.
+        self.recorder_tab.stop_live_stream(wait=False)
 
     @Slot()
     def _on_auto_stop_timeout(self) -> None:
-        self.recorder_tab.stop_live_stream(wait=True)
+        self.recorder_tab.stop_live_stream(wait=False)
 
     @Slot()
     def _cancel_auto_stop_timer(self) -> None:
@@ -472,6 +488,7 @@ class MainWindow(QMainWindow):
         self._current_gui_acquisition_config = cfg
         if getattr(cfg, "calibration", None) is not None:
             self._current_calibration_offsets = cfg.calibration
+            self._save_calibration_offsets()
         self._logger.info("GuiAcquisitionConfig updated: %s", cfg.summary())
         self.signals_tab.apply_gui_acquisition_config(cfg)
         self.recorder_tab.apply_gui_acquisition_config(cfg)
@@ -483,6 +500,45 @@ class MainWindow(QMainWindow):
     def _on_calibration_changed(self, offsets: CalibrationOffsets) -> None:
         self._current_calibration_offsets = offsets
         self.fft_tab.set_calibration_offsets(offsets)
+        self._save_calibration_offsets()
+
+    # Sensor offsets used to live only in memory and were lost on close.
+    @staticmethod
+    def _calibration_offsets_path() -> Path:
+        return AppPaths().config_dir / "calibration_offsets.json"
+
+    def _save_calibration_offsets(self) -> None:
+        offsets = self._current_calibration_offsets
+        path = self._calibration_offsets_path()
+        try:
+            if offsets is None or offsets.is_empty():
+                if path.exists():
+                    path.unlink()
+                return
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".json.tmp")
+            tmp.write_text(json.dumps(offsets.to_dict(), indent=2), encoding="utf-8")
+            tmp.replace(path)
+        except Exception:
+            self._logger.exception("Failed to save calibration offsets to %s", path)
+
+    def _restore_calibration_offsets(self) -> None:
+        path = self._calibration_offsets_path()
+        if not path.exists():
+            return
+        try:
+            offsets = CalibrationOffsets.from_dict(
+                json.loads(path.read_text(encoding="utf-8")))
+        except Exception:
+            self._logger.exception("Ignoring unreadable calibration offsets at %s", path)
+            return
+        if offsets.is_empty():
+            return
+        self._current_calibration_offsets = offsets
+        self.fft_tab.set_calibration_offsets(offsets)
+        self._logger.info(
+            "Restored calibration offsets (%d channels) from %s",
+            len(offsets.per_sensor_channel_offset), path)
 
     @Slot(dict)
     @Slot(object)
