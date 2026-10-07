@@ -38,14 +38,19 @@ from ...sonification.structure_pulse import (BELL_TIMBRES, SCALE_MODES,
 
 logger = logging.getLogger(__name__)
 
-BG = "#12151a"
-PANEL = "#1a1f27"
-FG = "#e8eaed"
-DIM = "#8b93a1"
-EDGE = "#2b3440"
-ACCENT = "#5ac8fa"
-MODE_COLORS = ("#5ac8fa", "#7ee787", "#ff9f43", "#c792ea")
-TRACE_COLORS = ("#5ac8fa", "#7ee787", "#ff9f43", "#c792ea", "#ffd93d", "#e05c5c")
+# Chrome follows the operating system, like every other tab: BG is a Qt
+# palette role so the window colour is the native one, and the remaining
+# values are tuned for that native (light) chrome. The plot canvases stay
+# dark to match the Spectrum tab, so anything drawn ON a plot uses the
+# *_ON_DARK / PLOT_* values instead.
+from .. import theme
+from ..theme import ACCENT, DIM, EDGE  # noqa: F401
+BG = "palette(window)"
+PANEL = "palette(base)"
+FG = "palette(text)"
+# Mode labels sit on chrome; the traces are drawn on the dark plot.
+MODE_COLORS = theme.MODE_COLORS_PRINT
+TRACE_COLORS = theme.MODE_COLORS
 
 PLAYHEAD_MS = 33            # ~30 fps; the playhead only reads a cursor
 #: Ticks of a frozen cursor before we conclude the output stream has died and
@@ -199,7 +204,7 @@ class StructurePulseTab(QWidget):
         self._spin_record.setSuffix(" s")
         row.addWidget(self._spin_record)
         self._btn_record = QPushButton("●  Start recording")
-        self._btn_record.setStyleSheet("color:#ff6b6b;font-weight:bold;")
+        self._btn_record.setStyleSheet(f"color:{theme.RECORD};font-weight:bold;")
         self._btn_record.clicked.connect(self._on_record)
         row.addWidget(self._btn_record)
 
@@ -231,7 +236,7 @@ class StructurePulseTab(QWidget):
         row.addSpacing(14)
         self._btn_live = QPushButton("◉  Live")
         self._btn_live.setCheckable(True)
-        self._btn_live.setStyleSheet("color:#7ee787;font-weight:bold;")
+        self._btn_live.setStyleSheet(f"color:{theme.PLAY};font-weight:bold;")
         self._btn_live.setToolTip(
             "Record, analyse and play continuously. Each cycle is prepared "
             "while the previous one plays, so the sound keeps running and the "
@@ -261,7 +266,7 @@ class StructurePulseTab(QWidget):
         # past the window and pushed the text off the edge. On its own line it
         # can shrink to nothing and still say everything when there is room.
         self._status = QLabel("open a recording, or record from the live stream")
-        self._status.setStyleSheet("color:#ffd93d;font-size:11px;")
+        self._status.setStyleSheet(f"color:{theme.STATUS};font-size:11px;")
         self._status.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self._status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._status.setMinimumWidth(0)
@@ -437,7 +442,7 @@ class StructurePulseTab(QWidget):
         tl = QVBoxLayout(tr)
         tl.setContentsMargins(4, 4, 4, 4)
         self._btn_play = QPushButton("▶  Play")
-        self._btn_play.setStyleSheet("color:#7ee787;font-weight:bold;")
+        self._btn_play.setStyleSheet(f"color:{theme.PLAY};font-weight:bold;")
         self._btn_play.clicked.connect(self._on_play)
         self._btn_stop = QPushButton("■  Stop")
         self._btn_stop.clicked.connect(self._on_stop)
@@ -463,15 +468,15 @@ class StructurePulseTab(QWidget):
         col.setSpacing(4)
 
         self._plot = pg.PlotWidget()
-        self._plot.setBackground(PANEL)
+        self._plot.setBackground(theme.PLOT_BG)
         for ax in ("left", "bottom"):
             a = self._plot.getAxis(ax)
-            a.setPen(pg.mkPen(EDGE))
-            a.setTextPen(pg.mkPen(DIM))
+            a.setPen(pg.mkPen(theme.PLOT_AXIS))
+            a.setTextPen(pg.mkPen(theme.DIM_ON_DARK))
         self._plot.showGrid(x=True, y=True, alpha=0.15)
         self._plot.addLegend(offset=(-10, 10))
         self._playhead = pg.InfiniteLine(angle=90, movable=False,
-                                         pen=pg.mkPen("#ffd93d", width=2))
+                                         pen=pg.mkPen(theme.STATUS_ON_DARK, width=2))
         self._playhead.setVisible(False)
         self._plot.addItem(self._playhead)
         col.addWidget(self._plot, 1)
@@ -942,8 +947,8 @@ class StructurePulseTab(QWidget):
                 f"current window.")
             return
         self._plot.setLogMode(x=bool(view.x_log), y=False)
-        self._plot.setLabel("bottom", view.x_label, color=DIM, size="9pt")
-        self._plot.setLabel("left", view.y_label, color=DIM, size="9pt")
+        self._plot.setLabel("bottom", view.x_label, color=theme.DIM_ON_DARK, size="9pt")
+        self._plot.setLabel("left", view.y_label, color=theme.DIM_ON_DARK, size="9pt")
         for i, c in enumerate(view.curves):
             if not c.is_usable:
                 continue
@@ -951,8 +956,8 @@ class StructurePulseTab(QWidget):
             self._plot.plot(c.x, c.y, pen=pen, name=c.label or None)
         self._apply_stable_range(view)
         for mk in view.markers:
-            colour = (MODE_COLORS[mk.mode % len(MODE_COLORS)]
-                      if mk.mode >= 0 else DIM)
+            colour = (TRACE_COLORS[mk.mode % len(TRACE_COLORS)]
+                      if mk.mode >= 0 else theme.DIM_ON_DARK)
             line = pg.InfiniteLine(pos=self._plot_x(float(mk.x)), angle=90,
                                    movable=False,
                                    pen=pg.mkPen(colour, width=1,

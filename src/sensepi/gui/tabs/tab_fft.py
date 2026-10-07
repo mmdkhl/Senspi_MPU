@@ -46,6 +46,7 @@ from ...data import StreamingDataBuffer
 # (eigen capture now uses RecorderController.snapshot_modal_capture, which aligns
 # internally — no direct align_per_sensor_series call here.)
 from ...tools.debug import debug_enabled
+from .. import theme
 from ..thread_retire import ThreadRetirer
 from . import SampleKey
 
@@ -85,7 +86,10 @@ FINAL_VALUES_BATCH_S = 20.0
 BASE_REF_BATCH_S = 40.0
 # Distinct colours for the (up to) three identified natural frequencies — also
 # reused to mark those frequencies on the per-sensor grid (Window 1).
-_EIGEN_COLORS = ("#ff5252", "#448aff", "#69f0ae")
+# Drawn on this tab's black plots, so the bright variant. Shared so that
+# eigenfrequency 1 is the same colour here, in Model Updating and in
+# Sonification — it used to be red here, blue there and cyan there.
+_EIGEN_COLORS = theme.MODE_COLORS[:3]
 
 # Where each sensor sits is NOT decided here. It comes from the single sensor
 # placement map in Settings, arrives via ``apply_sensor_map()``, and is turned

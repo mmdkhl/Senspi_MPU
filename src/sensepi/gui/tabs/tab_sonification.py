@@ -25,11 +25,16 @@ from .tab_structure_pulse import StructurePulseTab
 
 logger = logging.getLogger(__name__)
 
-BG = "#12151a"
-PANEL = "#1a1f27"
-FG = "#e8eaed"
-DIM = "#8b93a1"
-EDGE = "#2b3440"
+# Chrome follows the operating system, like every other tab: BG is a Qt
+# palette role so the window colour is the native one, and the remaining
+# values are tuned for that native (light) chrome. The plot canvases stay
+# dark to match the Spectrum tab, so anything drawn ON a plot uses the
+# *_ON_DARK / PLOT_* values instead.
+from .. import theme
+from ..theme import ACCENT, DIM, EDGE  # noqa: F401
+BG = "palette(window)"
+PANEL = "palette(base)"
+FG = "palette(text)"
 
 
 class SonificationTab(QWidget):

@@ -40,12 +40,17 @@ from ...sonification.chorus.types import (ROLE_COLORS, ROLE_MEANING,
 
 logger = logging.getLogger(__name__)
 
-BG = "#12151a"
-PANEL = "#1a1f27"
-FG = "#e8eaed"
-DIM = "#8b93a1"
-EDGE = "#2b3440"
-MODE_COLORS = ("#5ac8fa", "#7ee787", "#ff9f43", "#c792ea")
+# Chrome follows the operating system, like every other tab: BG is a Qt
+# palette role so the window colour is the native one, and the remaining
+# values are tuned for that native (light) chrome. The plot canvases stay
+# dark to match the Spectrum tab, so anything drawn ON a plot uses the
+# *_ON_DARK / PLOT_* values instead.
+from .. import theme
+from ..theme import ACCENT, DIM, EDGE  # noqa: F401
+BG = "palette(window)"
+PANEL = "palette(base)"
+FG = "palette(text)"
+MODE_COLORS = theme.MODE_COLORS_PRINT
 
 #: Eigenfrequencies the tab works with: f1, f2, f3 (a three-storey frame).
 N_FREQS = 3
@@ -130,16 +135,16 @@ _KNOBS = {**_KNOBS_MAIN, **_KNOBS_ADVANCED}
 
 
 def _style_plot(widget: pg.PlotWidget, xlabel: str = "", ylabel: str = "") -> None:
-    widget.setBackground(PANEL)
+    widget.setBackground(theme.PLOT_BG)
     for ax in ("left", "bottom"):
         a = widget.getAxis(ax)
-        a.setPen(pg.mkPen(EDGE))
-        a.setTextPen(pg.mkPen(DIM))
+        a.setPen(pg.mkPen(theme.PLOT_AXIS))
+        a.setTextPen(pg.mkPen(theme.DIM_ON_DARK))
     widget.showGrid(x=False, y=False)
     if xlabel:
-        widget.setLabel("bottom", xlabel, color=DIM, size="8pt")
+        widget.setLabel("bottom", xlabel, color=theme.DIM_ON_DARK, size="8pt")
     if ylabel:
-        widget.setLabel("left", ylabel, color=DIM, size="8pt")
+        widget.setLabel("left", ylabel, color=theme.DIM_ON_DARK, size="8pt")
 
 
 def _titled(title: str, tag: str, inner: QWidget) -> QWidget:
@@ -244,7 +249,7 @@ class _CastPanel(QScrollArea):
                           if c.mode == m and c.role == "chorus"]
             state = ("▲ RESONANCE — resonance layer active, chorus phase-locked"
                      if s > 0.6 else "scattered chorus, individuals free-running")
-            state_col = "#ff9f43" if s > 0.6 else DIM
+            state_col = theme.MODE_COLORS_PRINT[1] if s > 0.6 else DIM
             bar = int(round(s * 22))
             html = (
                 f"<div style='color:{colour};font-weight:bold;font-size:10px'>f{m+1}"
@@ -256,7 +261,7 @@ class _CastPanel(QScrollArea):
                 f" · carrier {entry.info.carrier:,.0f} Hz · {entry.info.license.upper()}</div>"
                 f"<div style='color:{FG};font-size:10px'>{entry.mode_freq:.2f} Hz"
                 f" &nbsp; ζ={damp:.2f}% &nbsp;→ target {entry.target_carrier:,.0f} Hz</div>"
-                f"<div style='color:#7ee787;font-size:10px'>chirps at "
+                f"<div style='color:{theme.PLAY};font-size:10px'>chirps at "
                 f"{entry.mode_freq:.2f}/s &nbsp;(1:1, no transposition)</div>"
                 f"<div style='color:{FG};font-size:10px'>singing: {n_sing} individuals"
                 f" &nbsp;<span style='color:{colour}'>{'█'*bar}</span>"
@@ -288,9 +293,9 @@ class _RadarPanel(pg.PlotWidget):
         super().__init__()
         _style_plot(self, "structural frequency (Hz)", "PSD")
         self.setLogMode(False, True)
-        self._curve = self.plot(pen=pg.mkPen("#5ac8fa", width=2))
+        self._curve = self.plot(pen=pg.mkPen(theme.MODE_COLORS[0], width=2))
         self._mode_lines: list[pg.InfiniteLine] = []
-        self._exc = pg.InfiniteLine(angle=90, pen=pg.mkPen("#ff6b6b", width=2))
+        self._exc = pg.InfiniteLine(angle=90, pen=pg.mkPen(theme.RECORD_ON_DARK, width=2))
         self.addItem(self._exc)
         self._region = pg.LinearRegionItem(values=(0, 0), movable=False,
                                            brush=pg.mkBrush(255, 107, 107, 40))
@@ -344,7 +349,7 @@ class _WaterfallPanel(pg.PlotWidget):
         self._curves = []
         for i in range(WATERFALL_SLICES):
             frac = i / max(WATERFALL_SLICES - 1, 1)
-            col = QColor("#ff9f43")
+            col = QColor(theme.MODE_COLORS[1])
             col.setAlphaF(0.16 + 0.84 * (1.0 - frac))
             c = self.plot(pen=pg.mkPen(col, width=1.2))
             c.setZValue(-i)
@@ -408,7 +413,7 @@ class _ScorePanel(pg.PlotWidget):
                               fillLevel=index, brush=pg.mkBrush(fill))
             short = name if len(name) <= 22 else (
                 name.split()[0][:1] + ". " + " ".join(name.split()[1:]))
-            label = pg.TextItem(f"{short}", color=DIM, anchor=(0, 0.5))
+            label = pg.TextItem(f"{short}", color=theme.DIM_ON_DARK, anchor=(0, 0.5))
             label.setFont(QFont("", 7))
             self.addItem(label)
             lane = {"curve": curve, "label": label, "values": [], "index": index}
@@ -475,14 +480,14 @@ class _LegendPanel(QLabel):
             for k in ("lead", "chorus", "resonance", "torsion", "ambient"))
         self.setText(
             f"<table style='border-collapse:collapse'>{rows}</table>"
-            f"<div style='color:#5ac8fa;font-size:10px;font-weight:bold;"
+            f"<div style='color:{theme.ACCENT};font-size:10px;font-weight:bold;"
             f"padding-top:6px'>CHANNELS</div>"
             f"<div style='color:{DIM};font-size:9px'>driven axis → the modes and their "
             f"leads · other axis → the supporting chorus swells and widens · az → "
             f"ambient bed density · gx/gy → a rocking floor sings the drift voice · "
             f"gz → torsion. The shaker's own sensor is the excitation reference, "
             f"never a voice.</div>"
-            f"<div style='color:#ff9f43;font-size:10px;font-weight:bold;"
+            f"<div style='color:{theme.MODE_COLORS_PRINT[1]};font-size:10px;font-weight:bold;"
             f"padding-top:6px'>STRUCTURAL CHANGE</div>"
             f"<div style='color:{DIM};font-size:9px'>Each mode sings as the animal "
             f"type you chose, and inside that type the mode's frequency picks the "
@@ -537,13 +542,13 @@ class BioacousticChorusTab(QWidget):
         tl = QHBoxLayout(bar)
         tl.setContentsMargins(10, 6, 10, 6)
         self._btn_start = QPushButton("▶  Start")
-        self._btn_start.setStyleSheet("color:#7ee787;font-weight:bold;")
+        self._btn_start.setStyleSheet(f"color:{theme.PLAY};font-weight:bold;")
         self._btn_start.clicked.connect(self._on_start)
         self._btn_stop = QPushButton("■  Stop")
         self._btn_stop.clicked.connect(self._on_stop)
         self._btn_capture = QPushButton("●  Capture WAV")
         self._btn_capture.setCheckable(True)
-        self._btn_capture.setStyleSheet("color:#ff6b6b;")
+        self._btn_capture.setStyleSheet(f"color:{theme.RECORD};")
         self._btn_capture.toggled.connect(self._on_capture)
         self._btn_snapshot = QPushButton("Save PNG")
         self._btn_snapshot.clicked.connect(self._on_snapshot)
@@ -566,7 +571,7 @@ class BioacousticChorusTab(QWidget):
             tl.addWidget(b)
         tl.addStretch(1)
         self._status = QLabel("idle")
-        self._status.setStyleSheet("color:#ffd93d;font-size:11px;")
+        self._status.setStyleSheet(f"color:{theme.STATUS};font-size:11px;")
         tl.addWidget(self._status)
         root.addWidget(bar)
 
@@ -625,7 +630,7 @@ class BioacousticChorusTab(QWidget):
         self._btn_advanced = QPushButton("▸  Advanced")
         self._btn_advanced.setCheckable(True)
         self._btn_advanced.setStyleSheet(
-            f"QPushButton{{text-align:left;color:#5ac8fa;background:{PANEL};"
+            f"QPushButton{{text-align:left;color:{ACCENT};background:{PANEL};"
             f"border:1px solid {EDGE};border-radius:4px;padding:5px;font-size:10px}}")
         self._advanced = QWidget()
         adv = QVBoxLayout(self._advanced)
@@ -648,7 +653,7 @@ class BioacousticChorusTab(QWidget):
 
     @staticmethod
     def _group_css() -> str:
-        return (f"QGroupBox{{color:#5ac8fa;font-weight:bold;font-size:10px;"
+        return (f"QGroupBox{{color:{ACCENT};font-weight:bold;font-size:10px;"
                 f"border:1px solid {EDGE};border-radius:4px;margin-top:7px;"
                 f"padding:6px}}"
                 f"QGroupBox::title{{subcontrol-origin:margin;left:7px}}")
@@ -737,7 +742,7 @@ class BioacousticChorusTab(QWidget):
         self._case_type_combos: dict[str, QComboBox] = {}
         for r, (attr, label, tip) in enumerate(_CASE_SLOTS, start=N_FREQS):
             lbl = QLabel(label)
-            lbl.setStyleSheet(f"color:{ROLE_COLORS.get(attr.split('_')[0], DIM)};"
+            lbl.setStyleSheet(f"color:{theme.on_light(ROLE_COLORS.get(attr.split('_')[0], DIM))};"
                               f"font-size:10px;")
             lbl.setToolTip(tip)
             c = combo(extra=("auto",) if attr == "ambient_type" else ())
@@ -887,7 +892,7 @@ class BioacousticChorusTab(QWidget):
         layout = slayout.layout_from_mapping(getattr(self, "_sensor_mapping", None))
         if not layout.is_valid:
             label.setText(
-                "<span style='color:#ffd93d'>No placement set.</span> The chorus "
+                "<span style='color:{theme.STATUS}'>No placement set.</span> The chorus "
                 "still sings, but every animal sits centre and the shaker is "
                 "treated as a floor. Set it in Settings → Sensor placement map.")
             return

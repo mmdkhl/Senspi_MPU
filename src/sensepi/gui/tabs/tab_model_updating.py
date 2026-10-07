@@ -51,6 +51,7 @@ from ...analysis import modal as modal_id
 from ...analysis import sensor_layout as slayout
 from ...digital_twin import decisions as twin_decisions
 from ..widgets.decision_panel import DecisionPanel
+from .. import theme
 from ..widgets.wireframe import LiveStructureView
 from ...analysis import modal_tracker as modal_trk
 from ...dataio import modal_session_loader as msl
@@ -1171,7 +1172,9 @@ def _fig_to_png(fig: Figure) -> bytes:
 # One fixed color per mode index, used CONSISTENTLY across every output figure
 # (spectrum peaks, identified mode shapes, parameter-history frequencies) so a
 # given mode is the same color everywhere. Indexed by 0-based mode number.
-_MODE_COLORS = ["#2563eb", "#ea580c", "#16a34a", "#9333ea", "#0891b2", "#ca8a04"]
+# These end up in the report figures, which are printed on white, so the
+# print variant. Same hue order as the on-screen palette.
+_MODE_COLORS = list(theme.MODE_COLORS_PRINT)
 
 
 def _mode_color(i: int) -> str:
