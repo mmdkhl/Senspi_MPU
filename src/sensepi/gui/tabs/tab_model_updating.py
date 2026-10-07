@@ -66,7 +66,7 @@ REQUIRED_MODULES = ("openseespy", "opsvis")
 # value and bias the shape. map_to_stories() ignores any sensor missing from the
 # map, so an unassigned sensor never enters the calculation.
 # Retained: the manual mode-shape table still offers "not measured" cells.
-UNASSIGNED_STORY = "—"
+UNASSIGNED_STORY = ": "
 
 # Shortest gap between two redraws of Run Analysis's live plots (see
 # ModelUpdatingTab._on_animation_frame).
@@ -437,6 +437,7 @@ class _LiveResponseCanvas(FigureCanvas):
         self.ax_acc.set_ylabel("Acceleration (m/s²)")
         self.ax_acc.grid(True, alpha=0.25)
         self.fig.tight_layout(pad=1.6)
+        theme.style_mpl_canvas(self.fig)
 
     def initialize(self, overlay_response: dict[str, Any] | None = None, tmax: float | None = None) -> None:
         self.ax_disp.clear()
@@ -508,6 +509,7 @@ class _Live3DCanvas(FigureCanvas):
         self.ax.view_init(elev=25, azim=-70)
         self.fig.tight_layout(pad=0.5)
         self.draw_idle()
+        theme.style_mpl_canvas(self.fig)
 
     def initialize_model(self, modal_data: dict[str, Any] | None, title: str = "3D Transient Response") -> None:
         self.ax.clear()
@@ -520,6 +522,7 @@ class _Live3DCanvas(FigureCanvas):
         self.ax.set_zticks([])
         self.ax.grid(False)
         self.ax.view_init(elev=25, azim=-70)
+        theme.style_mpl_canvas(self.fig)
 
         self._defo_lines = []
         if not modal_data:
@@ -885,7 +888,7 @@ class _ModelUpdatingWorker(QObject):
                 _log_model_params(final_params, upd_heights, "UPDATED MODEL (calibrated)")
             else:
                 prior_heights = final_params.get("story_heights", [])
-                _log_model_params(final_params, prior_heights, "RUN ANALYSIS — Prior model (uncalibrated)")
+                _log_model_params(final_params, prior_heights, "RUN ANALYSIS, Prior model (uncalibrated)")
 
             self.log.emit("\nExtracting modal properties...\n")
             final_modal = extract_modal_results(
@@ -1206,7 +1209,7 @@ def _render_fdd_spectrum_png(result: "modal_id.ExperimentalModalResult",
                         xytext=(2, -10), textcoords="offset points",
                         fontsize=8, color=c, rotation=90, va="top")
             handles.append(Line2D([0], [0], color=c, linestyle="--",
-                                  label=f"Mode {i + 1} — {f:.2f} Hz"))
+                                  label=f"Mode {i + 1}: {f:.2f} Hz"))
     ax.set_xlim(f_min, f_max)
     ax.set_title(title)
     ax.set_xlabel("Frequency (Hz)")
@@ -1241,7 +1244,7 @@ def _render_identified_shapes_png(story_data: "modal_id.StoryModalData",
         ax.set_xlabel("ux")
         ax.grid(True, alpha=0.3)
         handles.append(Line2D([0], [0], color=c, marker="o",
-                              label=f"Mode {m + 1} — {result.frequencies_hz[m]:.2f} Hz"))
+                              label=f"Mode {m + 1}: {result.frequencies_hz[m]:.2f} Hz"))
     fig.suptitle("Identified mode shapes (measured stories)", fontsize=10)
     fig.legend(handles=handles, loc="lower center", ncol=min(n_modes, 3),
                fontsize=8, framealpha=0.9)
@@ -1413,7 +1416,7 @@ class _IdentifyWorker(QObject):
             )
 
             # ── INPUTS ────────────────────────────────────────────────
-            self.log.emit(f"{sep}\nLOAD & IDENTIFY — sensor modal identification\n{sep}\n")
+            self.log.emit(f"{sep}\nLOAD & IDENTIFY: sensor modal identification\n{sep}\n")
             self.log.emit("INPUTS\n")
             self.log.emit(f"  Recorded session: {self._session_path}\n")
             self.log.emit(f"  Axis:             {p['sensor_axis']}\n")
@@ -1452,7 +1455,7 @@ class _IdentifyWorker(QObject):
             self.log.emit(f"  Duration:         {session.duration_s:.1f} s\n")
             self.log.emit(f"  Missing samples:  {session.nan_fraction * 100:.2f} %\n")
             if session.nan_fraction > 0.10:
-                self.log.emit("  WARNING: high fraction of missing samples — results may be unreliable.\n")
+                self.log.emit("  WARNING: high fraction of missing samples, results may be unreliable.\n")
 
             exp_dict, result, story_data = _build_sensor_exp_dict(session, p)
             if not result.success:
@@ -1509,7 +1512,7 @@ class _IdentifyWorker(QObject):
             self.log.emit(f"\n{sep}\n")
             self.log.emit(
                 "NOTE: Load & Identify does NOT run the OpenSees update. The identified\n"
-                "values are loaded into Manual input — review them, then press Calibrate,\n"
+                "values are loaded into Manual input, review them, then press Calibrate,\n"
                 "or use 'Identify & Update' to run the OpenSees calibration in one step.\n"
             )
             self.log.emit(f"{sep}\n")
@@ -1656,7 +1659,7 @@ class _ContinuousUpdateWorker(QObject):
                 have = session.duration_s if session.success else 0.0
                 self.log.emit(
                     f"  Collecting data ({have:.1f}/{duration:g} s)"
-                    f"{'' if session.success else f' — {session.message}'}; waiting…\n")
+                    f"{'' if session.success else f', {session.message}'}; waiting…\n")
                 if not self._wait_cycle(cycle_start, duration):
                     break
                 continue
@@ -1862,7 +1865,7 @@ class _ContinuousUpdateWorker(QObject):
         if pinned:
             self.log.emit(
                 "  ⚠ parameter(s) hit a bound: " + "; ".join(pinned) +
-                " — widen the bounds or move the PRIOR model closer to the rig "
+                ": widen the bounds or move the PRIOR model closer to the rig "
                 "(the filter cannot reach frequencies the model physically can't produce).\n")
 
     def _wait_cycle(self, cycle_start: float, duration: float) -> bool:
@@ -2364,14 +2367,14 @@ class ModelUpdatingTab(QWidget):
         manual_vbox.setContentsMargins(0, 4, 0, 0)
 
         # Frequencies row (rebuilt dynamically)
-        freq_group = QGroupBox("Frequencies (Hz) — one per calibration mode", self)
+        freq_group = QGroupBox("Frequencies (Hz): one per calibration mode", self)
         self._freq_row_layout = QHBoxLayout(freq_group)
         self._exp_freq_spins: list[QDoubleSpinBox] = []
         manual_vbox.addWidget(freq_group)
 
         # Mode shapes table (rebuilt dynamically)
         shapes_group = QGroupBox(
-            "Mode Shapes UX — rows = stories, columns = modes (normalized, |max| = 1)", self
+            "Mode Shapes UX: rows = stories, columns = modes (normalized, |max| = 1)", self
         )
         shapes_vbox = QVBoxLayout(shapes_group)
         self._exp_mode_table = QTableWidget(self)
@@ -2447,8 +2450,8 @@ class ModelUpdatingTab(QWidget):
         self._sensor_method = QComboBox(self)
         self._sensor_method.addItems(["FDD", "FFT"])
         self._sensor_method.setToolTip(
-            "FDD: SVD of the cross-spectral-density matrix — signed mode shapes.\n"
-            "FFT: sensor-averaged Welch PSD peak-picking — simpler, magnitude-only shapes\n"
+            "FDD: SVD of the cross-spectral-density matrix, signed mode shapes.\n"
+            "FFT: sensor-averaged Welch PSD peak-picking, simpler, magnitude-only shapes\n"
             "(natural fit for frequency-only calibration)."
         )
         id_form.addRow("Method:", self._sensor_method)
@@ -2549,7 +2552,7 @@ class ModelUpdatingTab(QWidget):
             f"placement covers only {sorted(set(layout.story_map.values()))}. "
             f"Storey(s) {', '.join(map(str, missing))} are unmeasured; calibration "
             f"proceeds on the measured storeys only (partial coverage). Check that "
-            f"the numerical model matches the physical rig — the placement is set "
+            f"the numerical model matches the physical rig, the placement is set "
             f"in Settings, the storey count on the Model tab.\n")
 
     def _refresh_sensor_map_summary(self) -> None:
@@ -3744,7 +3747,7 @@ class ModelUpdatingTab(QWidget):
             self._status.setText("Updating model from sensor results…")
         else:
             self._append_log(
-                "\n─── Identification complete. Values loaded into Manual input — "
+                "\n─── Identification complete. Values loaded into Manual input, "
                 "review and press Calibrate. ───\n"
             )
             self._set_busy(False, "Identification complete.")

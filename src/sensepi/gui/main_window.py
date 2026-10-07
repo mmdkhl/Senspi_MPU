@@ -10,6 +10,7 @@ from PySide6.QtCore import QObject, QThread, Signal, Slot, QTimer
 from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import QMainWindow, QMessageBox, QTabWidget, QVBoxLayout, QWidget
 
+from .. import APP_NAME
 from ..config.app_config import AppConfig, AppPaths, HostInventory
 from ..config.sampling import SamplingConfig
 from ..remote.log_sync import SyncReport, sync_logs_from_pi
@@ -51,7 +52,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, app_config: AppConfig | None = None) -> None:
         super().__init__()
-        self.setWindowTitle("SensePi Recorder")
+        self.setWindowTitle(APP_NAME)
 
         self._app_config = app_config or AppConfig()
         self._host_inventory = HostInventory()

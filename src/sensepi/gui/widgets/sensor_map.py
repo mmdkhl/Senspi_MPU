@@ -21,6 +21,8 @@ from dataclasses import dataclass, field
 import shiboken6
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QPainter, QPen, QPolygonF
+from .. import theme
+from .info_button import InfoButton
 from PySide6.QtWidgets import (QComboBox, QFormLayout, QGridLayout, QGroupBox,
                                QHBoxLayout, QLabel, QSizePolicy, QSpinBox,
                                QVBoxLayout, QWidget)
@@ -33,7 +35,7 @@ COLS = ("A", "B", "C")
 ROWS = ("1", "2", "3")
 CELLS = tuple(f"{c}{r}" for r in ROWS for c in COLS)   # A1 B1 C1 A2 ... C3
 CENTRE = "B2"
-UNASSIGNED = "—"
+UNASSIGNED = ": "
 
 SENSOR_COLORS = ("#5ac8fa", "#7ee787", "#ff9f43", "#c792ea")
 BASE_COLOR = "#e05c5c"
@@ -113,25 +115,25 @@ class SensorMap:
 # --- presets -------------------------------------------------------------
 # (label, n_floors, {sensor_id: (floor, cell)})
 PRESETS: dict = {
-    "3 storeys — base + one per floor (centre)": (
+    "3 storeys: base + one per floor (centre)": (
         3, {1: (0, CENTRE), 2: (1, CENTRE), 3: (2, CENTRE), 4: (3, CENTRE)}),
     # Torsion pairs sit on the A3 / C1 diagonal — the corners the rig actually
     # uses. Any two different cells work for the maths (the lever arm is the
     # perpendicular separation, 2 cells on either axis here); the preset must
     # simply say where the sensors really are.
-    "3 storeys — one per floor + torsion pair on top": (
+    "3 storeys: one per floor + torsion pair on top": (
         3, {1: (1, CENTRE), 2: (2, CENTRE), 3: (3, "A3"), 4: (3, "C1")}),
-    "4 storeys — one per floor (centre)": (
+    "4 storeys: one per floor (centre)": (
         4, {1: (1, CENTRE), 2: (2, CENTRE), 3: (3, CENTRE), 4: (4, CENTRE)}),
-    "4 storeys — two floors + torsion pair on top": (
+    "4 storeys: two floors + torsion pair on top": (
         4, {1: (1, CENTRE), 2: (2, CENTRE), 3: (4, "A3"), 4: (4, "C1")}),
-    "5 storeys — floors 1, 2, 4, 5 (centre)": (
+    "5 storeys: floors 1, 2, 4, 5 (centre)": (
         5, {1: (1, CENTRE), 2: (2, CENTRE), 3: (4, CENTRE), 4: (5, CENTRE)}),
-    "5 storeys — floors 1, 3 (centre) + torsion pair on top": (
+    "5 storeys: floors 1, 3 (centre) + torsion pair on top": (
         5, {1: (1, CENTRE), 2: (3, CENTRE), 3: (5, "A3"), 4: (5, "C1")}),
-    "2 storeys — base + 2 floors + torsion pair on top": (
+    "2 storeys: base + 2 floors + torsion pair on top": (
         2, {1: (0, CENTRE), 2: (1, CENTRE), 3: (2, "A3"), 4: (2, "C1")}),
-    "6 storeys — base + floors 1, 3, 6 (centre)": (
+    "6 storeys: base + floors 1, 3, 6 (centre)": (
         6, {1: (0, CENTRE), 2: (1, CENTRE), 3: (3, CENTRE), 4: (6, CENTRE)}),
     "Custom": (0, {}),
 }
@@ -155,7 +157,7 @@ class _MapFigure(QWidget):
     def paintEvent(self, event) -> None:          # noqa: N802 (Qt naming)
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        p.fillRect(self.rect(), QColor("#12151a"))
+        p.fillRect(self.rect(), QColor(theme.canvas_bg()))
         w, h = self.width(), self.height()
         split = int(w * 0.46)
         self._draw_elevation(p, QRectF(6, 6, split - 12, h - 12))
@@ -323,8 +325,8 @@ class SensorMapWidget(QGroupBox):
         form.addRow("Preset:", self.combo_preset)
 
         self.combo_axis = QComboBox(self)
-        self.combo_axis.addItem("X — shaking along X", "x")
-        self.combo_axis.addItem("Y — shaking along Y", "y")
+        self.combo_axis.addItem("X: shaking along X", "x")
+        self.combo_axis.addItem("Y: shaking along Y", "y")
         self.combo_axis.currentIndexChanged.connect(self._emit)
         form.addRow("Excitation axis:", self.combo_axis)
         left.addLayout(form)
@@ -347,7 +349,7 @@ class SensorMapWidget(QGroupBox):
                 cc.addItem(c)
             cc.setCurrentText(CENTRE)
             cc.currentIndexChanged.connect(self._on_manual_edit)
-            rl = QLabel("—")
+            rl = QLabel(": ")
             grid.addWidget(tag, sid, 0)
             grid.addWidget(fc, sid, 1)
             grid.addWidget(cc, sid, 2)
@@ -357,15 +359,26 @@ class SensorMapWidget(QGroupBox):
             self._role_labels[sid] = rl
         left.addLayout(grid)
 
-        self.lbl_summary = QLabel("")
-        self.lbl_summary.setWordWrap(True)
-        self.lbl_summary.setStyleSheet("color:#8b93a1;font-size:11px;")
-        left.addWidget(self.lbl_summary)
 
-        note = QLabel("Used by every tab: Smart Recording, Spectrum, Model Updating, "
-                      "Sonification and the Digital Twin all read this map.")
-        note.setStyleSheet("color:#ffd93d;font-size:11px;font-style:italic;")
-        left.addWidget(note)
+        # This note said the same thing on every run and sat under the map
+        # permanently. It is the kind of thing you read once, so it moved behind
+        # the info button on the summary row.
+        #: The live summary is written into this button rather than printed
+        #: under the table: it restates what the table above already shows.
+        self._summary_text = ""
+        self.info = InfoButton(
+            "This map is the single definition of where the sensors are.<br><br>"
+            "Smart Recording, Spectrum, Model Updating, Sonification and the "
+            "Digital Shadow all read it. No other tab defines its own placement, "
+            "so changing it here changes it everywhere.<br><br>"
+            "Floor sets the height, the plan cell sets the position. A sensor on "
+            "floor 0 sits on the shaker and measures the input, not a response.",
+            title="Sensor placement")
+        summary_row = QHBoxLayout()
+        summary_row.setContentsMargins(0, 0, 0, 0)
+        summary_row.addWidget(self.info)
+        summary_row.addStretch(1)
+        left.addLayout(summary_row)
         left.addStretch(1)
 
         outer.addLayout(left, 3)
@@ -519,8 +532,21 @@ class SensorMapWidget(QGroupBox):
             self._role_labels[sid].setText(
                 f"<span style='color:{colour}'>{role}</span>")
         self.figure.set_map(smap)
-        self.lbl_summary.setText(self._summarise(smap))
+        self._summary_text = self._summarise(smap)
+        self.info.set_info_text(self._info_text())
         self.mapChanged.emit(smap)
+
+    def _info_text(self) -> str:
+        """The standing explanation, with the current placement on top."""
+        current = (f"<b>Now:</b> {self._summary_text}<br><br>"
+                   if self._summary_text else "")
+        return current + (
+            "This map is the single definition of where the sensors are.<br><br>"
+            "Smart Recording, Spectrum, Model Updating, Sonification and the "
+            "Digital Shadow all read it. No other tab defines its own placement, "
+            "so changing it here changes it everywhere.<br><br>"
+            "Floor sets the height, the plan cell sets the position. A sensor on "
+            "floor 0 sits on the shaker and measures the input, not a response.")
 
     @staticmethod
     def _summarise(m: SensorMap) -> str:
@@ -528,9 +554,9 @@ class SensorMapWidget(QGroupBox):
         covered = m.covered_floors()
         base = m.base()
         bits = [f"<b>{len(struct)}</b> structural sensor(s) on floor(s) "
-                f"{', '.join(str(f) for f in covered) if covered else '—'}"]
+                f"{', '.join(str(f) for f in covered) if covered else ', '}"]
         bits.append("base sensor present (measures input)" if base
-                    else "no base sensor — no direct excitation reading")
+                    else "no base sensor: no direct excitation reading")
         missing = [f for f in range(1, m.n_floors + 1) if f not in covered]
         if missing:
             bits.append(f"unmeasured floor(s): {', '.join(map(str, missing))} "

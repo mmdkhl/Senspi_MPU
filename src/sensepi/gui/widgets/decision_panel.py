@@ -21,7 +21,7 @@ _LIGHT = {
 
 
 class DecisionPanel(QGroupBox):
-    def __init__(self, title: str = "Decisions — change the structure to match the design",
+    def __init__(self, title: str = "Decisions, change the structure to match the design",
                  parent: QWidget | None = None) -> None:
         super().__init__(title, parent)
         col = QVBoxLayout(self)

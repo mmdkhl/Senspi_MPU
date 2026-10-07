@@ -17,6 +17,7 @@ from matplotlib.figure import Figure
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Signal, Slot
 from PySide6.QtWidgets import QLabel, QSizePolicy, QVBoxLayout, QWidget
 
+from .. import theme
 from ...analysis import sensor_layout as slayout
 from ...digital_twin import motion as twin_motion
 
@@ -160,12 +161,14 @@ class WireframeCanvas(FigureCanvas):
     the same rule the story mapping follows everywhere else in this application.
     """
 
-    _MEASURED = "#123B6D"
-    _UNMEASURED = "#B9C2CC"
+    # Resolved per instance in __init__, because they follow the OS theme and
+    # the palette is not known at import time.
     _SENSOR = "#E4572E"
-    _BACKGROUND = "#F7F9FC"
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        self._MEASURED = theme.model_line()
+        self._UNMEASURED = theme.model_reference()
+        self._BACKGROUND = theme.canvas_bg()
         self.fig = Figure(figsize=(5.0, 5.0))
         super().__init__(self.fig)
         self.setParent(parent)
@@ -249,6 +252,9 @@ class WireframeCanvas(FigureCanvas):
         self.ax.set_xticks([]); self.ax.set_yticks([])
         self.ax.set_zticks(list(range(0, n_floors + 1)))
         self.ax.tick_params(labelsize=7)
+        # The floor-number z-ticks are set just above and default to
+        # black, which is invisible on a dark panel.
+        theme.style_mpl_canvas(self.fig)
         self.fig.subplots_adjust(left=0, right=1, bottom=0, top=1)
         self.draw_idle()
 
@@ -256,13 +262,17 @@ class WireframeCanvas(FigureCanvas):
 
 
 class LiveStructureView(QWidget):
-    """Title + wireframe + caption, and the timer/job plumbing that feeds it.
+    """Wireframe + caption, and the timer/job plumbing that feeds it.
+
+    Carries its own heading unless ``title`` is empty, which is what a host
+    that already wraps it in a titled panel should pass.
 
     Give it a controller (for ``snapshot_modal_capture``) and a placement map;
     call :meth:`start` / :meth:`stop`. Everything heavy runs in the pool.
     """
 
-    def __init__(self, parent: QWidget | None = None, interval_ms: int = 400) -> None:
+    def __init__(self, parent: QWidget | None = None, interval_ms: int = 400,
+                 title: str = "Physical structure: live") -> None:
         super().__init__(parent)
         self._controller = None
         self._mapping: dict | None = None
@@ -277,9 +287,12 @@ class LiveStructureView(QWidget):
         col = QVBoxLayout(self)
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(2)
-        title = QLabel("Physical structure — live")
-        title.setStyleSheet("font-weight:600;")
-        col.addWidget(title)
+        # Hosts that already put this inside a titled panel pass title="",
+        # because otherwise the same heading is shown twice.
+        if title:
+            heading = QLabel(title)
+            heading.setStyleSheet("font-weight:600;")
+            col.addWidget(heading)
         self.canvas = WireframeCanvas(self)
         col.addWidget(self.canvas, stretch=1)
         self.caption = QLabel(

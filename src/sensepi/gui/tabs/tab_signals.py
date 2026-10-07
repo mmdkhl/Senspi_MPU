@@ -26,6 +26,7 @@ import pyqtgraph as pg
 import numpy as np
 
 from ..perf_metrics import PlotPerfStats
+from ..widgets.info_button import InfoButton
 from ..widgets import (
     AcquisitionSettings,
     AcquisitionSettingsWidget,
@@ -1240,7 +1241,7 @@ class SignalsTab(QWidget):
         self.record_length_spin.setValue(60)
         self.record_length_spin.setSuffix(" s")
         self.record_length_spin.setToolTip(
-            "Recording length — used by BOTH Smart Record and 'Record only' (Start).")
+            "Recording length: used by BOTH Smart Record and 'Record only' (Start).")
         # Requested sampling rate (Hz). This is THE single device rate (G3),
         # surfaced here for convenience and kept in sync with the Acquisition
         # section's "Sampling rate [Hz]". Smart Record asks the Pi for this rate and
@@ -1320,6 +1321,27 @@ class SignalsTab(QWidget):
         recording_section.setContentLayout(recording_layout)
         layout.addWidget(recording_section)
         self._recording_section = recording_section
+
+        # One explanation for the whole tab. The plots carry their own axis
+        # labels, so nothing else here needs standing text.
+        info_row = QHBoxLayout()
+        info_row.setContentsMargins(0, 0, 0, 0)
+        info_row.addStretch(1)
+        self._info = InfoButton(
+            "Live acceleration and rotation from every sensor, one row per "
+            "sensor.<br><br>"
+            "<b>Refresh</b> changes how often the plots redraw. It does not "
+            "change the sampling rate, which is set once in Settings and is the "
+            "same for the Pi and for every tab.<br><br>"
+            "<b>Normalise</b> centres each trace on zero so they can be compared "
+            "side by side. It affects the display only, never what is recorded."
+            "<br><br>"
+            "<b>Smart Record</b> writes a time-corrected and rate-corrected "
+            "recording to output/sensor_recordings. <b>Sync logs from Pi</b> "
+            "copies what the Pi logged itself.",
+            title="Live Signals")
+        info_row.addWidget(self._info)
+        layout.addLayout(info_row)
 
         # Plot widget -----------------------------------------------------------
         layout.addWidget(self._plot, stretch=1)
