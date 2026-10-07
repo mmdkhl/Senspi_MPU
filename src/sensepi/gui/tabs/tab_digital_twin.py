@@ -42,8 +42,6 @@ from PySide6.QtWidgets import (
 
 from ...dataio import modal_session_loader as msl
 from ...analysis import sensor_layout as slayout
-from ...digital_twin import decisions as twin_decisions
-from ..widgets.decision_panel import DecisionPanel
 from ..widgets.wireframe import LiveStructureView
 from ..thread_retire import ThreadRetirer
 from ...digital_twin.comparison import compute_comparison_metrics, fft_amplitude
@@ -546,7 +544,6 @@ class DigitalTwinExperimentTab(QWidget):
         self._onset_source = ""
         self._calibrated_params: dict[str, Any] | None = None
         self._calibration_source = ""
-        self._decisions = None
         self._sensor_mapping: dict | None = None
         self._calib_thread: QThread | None = None
         self._calib_worker = None
@@ -622,10 +619,15 @@ class DigitalTwinExperimentTab(QWidget):
         self._setup_label.setWordWrap(True)
         root.addWidget(self._setup_label)
 
-        # 2x2: the two comparison plots on the left (one canvas, two subplots),
-        # the numerical model top-right, and the PHYSICAL structure bottom-right
-        # with the decision panel beside it. The two right-hand panels are the
-        # two halves of the twin — model and reality — so they sit in a column.
+        # The two comparison plots on the left (one canvas, two subplots), the
+        # numerical model top-right and the PHYSICAL structure bottom-right: the
+        # two halves of the comparison — model and reality — in a column.
+        #
+        # No decision panel here. Decisions are a Digital TWIN output: they read
+        # a calibration and say what to change about the structure. A shadow only
+        # reports where reality departs from the model, so the panel was a second
+        # rendering of what Model Updating's Digital Twin sub-tab already owns
+        # (its own DecisionPanel, fed per Continuous Update cycle).
         splitter = QSplitter(Qt.Horizontal)
         self._plots = _TwinPlotsCanvas()
         self._model_3d = _Twin3DCanvas()
@@ -634,14 +636,7 @@ class DigitalTwinExperimentTab(QWidget):
 
         right = QSplitter(Qt.Vertical)
         right.addWidget(self._model_3d)
-
-        lower = QWidget()
-        lower_row = QHBoxLayout(lower)
-        lower_row.setContentsMargins(0, 0, 0, 0)
-        lower_row.addWidget(self._live_view, stretch=3)
-        self._decision_panel = DecisionPanel(parent=self)
-        lower_row.addWidget(self._decision_panel, stretch=2)
-        right.addWidget(lower)
+        right.addWidget(self._live_view)
         right.setSizes([420, 420])
 
         splitter.addWidget(self._plots)
@@ -887,13 +882,13 @@ class DigitalTwinExperimentTab(QWidget):
     @Slot(object)
     def _on_calibrated(self, payload) -> None:
         self._calibrated_params = payload.get("calibrated")
-        designed = payload.get("designed") or {}
-        self._decisions = twin_decisions.decide(designed, self._calibrated_params)
-        self._decision_panel.set_decisions(self._decisions, source="this calibration")
         note = "" if payload.get("success") else " (did not converge)"
+        # What this calibration IMPLIES about the structure is a Digital Twin
+        # question, and Model Updating's Digital Twin sub-tab answers it. Here the
+        # calibration matters only as the model the experiment will run.
         self._status.setText(
-            f"Calibrated{note}. {self._decisions.summary()} "
-            f"This calibration will drive the experiment — now Arm the numerical model.")
+            f"Calibrated{note}. This calibration will drive the experiment — "
+            f"now Arm the numerical model.")
         self._clear_calibration_worker()
 
     @Slot(str)

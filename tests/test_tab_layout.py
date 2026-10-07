@@ -78,6 +78,26 @@ class TestTabLayout(unittest.TestCase):
         # the Model Updating tab.
         self.assertIs(self.win.digital_twin_tab._model_tab, self.mu)
 
+    def test_the_shadow_has_no_decision_panel(self):
+        # Decisions read a calibration and say what to change about the
+        # structure: that is a Digital TWIN output. A shadow only reports where
+        # reality departs from the model, and the panel here was a second
+        # rendering of what the Digital Twin sub-tab already owns.
+        shadow = self.win.digital_twin_tab
+        self.assertFalse(hasattr(shadow, "_decision_panel"))
+        self.assertFalse(hasattr(shadow, "_decisions"))
+
+    def test_the_digital_twin_sub_tab_still_owns_the_decisions(self):
+        from sensepi.gui.widgets.decision_panel import DecisionPanel
+
+        self.assertIsInstance(self.mu._twin_panel, DecisionPanel)
+
+    def test_the_shadow_keeps_its_own_comparison_views(self):
+        # Removing the panel must not have taken the model/reality pair with it.
+        shadow = self.win.digital_twin_tab
+        for attr in ("_plots", "_model_3d", "_live_view"):
+            self.assertIsNotNone(getattr(shadow, attr, None), attr)
+
     def test_the_shadow_still_follows_the_stream(self):
         shadow = self.win.digital_twin_tab
         self.assertFalse(shadow._render_timer.isActive())

@@ -129,6 +129,11 @@ The main window builds these tabs:
   one sub-tab per model
 - **Settings** (`src/sensepi/gui/tabs/tab_settings.py`)
 
+Open review: [`model_updating_twin_shadow_review.md`](model_updating_twin_shadow_review.md)
+records eight findings on the Model Updating tab — one of them a bug (the shadow's
+own Calibrate ignores the selected calibration method) — with recommendations and
+acceptance criteria. Read it before changing that tab.
+
 **Naming, and the one crossover to know about.** The tab the UI calls **Digital
 Shadow** is `tab_digital_twin.py`, backed by the `sensepi.digital_twin` package
 and writing to `output/digital_twin/`; it is built by `MainWindow` (still
