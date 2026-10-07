@@ -636,7 +636,10 @@ class DigitalTwinExperimentTab(QWidget):
         row.addWidget(QLabel("Lag:"))
         row.addWidget(self._lag_spin)
         row.addStretch(1)
-        row.addWidget(self._sonify_btn)
+        # The Sonify button is NOT placed here. It plays the model selected in
+        # the Sonification tab on live sensor data, which has nothing to do with
+        # this experiment, so Model Updating adopts it into the action row at
+        # the bottom of the tab (see host_digital_shadow).
         root.addWidget(controls)
 
         # The workflow is the same on every run, so it sits behind the info
@@ -714,6 +717,10 @@ class DigitalTwinExperimentTab(QWidget):
         self._start_btn.clicked.connect(self._start_experiment)
         self._stop_btn.clicked.connect(self._stop_experiment)
         self._sonify_btn.clicked.connect(self._toggle_sonification)
+        son_tabs = getattr(self._sonification_tab, "_tabs", None)
+        if son_tabs is not None:
+            son_tabs.currentChanged.connect(lambda _i: self.refresh_sonify_tooltip())
+        self.refresh_sonify_tooltip()
         self._story_combo.currentIndexChanged.connect(self._refresh_plot)
         self._auto_align.toggled.connect(self._on_auto_align_changed)
         self._lag_spin.valueChanged.connect(self._refresh_plot)
@@ -1596,6 +1603,34 @@ class DigitalTwinExperimentTab(QWidget):
                     if callable(stop):
                         stop()
             self._set_sonification_button(checked=False, text="▶ Sonify")
+
+    def sonify_button(self) -> QPushButton:
+        """The Sonify button, for a host that wants to place it elsewhere."""
+        return self._sonify_btn
+
+    def refresh_sonify_tooltip(self) -> None:
+        """Name the model the button will start, since it is not obvious.
+
+        Which model plays depends on the sub-tab selected over in Sonification,
+        and that is not visible from here. The button keeps its short name and
+        says the rest on hover.
+        """
+        model = self._active_sonification_model()
+        name = ""
+        tabs = getattr(self._sonification_tab, "_tabs", None)
+        if tabs is not None and model is not None:
+            idx = tabs.indexOf(model)
+            if idx >= 0:
+                name = tabs.tabText(idx)
+        if name:
+            self._sonify_btn.setToolTip(
+                f"Play \u201c{name}\u201d, the model selected in the Sonification tab, "
+                "using its own settings.\n\n"
+                "It sonifies the LIVE sensor data, not this experiment's model.")
+        else:
+            self._sonify_btn.setToolTip(
+                "Play the model selected in the Sonification tab, using its own "
+                "settings, on the live sensor data.")
 
     def shutdown(self) -> None:
         # Stop the display timers first: they poll the controller, and polling a

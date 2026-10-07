@@ -1997,6 +1997,8 @@ class ModelUpdatingTab(QWidget):
         self._reset_btn = QPushButton("Reset", self)
         self._reset_btn.setToolTip("Clear results/log and return to a ready state for a new analysis.")
         actions.addWidget(self._reset_btn)
+        # host_digital_shadow() drops the Sonify button in here, after Reset.
+        self._actions_row = actions
         actions.addStretch(1)
         root.addLayout(actions)
 
@@ -3570,6 +3572,15 @@ class ModelUpdatingTab(QWidget):
         ``MainWindow.digital_twin_tab`` and is still shut down from there.
         """
         self._tabs.addTab(tab, title)
+        # Sonify belongs with the other tab-wide actions, not inside the
+        # experiment controls: it plays live sensor data through the
+        # Sonification tab's model and is unrelated to the experiment.
+        take_button = getattr(tab, "sonify_button", None)
+        row = getattr(self, "_actions_row", None)
+        if callable(take_button) and row is not None:
+            button = take_button()
+            if button is not None:
+                row.insertWidget(row.indexOf(self._reset_btn) + 1, button)
 
     def _persist_calibration_state(self) -> None:
         try:
