@@ -171,9 +171,8 @@ git pull
 |---|---|
 | **Live Signals** | Streams the four sensors live and records measurements |
 | **Spectrum** | Shows which frequencies the structure vibrates at (its natural frequencies and mode shapes) |
-| **Model Updating** | Tunes a computer (OpenSees) model of the structure so it matches your measurements |
+| **Model Updating** | Tunes a computer (OpenSees) model of the structure so it matches your measurements. Its sub-tabs are Model, Additional Mass, Analysis, Calibration, **Digital Twin** (the tuned model's response beside the measurement) and **Digital Shadow** (the model run live alongside the real structure) |
 | **Sonification** | Turns the vibrations into sound |
-| **Digital Twin Experiment** | Runs the computer model alongside the real structure and compares the two |
 | **Settings** | Raspberry Pi connection, number of sensors, sensor positions and sampling rate |
 
 ### Where your data is saved
@@ -184,7 +183,7 @@ Everything the app produces goes into the `output/` folder inside `Senspi_MPU`:
 output/
   sensor_recordings/   your recorded measurements (one folder per recording)
   model/               computer-model files
-  digital_twin/        Digital Twin experiment runs
+  digital_twin/        Digital Shadow runs
   sonification/        audio you captured
 ```
 

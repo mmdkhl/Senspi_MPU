@@ -122,12 +122,21 @@ The GUI treats the desktop config as the source of truth.
 The main window builds these tabs:
 - **Live Signals** (`src/sensepi/gui/tabs/tab_signals.py`)
 - **Spectrum / FFT** (`src/sensepi/gui/tabs/tab_fft.py`)
-- **Model Updating** (`src/sensepi/gui/tabs/tab_model_updating.py`)
+- **Model Updating** (`src/sensepi/gui/tabs/tab_model_updating.py`) — sub-tabs
+  Model, Additional Mass, Analysis, Calibration, **Digital Twin** (the output
+  views: `_output_tab`) and **Digital Shadow**
 - **Sonification** (`src/sensepi/gui/tabs/tab_sonification.py`) — a container with
   one sub-tab per model
-- **Digital Twin Experiment** (`src/sensepi/gui/tabs/tab_digital_twin.py`) — runs
-  the calibrated model in wall-clock time beside the real structure and compares them
 - **Settings** (`src/sensepi/gui/tabs/tab_settings.py`)
+
+**Naming, and the one crossover to know about.** The tab the UI calls **Digital
+Shadow** is `tab_digital_twin.py`, backed by the `sensepi.digital_twin` package
+and writing to `output/digital_twin/`; it is built by `MainWindow` (still
+`MainWindow.digital_twin_tab`) and handed to Model Updating via
+`host_digital_shadow()`, which keeps the dependency one-directional. The sub-tab
+the UI calls **Digital Twin** is Model Updating's `_output_tab`. The internal
+names were deliberately left alone when the labels changed: renaming the package
+or the results folder would move users' saved experiment data.
 
 ### Sensor placement: defined once, in Settings
 Where each sensor sits — its floor and its plan cell on a 3x3 grid — is set **only**

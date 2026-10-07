@@ -186,11 +186,17 @@ class MainWindow(QMainWindow):
             parent=self,
         )
 
+        # "Digital Twin Experiment" is now called Digital Shadow, and it lives
+        # INSIDE Model Updating rather than beside it — everything it needs
+        # (the calibrated model, the model definition) comes from that tab, so
+        # the two belong together. It is still owned and shut down here.
+        self.model_updating_tab.host_digital_shadow(
+            self.digital_twin_tab, self.tr("Digital Shadow"))
+
         self._tabs.addTab(self.signals_tab, self.tr("Live Signals"))
         self._tabs.addTab(self.fft_tab, self.tr("Spectrum"))
         self._tabs.addTab(self.model_updating_tab, self.tr("Model Updating"))
         self._tabs.addTab(self.sonification_tab, self.tr("Sonification"))
-        self._tabs.addTab(self.digital_twin_tab, self.tr("Digital Twin Experiment"))
         self._tabs.addTab(self.settings_tab, self.tr("Settings"))
 
         container = QWidget()

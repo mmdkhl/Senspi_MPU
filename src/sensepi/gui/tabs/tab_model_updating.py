@@ -1931,7 +1931,12 @@ class ModelUpdatingTab(QWidget):
         self._tabs.addTab(self._mass_tab, "Additional Mass")
         self._tabs.addTab(self._analysis_tab, "Analysis")
         self._tabs.addTab(self._calibration_tab, "Calibration")
-        self._tabs.addTab(self._output_tab, "Output")
+        # Shown as "Digital Twin": this is where the calibrated model's response
+        # is presented beside the measurement. The attribute keeps its original
+        # name because the internal "digital_twin" package and the
+        # output/digital_twin/ results folder refer to the Digital SHADOW tab,
+        # not to this one — renaming either side would cross the two over.
+        self._tabs.addTab(self._output_tab, "Digital Twin")
 
         self._build_model_tab()
         self._build_mass_tab()
@@ -2227,14 +2232,23 @@ class ModelUpdatingTab(QWidget):
         # Method selector (Q-F): Bayesian is the v26.1.1 default digital-twin engine;
         # deterministic least-squares stays selectable as the safe fallback.
         self._calibration_method = QComboBox(self)
+        # Bayesian is first, so it is already the default on open.
         self._calibration_method.addItems(["Bayesian (Gaussian)", "Least-squares (current)"])
         # Analysis scope (B4): replaces the old "use mode shapes" checkbox.
         self._analysis_scope = QComboBox(self)
         self._analysis_scope.addItems(["Frequency only", "Frequency + mode shapes"])
+        # Default to using the shapes as well: the rig gives usable shapes and
+        # calibrating on frequency alone leaves the mode order unconstrained.
+        # Loading identified data still overrides this to match what that data
+        # actually contains (see _apply_identified_to_fields).
+        self._analysis_scope.setCurrentText("Frequency + mode shapes")
         self._mass_scope = QComboBox(self)
         self._mass_scope.addItems(
             ["Self-weight mass only", "Total mass including additional masses"]
         )
+        # The camp setup always carries the added floor weights, so the total is
+        # the honest default; self-weight only is the special case.
+        self._mass_scope.setCurrentText("Total mass including additional masses")
         self._n_calib_modes = QSpinBox(self)
         self._n_calib_modes.setRange(1, 20)
         self._n_calib_modes.setValue(3)
@@ -3536,6 +3550,20 @@ class ModelUpdatingTab(QWidget):
     def is_busy(self) -> bool:
         """True while a calibration, run or continuous update is in progress."""
         return self._thread is not None or self._continuous_thread is not None
+
+    def host_digital_shadow(self, tab: QWidget, title: str = "Digital Shadow") -> None:
+        """Adopt the Digital Shadow tab as this tab's last sub-tab.
+
+        It is added here rather than built here because it needs *this* tab as a
+        collaborator (``is_busy``, ``calibration_snapshot``,
+        ``model_definition_snapshot``). MainWindow therefore builds this tab
+        first, then the shadow, then hands the shadow over — which keeps the
+        dependency one-directional and avoids a circular construction.
+
+        Its owner stays MainWindow: the shadow is still reachable as
+        ``MainWindow.digital_twin_tab`` and is still shut down from there.
+        """
+        self._tabs.addTab(tab, title)
 
     def _persist_calibration_state(self) -> None:
         try:
