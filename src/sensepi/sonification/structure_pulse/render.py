@@ -275,18 +275,25 @@ def _pulsar_voice(y_t: np.ndarray, cfg: PulseConfig, sr: int,
 
 
 def _audify(y: np.ndarray, fs_data: float, sr: int, target_hz: float,
-            source_hz: float) -> tuple:
+            source_hz: float, speed_override: float = 0.0) -> tuple:
     """Speed the record up until the structure lands in the audible range.
 
-    Returns ``(audio, speed)``. Speed is chosen so ``source_hz`` arrives at
-    ``target_hz``; at 2 Hz -> 220 Hz that is a factor of 110, which is the same
-    move seismologists make to listen to an earthquake.
+    Returns ``(audio, speed)``. Speed is normally chosen so ``source_hz``
+    arrives at ``target_hz``; at 2 Hz -> 220 Hz that is a factor of 110, which
+    is the same move seismologists make to listen to an earthquake.
+
+    ``speed_override`` above zero takes that decision instead, which is how the
+    live loop makes one pass last a chosen number of seconds. Before this the
+    config carried an ``audify_speed`` field that nothing ever read.
     """
     y = np.nan_to_num(np.asarray(y, dtype=float).ravel())
     if y.size < 4 or not np.isfinite(fs_data) or fs_data <= 0:
         return np.zeros(0), 1.0
     src = float(source_hz) if np.isfinite(source_hz) and source_hz > 0.05 else 2.0
-    speed = float(np.clip(target_hz / src, 1.0, 2000.0))
+    if speed_override and speed_override > 0:
+        speed = float(np.clip(speed_override, 1.0, 2000.0))
+    else:
+        speed = float(np.clip(target_hz / src, 1.0, 2000.0))
     n_out = int(max(y.size * (sr / (fs_data * speed)), 8))
     out = np.interp(np.linspace(0, y.size - 1, n_out), np.arange(y.size), y)
     peak = float(np.abs(out).max())
@@ -320,7 +327,8 @@ def render_view(view: PulseView, cfg: PulseConfig, *,
                 message=f"audify needs a time-domain view; "
                         f"'{view.name}' is {view.kind} — use arc or pulsar")
         mono, speed = _audify(curves[0].y, data_fs, sr,
-                              target_hz=max(cfg.f_lo * 2.0, 180.0), source_hz=f1)
+                              target_hz=max(cfg.f_lo * 2.0, 180.0), source_hz=f1,
+                              speed_override=float(getattr(cfg, "audify_speed", 0.0)))
         if mono.size == 0:
             return RenderResult(sample_rate=sr, message="cannot audify this view")
         n = mono.size

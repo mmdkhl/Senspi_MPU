@@ -145,6 +145,7 @@ class StructurePulseTab(QWidget):
         self._silent = False
         self._last_pos = -1.0
         self._stall_ticks = 0
+        self._last_wrap_pos = 0.0
         self._live_worker = None
         self._live_thread: QThread | None = None
         self._live_next = None          # the render waiting to take over
@@ -248,6 +249,22 @@ class StructurePulseTab(QWidget):
         self._spin_live.setToolTip("Length of each live cycle")
         self._spin_live.valueChanged.connect(self._on_live_window)
         row.addWidget(self._spin_live)
+        # How many times one cycle is heard before the next replaces it. The
+        # capture length is what the structure gives us; this is how fast we
+        # read it back. At 1x a 10 s window is swept once over 10 s; at 5x it
+        # is swept in 2 s and repeats five times, which turns a slow structural
+        # drift into a figure short enough to hear as a shape.
+        self._spin_replay = QSpinBox()
+        self._spin_replay.setRange(1, 20)
+        self._spin_replay.setValue(1)
+        self._spin_replay.setPrefix("\u00d7 ")
+        self._spin_replay.setToolTip(
+            "Replays per cycle.\n\n"
+            "1 sweeps the window once, taking as long as the window itself. "
+            "Higher compresses the sweep and repeats it until the next cycle "
+            "is ready, so a 10 s window at \u00d75 is swept in 2 s, five times.")
+        self._spin_replay.valueChanged.connect(self._on_replay_changed)
+        row.addWidget(self._spin_replay)
 
         self._btn_save = QPushButton("Save session")
         self._btn_save.setToolTip(
@@ -689,6 +706,18 @@ class StructurePulseTab(QWidget):
         cfg = replace(self._cfg)
         cfg.voice = str(self._combo_voice.currentData() or "pulsar")
         cfg.duration_s = float(self._spin_dur.value())
+        # Live: fit `replay` sweeps inside one capture window, so the cycle is
+        # heard that many times before the next one is ready.
+        if self._live_worker is not None:
+            replay = max(1, int(self._spin_replay.value()))
+            if replay > 1:
+                cfg.duration_s = max(1.0, float(self._spin_live.value()) / replay)
+            # Audify is deliberately NOT retimed to the slot. Its speed is
+            # what carries the structure into hearing range: the automatic
+            # factor puts a 2 Hz mode at ~220 Hz, and forcing a pass to last
+            # window/replay instead gives roughly x8, which lands it at 16 Hz
+            # where there is nothing to hear. It keeps its own speed and simply
+            # repeats until the next cycle arrives.
         cfg.bells = bool(self._chk_bells.isChecked())
         cfg.f_lo = float(self._spin_flo.value())
         cfg.f_hi = float(self._spin_fhi.value())
@@ -1059,6 +1088,16 @@ class StructurePulseTab(QWidget):
                 self._stall_ticks = 0
             self._last_pos = t
         self._playhead.setPos(self._plot_x(self._render.x_at(t)))
+        # A repeating cycle never stops on its own, so the hand-over happens
+        # when the playhead wraps. Swapping mid-sweep would cut the sound in
+        # half; at the wrap the next cycle simply starts where this one ended.
+        if (self._live_worker is not None and self._live_next is not None
+                and self._player.is_playing and t + 0.05 < self._last_wrap_pos):
+            nxt, self._live_next = self._live_next, None
+            self._last_wrap_pos = 0.0
+            self._play_render(nxt)
+            return
+        self._last_wrap_pos = t
         if not self._player.is_playing:
             if self._live_worker is not None and self._live_next is not None:
                 nxt, self._live_next = self._live_next, None
@@ -1079,6 +1118,24 @@ class StructurePulseTab(QWidget):
     def _on_live_window(self, value: int) -> None:
         if self._live_worker is not None:
             self._live_worker.configure(window_s=float(value))
+            self._push_live_config()
+
+    def _on_replay_changed(self, _value: int) -> None:
+        """Replays per cycle changed: the next cycle is rendered to match.
+
+        The one already playing is left alone. Re-rendering it underneath the
+        playhead would cut the sound for a setting whose whole point is how the
+        sound is paced.
+        """
+        if self._live_worker is not None:
+            self._push_live_config()
+
+    def _push_live_config(self) -> None:
+        """Hand the worker the render settings the next cycle should use."""
+        if self._live_worker is None:
+            return
+        self._live_worker.configure(view_name=self._combo_view.currentText(),
+                                    config=self._current_config())
 
     def _start_live(self) -> None:
         streaming = False
@@ -1239,7 +1296,13 @@ class StructurePulseTab(QWidget):
         self._ensure_audio()
         self._last_pos = -1.0
         self._stall_ticks = 0
-        self._player.play(restart=True, loop=False)
+        # Live always repeats. Any render shorter than the capture cycle would
+        # otherwise finish early and leave silence until the next one was
+        # ready, which is what made audify look broken: its length comes from
+        # the data, not from the Sweep box, so one pass can be under a second.
+        live_loop = self._live_worker is not None
+        self._player.play(restart=True,
+                          loop=live_loop or bool(self._chk_loop.isChecked()))
         self._playhead.setVisible(True)
         if not self._tick.isActive():
             self._tick.start()

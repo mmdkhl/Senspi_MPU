@@ -30,7 +30,7 @@ from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFrame,
                                QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QMessageBox, QPushButton, QScrollArea, QSlider,
-                               QSpinBox, QSplitter, QVBoxLayout, QWidget)
+                               QSizePolicy, QSpinBox, QSplitter, QVBoxLayout, QWidget)
 
 from ...analysis import sensor_layout as slayout
 from ..widgets.info_button import InfoButton
@@ -133,12 +133,27 @@ _CASE_SLOTS = (
 _KNOBS = {**_KNOBS_MAIN, **_KNOBS_ADVANCED}
 
 
+#: Width reserved for the y axis, and height for the x axis, in pixels.
+#: pyqtgraph sizes an axis to fit its current tick labels, so a log plot whose
+#: range grows from "1" to "0.0001" widens its own axis, which widens the plot,
+#: which widens the window. Reserving the room up front keeps the layout still
+#: while the data moves. Wide enough for "0.0001".
+_AXIS_W = 58
+_AXIS_H = 34
+
+
 def _style_plot(widget: pg.PlotWidget, xlabel: str = "", ylabel: str = "") -> None:
     widget.setBackground(theme.PLOT_BG)
     for ax in ("left", "bottom"):
         a = widget.getAxis(ax)
         a.setPen(pg.mkPen(theme.PLOT_AXIS))
         a.setTextPen(pg.mkPen(theme.DIM_ON_DARK))
+    widget.getAxis("left").setWidth(_AXIS_W)
+    widget.getAxis("bottom").setHeight(_AXIS_H)
+    # A plot must be able to shrink. Without this its contents set a floor that
+    # the layout has to honour, and the only way to honour it is a wider window.
+    widget.setMinimumSize(1, 1)
+    widget.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
     widget.showGrid(x=False, y=False)
     if xlabel:
         widget.setLabel("bottom", xlabel, color=theme.DIM_ON_DARK, size="8pt")
@@ -166,7 +181,11 @@ def _titled(title: str, info: str, inner: QWidget) -> QWidget:
     head.addWidget(lbl)
     head.addStretch(1)
     lay.addLayout(head)
+    # No panel may set a width floor for the window: the stage is what has to
+    # fit the window, not the other way round.
+    inner.setMinimumSize(1, 1)
     lay.addWidget(inner, 1)
+    box.setMinimumSize(1, 1)
     box.setStyleSheet(f"background:{PANEL};border-radius:4px;")
     return box
 
@@ -260,7 +279,7 @@ class _CastPanel(QScrollArea):
                           if c.mode == m and c.role == "chorus"]
             state = ("▲ RESONANCE: resonance layer active, chorus phase-locked"
                      if s > 0.6 else "scattered chorus, individuals free-running")
-            state_col = theme.MODE_COLORS_PRINT[1] if s > 0.6 else DIM
+            state_col = theme.mode_colors()[1] if s > 0.6 else theme.dim()
             bar = int(round(s * 22))
             html = (
                 f"<div style='color:{colour};font-weight:bold'>f{m+1}"
@@ -593,7 +612,15 @@ class BioacousticChorusTab(QWidget):
         tl.addStretch(1)
         self._status = QLabel("idle")
         self._status.setStyleSheet(f"color:{theme.semantic('status')};")
-        tl.addWidget(self._status)
+        # The status text changes length on every update, and a plain QLabel
+        # makes its full width a layout minimum: the transport bar's minimum
+        # went 704 -> 1240 px when the live line appeared, and the window grew
+        # to match. Ignored means it never drives the width; the text is elided
+        # to whatever room it gets and the full line stays in the tooltip.
+        self._status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self._status.setMinimumWidth(0)
+        self._status_full = "idle"
+        tl.addWidget(self._status, 1)
         root.addWidget(bar)
 
         # controls + stage
@@ -798,10 +825,30 @@ class BioacousticChorusTab(QWidget):
         self._spin_reid.setValue(self._cfg.reid_interval_s)
         self._spin_reid.valueChanged.connect(
             lambda v: self._on_knob("reid_interval_s", float(v)))
+        # The drive frequency decides which mode counts as resonating, and so
+        # when the resonance voice locks on. Without a base sensor it is read
+        # from the structure's response, which is a stand-in for the input, so
+        # the operator can state the real number instead.
+        self._spin_drive = QDoubleSpinBox()
+        self._spin_drive.setRange(0.0, 200.0)
+        self._spin_drive.setDecimals(2)
+        self._spin_drive.setSingleStep(0.1)
+        self._spin_drive.setSuffix(" Hz")
+        self._spin_drive.setSpecialValueText("auto (from data)")
+        self._spin_drive.setValue(float(self._cfg.exc_freq_hz_override))
+        self._spin_drive.setToolTip(
+            "The frequency the shaker is driving at.\n\n"
+            "Leave at auto to track it from the data. With no base sensor the "
+            "tracker reads the structure's response rather than the input, so "
+            "stating the real number makes the resonance voice lock on the "
+            "mode it should.")
+        self._spin_drive.valueChanged.connect(
+            lambda v: self._on_knob("exc_freq_hz_override", float(v)))
         # The axis combo is gone: the channel follows the excitation axis in the
         # Settings map, which is the direction the rig is actually shaken in.
         # Two places to set one physical fact is how they end up disagreeing.
         for r, (lbl, w) in enumerate((("modes", self._spin_modes),
+                                      ("drive", self._spin_drive),
                                       ("re-ID (s)", self._spin_reid))):
             il.addWidget(QLabel(lbl), r, 0)
             il.addWidget(w, r, 1)
@@ -949,7 +996,7 @@ class BioacousticChorusTab(QWidget):
         self._btn_stop.setEnabled(running)
         self._btn_capture.setEnabled(running)
         if not streaming and not running:
-            self._status.setText("start the live stream first")
+            self._set_status("start the live stream first")
 
     @Slot()
     def on_stream_started(self) -> None:
@@ -1003,7 +1050,7 @@ class BioacousticChorusTab(QWidget):
         thread.started.connect(lambda: self._req_start.emit(cfg))
         thread.start()
         self._drain.start()
-        self._status.setText("starting…")
+        self._set_status("starting…")
         self._update_enabled()
 
     def _on_stop(self) -> None:
@@ -1036,7 +1083,7 @@ class BioacousticChorusTab(QWidget):
             self._btn_capture.blockSignals(True)
             self._btn_capture.setChecked(False)
             self._btn_capture.blockSignals(False)
-            self._status.setText("stopped")
+            self._set_status("stopped")
             self._stopping = False
             self._update_enabled()
 
@@ -1046,7 +1093,7 @@ class BioacousticChorusTab(QWidget):
 
     @Slot()
     def _on_worker_started(self) -> None:
-        self._status.setText("listening: identifying modes…")
+        self._set_status("listening: identifying modes…")
         self._structure.start()
         self._update_enabled()
 
@@ -1057,7 +1104,7 @@ class BioacousticChorusTab(QWidget):
     @Slot(str)
     def _on_worker_error(self, message: str) -> None:
         logger.error("chorus: %s", message)
-        self._status.setText(message)
+        self._set_status(message)
         QMessageBox.warning(self, "Sonification", message)
         self._on_stop()
 
@@ -1109,6 +1156,24 @@ class BioacousticChorusTab(QWidget):
             self._stage.grab().save(path)
 
     # ------------------------------------------------------------------ frames
+    def _set_status(self, text: str) -> None:
+        """Show ``text``, elided to the room available, full text on hover."""
+        self._status_full = str(text)
+        self._status.setToolTip(self._status_full)
+        self._elide_status()
+
+    def _elide_status(self) -> None:
+        # Writes the widget directly. Going back through _set_status here would
+        # recurse, because that is what calls this.
+        width = max(self._status.width(), 80)
+        metrics = self._status.fontMetrics()
+        self._status.setText(
+            metrics.elidedText(self._status_full, Qt.ElideRight, width))
+
+    def resizeEvent(self, event):            # noqa: N802 (Qt naming)
+        super().resizeEvent(event)
+        self._elide_status()
+
     def _drain_queue(self) -> None:
         latest: VizFrame | None = None
         while True:
@@ -1118,18 +1183,31 @@ class BioacousticChorusTab(QWidget):
                 break
         if latest is None:
             return
-        try:
-            self._cast_panel.update_frame(latest)
-            self._radar.update_frame(latest)
-            self._waterfall.update_frame(latest)
-            self._score.update_frame(latest)
-        except Exception:
-            logger.debug("chorus: panel update failed", exc_info=True)
+        # One panel per try: these shared a single block, so when the cast
+        # panel raised, the radar, the waterfall and the score were never
+        # reached and the whole stage went blank with nothing on screen to say
+        # why. Logged at warning, because debug made it invisible.
+        for name, panel in (("cast", self._cast_panel), ("radar", self._radar),
+                            ("waterfall", self._waterfall), ("score", self._score)):
+            try:
+                panel.update_frame(latest)
+            except Exception:
+                logger.warning("chorus: %s panel failed to update", name,
+                               exc_info=True)
         extra = getattr(self, "_status_extra", {})
         bits = [latest.state_text]
         if extra:
             if extra.get("silent"):
                 bits.append("SILENT (install sensepi[sonification])")
+            # Identification window, tick window and modes found. A short
+            # window here is the difference between a quiet structure and a
+            # starved snapshot, and it used to be invisible.
+            id_s = float(extra.get("id_s", 0.0) or 0.0)
+            fast_s = float(extra.get("fast_s", 0.0) or 0.0)
+            n_modes = int(extra.get("n_modes", 0) or 0)
+            if id_s or fast_s:
+                bits.append(f"win {id_s:.0f}s/{fast_s:.1f}s")
+            bits.append(f"modes {n_modes}")
             bits.append(f"buffer {extra.get('buffer_s', 0):.2f}s")
             if extra.get("rate_hz"):
                 bits.append(f"{extra['rate_hz']:.1f} Hz in")
@@ -1140,7 +1218,7 @@ class BioacousticChorusTab(QWidget):
             ch = extra.get("channels") or ()
             if ch:
                 bits.append("+" + " ".join(ch))
-        self._status.setText("  ·  ".join(bits))
+        self._set_status("  ·  ".join(bits))
 
     def closeEvent(self, event) -> None:      # noqa: N802 (Qt naming)
         self._on_stop()

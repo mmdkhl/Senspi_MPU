@@ -12,6 +12,8 @@ from __future__ import annotations
 import logging
 import time
 from pathlib import Path
+
+import numpy as np
 from queue import Queue
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
@@ -22,6 +24,18 @@ from .engine import ChorusEngine
 from .types import BLOCK_SIZE, ChorusConfig
 
 logger = logging.getLogger(__name__)
+
+
+def _span_seconds(session) -> float:
+    """Seconds of aligned data in a ModalSession, 0 when it carries none."""
+    try:
+        data = np.asarray(getattr(session, "data", None))
+        fs = float(getattr(session, "fs", 0.0) or 0.0)
+        if data.ndim == 2 and data.shape[1] and fs > 0:
+            return float(data.shape[1] / fs)
+    except Exception:
+        pass
+    return 0.0
 
 TICK_MS = 50
 STATUS_MIN_INTERVAL = 0.2          # <=5 Hz status digests
@@ -48,6 +62,9 @@ class ChorusWorker(QObject):
         self._t0 = 0.0
         self._last_status = 0.0
         self._rate_hz = 0.0
+        self._last_id_s = 0.0
+        self._last_fast_s = 0.0
+        self._last_modes = 0
         self._silent = False
         self._running = False
         # Which channels the accumulator actually stores. Only those are
@@ -189,6 +206,7 @@ class ChorusWorker(QObject):
             if engine.wants_reid(t):
                 long_snap = self._controller.snapshot_modal_capture(
                     axis=cfg.axis, last_seconds=cfg.id_window_s)
+                self._last_id_s = _span_seconds(long_snap)
                 engine.reidentify(long_snap, t)
             ax_snap = self._controller.snapshot_modal_capture(
                 axis=cfg.axis, last_seconds=cfg.fast_window_s)
@@ -210,8 +228,15 @@ class ChorusWorker(QObject):
                         axis=a, last_seconds=cfg.fast_window_s)
                 except Exception:
                     continue
+            # What the live capture actually handed over. Identification and
+            # the spectrum panels both go quiet when this is short, and without
+            # it on screen there is no way to tell a quiet structure from a
+            # starved snapshot.
+            self._last_fast_s = _span_seconds(ax_snap)
             viz = engine.tick(t, ax_snap, gz_snap, rate_hz=self._rate_hz,
                               channels=channels or None)
+            self._last_modes = int(
+                np.asarray(viz.modal.frequencies_hz, dtype=float).ravel().size)
             engine.schedule_ahead()
             if self._silent:
                 # no device: still advance the renderer so views and capture work
@@ -245,6 +270,11 @@ class ChorusWorker(QObject):
             "buffer_s": round(engine.buffered_seconds, 3),
             "underruns": self._audio.underruns if self._audio else 0,
             "rate_hz": self._rate_hz,
+            # Seconds of aligned data the last identification and the last
+            # tick received, and how many modes came back.
+            "id_s": round(self._last_id_s, 1),
+            "fast_s": round(self._last_fast_s, 2),
+            "n_modes": self._last_modes,
             "capture_s": round(self._capture.seconds, 1) if self._capture.active else 0.0,
             "capturing": self._capture.active,
             "channels": tuple(getattr(engine._frame, "channels", ())),

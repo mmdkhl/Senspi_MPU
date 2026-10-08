@@ -188,6 +188,10 @@ class ChorusConfig:
     # which case every sensor is treated as an unplaced response, exactly as
     # before this existed.
     sensor_map: dict | None = None
+    #: The frequency the table is being driven at, in Hz. 0 means track it
+    #: from the data. Stating it matters most with no base sensor, where the
+    #: tracker has to read the structure's response as a stand-in for the input.
+    exc_freq_hz_override: float = 0.0
     reid_interval_s: float = 8.0
     id_window_s: float = 30.0
     fast_window_s: float = 6.0
@@ -236,6 +240,13 @@ class ChorusConfig:
         self.ambient_bed = float(np.clip(self.ambient_bed, 0.0, 1.0))
         self.duck_db = float(np.clip(self.duck_db, 0.0, 24.0))
         self.damping_expression = float(np.clip(self.damping_expression, 0.0, 2.0))
+        # 0 means 'track it from the data'; anything else is a real drive
+        # frequency and is held inside the band the chorus listens to.
+        if self.exc_freq_hz_override > 0.0:
+            self.exc_freq_hz_override = float(
+                np.clip(self.exc_freq_hz_override, 0.05, 200.0))
+        else:
+            self.exc_freq_hz_override = 0.0
         return self
 
 
