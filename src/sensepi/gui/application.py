@@ -20,8 +20,9 @@ from PySide6.QtCore import QLoggingCategory
 from PySide6.QtWidgets import QApplication, QMainWindow
 
 from .benchmark import BenchmarkDriver, BenchmarkOptions
+from .hang_watchdog import HangWatchdog
 from .main_window import MainWindow
-from ..config.app_config import AppConfig, SensorDefaults
+from ..config.app_config import AppConfig, AppPaths, SensorDefaults
 
 _MPL_CONFIGURED = False
 
@@ -159,6 +160,19 @@ def main(argv: list[str] | None = None) -> None:
         level=logging.ERROR,
         format="%(levelname)s:%(name)s:%(message)s",
     )
+    # Also keep warnings/errors on disk: a GUI freeze or crash leaves nothing
+    # behind otherwise, and the console is usually gone with the process.
+    logs_dir = AppPaths().logs
+    try:
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(logs_dir / "sensepi.log", encoding="utf-8")
+        file_handler.setLevel(logging.WARNING)
+        file_handler.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)s [%(threadName)s] %(name)s: %(message)s"))
+        logging.getLogger().addHandler(file_handler)
+        logging.getLogger().setLevel(logging.WARNING)
+    except OSError:
+        pass
 
     raw_argv = argv if argv is not None else sys.argv
     args, qt_argv = _parse_cli_args(raw_argv)
@@ -171,6 +185,8 @@ def main(argv: list[str] | None = None) -> None:
         sampling_config=sampling_cfg,
     )
     app, win = create_app(qt_argv, app_config=app_config)
+    watchdog = HangWatchdog(logs_dir / "hang_traces.log", timeout_s=5.0, parent=app)
+    watchdog.start()
 
     benchmark_driver: BenchmarkDriver | None = None
     if args.benchmark:
@@ -196,7 +212,9 @@ def main(argv: list[str] | None = None) -> None:
     win.show()
     if benchmark_driver is not None:
         benchmark_driver.start()
-    raise SystemExit(app.exec())
+    code = app.exec()
+    watchdog.stop()
+    raise SystemExit(code)
 
 
 if __name__ == "__main__":

@@ -49,6 +49,9 @@ python-*.msi
 # Local secrets / machine-specific overrides
 src/sensepi/config/hosts.local.yaml
 src/sensepi/config/sensors.local.yaml
+# Written by Settings when a calibration is taken, and restored at startup. It
+# lives beside the other machine-local config, so it must not be committed.
+src/sensepi/config/calibration_offsets.json
 deploy_pi.local.bat
 .env
 .env.*

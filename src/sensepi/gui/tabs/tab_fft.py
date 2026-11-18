@@ -46,6 +46,9 @@ from ...data import StreamingDataBuffer
 # (eigen capture now uses RecorderController.snapshot_modal_capture, which aligns
 # internally — no direct align_per_sensor_series call here.)
 from ...tools.debug import debug_enabled
+from .. import theme
+from ..widgets.info_button import InfoButton
+from ..thread_retire import ThreadRetirer
 from . import SampleKey
 
 if TYPE_CHECKING:  # pragma: no cover - circular import guard
@@ -64,7 +67,10 @@ DEFAULT_MAX_FREQUENCY_HZ = 20.0
 
 # Text lines reserved for the placement summary. Enough for the placement line
 # wrapping to two, the axis line, and one combined warning line.
-PLACEMENT_SUMMARY_LINES = 4
+#: Lines reserved for the placement WARNINGS. The description itself
+#: lives in the info button beside "Show:", so this no longer has to
+#: budget for it n/a three lines went back to the plot.
+PLACEMENT_SUMMARY_LINES = 1
 
 # The spectrum shows only the structural horizontal axes (T11.1).
 SPECTRUM_CHANNELS: tuple[str, ...] = ("ax", "ay")
@@ -84,7 +90,10 @@ FINAL_VALUES_BATCH_S = 20.0
 BASE_REF_BATCH_S = 40.0
 # Distinct colours for the (up to) three identified natural frequencies — also
 # reused to mark those frequencies on the per-sensor grid (Window 1).
-_EIGEN_COLORS = ("#ff5252", "#448aff", "#69f0ae")
+# Drawn on this tab's black plots, so the bright variant. Shared so that
+# eigenfrequency 1 is the same colour here, in Model Updating and in
+# Sonification — it used to be red here, blue there and cyan there.
+_EIGEN_COLORS = theme.MODE_COLORS[:3]
 
 # Where each sensor sits is NOT decided here. It comes from the single sensor
 # placement map in Settings, arrives via ``apply_sensor_map()``, and is turned
@@ -279,7 +288,7 @@ class _EigenFreqWorker(QObject):
                     self.failed.emit(
                         "Base-referenced identification needs the floor-0 sensor "
                         "to be streaming. It is placed in Settings but is not in "
-                        "the capture — switch to FDD or check the sensor.")
+                        "the capture: switch to FDD or check the sensor.")
                     return
                 br = transmiss.identify_modes_base_referenced(
                     data, reference, session.fs, n_modes=self._n_modes,
@@ -545,6 +554,7 @@ class FftTab(QWidget):
         self._eig_worker: _EigenFreqWorker | None = None
         self._final_thread: QThread | None = None
         self._final_worker: _EigenFreqWorker | None = None
+        self._thread_retirer = ThreadRetirer(self)
         self._final_collect_started_perf: float | None = None
         self._last_final_values_payload: dict | None = None
         self._final_countdown_timer = QTimer(self)
@@ -573,8 +583,8 @@ class FftTab(QWidget):
         # input there is nothing to reference against.
         self.method_combo.addItem("Base-referenced (FRF)", "base_ref")
         self.method_combo.setToolTip(
-            "FDD: SVD of the cross-spectral-density matrix — signed mode shapes.\n"
-            "FFT: sensor-averaged Hann FFT peak-picking — phase-aligned signed mode shapes.\n"
+            "FDD: SVD of the cross-spectral-density matrix, signed mode shapes.\n"
+            "FFT: sensor-averaged Hann FFT peak-picking, phase-aligned signed mode shapes.\n"
             "Both are output-only: they assume the shaker's own spectrum is flat.\n\n"
             "Base-referenced: divides the measured base motion out of every floor\n"
             "(H1 transmissibility) and gates each peak on coherence, so a peak that\n"
@@ -597,7 +607,7 @@ class FftTab(QWidget):
         self._axis_combo.addItem("X (ax)", "x")
         self._axis_combo.addItem("Y (ay)", "y")
         self._axis_combo.setToolTip(
-            "Horizontal axis the modal identification reads — one at a time.\n"
+            "Horizontal axis the modal identification reads, one at a time.\n"
             "'Follow Settings' uses the excitation axis from the sensor placement\n"
             "map, which is the direction the structure is actually being shaken in.\n"
             "az (vertical) is not offered: it carries no lateral mode-shape or\n"
@@ -729,6 +739,13 @@ class FftTab(QWidget):
         view_row.addSpacing(10)
         view_row.addWidget(QLabel("Show:"))
         view_row.addWidget(self._right_view_combo)
+        view_row.addSpacing(8)
+        # The placement description used to be printed permanently under
+        # this row, costing four lines of plot height on every run. It is
+        # the same on every run, so it belongs behind a click; the
+        # warnings stay on screen.
+        self._placement_info = InfoButton("", title="Sensor placement")
+        view_row.addWidget(self._placement_info)
         right_v.addLayout(view_row)
         # Read-only reflection of the Settings placement map. Every view depends
         # on it (it picks the channel, the response sensors and the mode cap), so
@@ -829,8 +846,8 @@ class FftTab(QWidget):
         10 s batch.
         """
         hints = {
-            "fdd": "SVD of the cross-spectral-density matrix — signed mode shapes.",
-            "fft": ("Sensor-averaged Hann FFT peaks — phase-aligned signed mode shapes. "
+            "fdd": "SVD of the cross-spectral-density matrix, signed mode shapes.",
+            "fft": ("Sensor-averaged Hann FFT peaks, phase-aligned signed mode shapes. "
                     "Closely spaced modes blur together; FDD separates them."),
             "base_ref": "H1 transmissibility vs the floor-0 sensor, coherence-gated.",
         }
@@ -1040,6 +1057,24 @@ class FftTab(QWidget):
             self._eig_status.setText(
                 f"Live eigen-frequencies: collecting first {EIGEN_BATCH_S:.0f} s of data…")
 
+    def shutdown(self, wait_ms: int = 3000) -> None:
+        """Stop timers and let identification threads end before the app quits.
+
+        Destroying a QThread that is still running aborts the process
+        (0xc0000409), and this tab had no shutdown at all.
+        """
+        for name in ("_timer", "_eig_timer", "_final_countdown_timer"):
+            timer = getattr(self, name, None)
+            if timer is not None and timer.isActive():
+                timer.stop()
+        for t_attr, w_attr in (("_eig_thread", "_eig_worker"),
+                               ("_final_thread", "_final_worker")):
+            thread, worker = getattr(self, t_attr), getattr(self, w_attr)
+            setattr(self, t_attr, None)
+            setattr(self, w_attr, None)
+            self._thread_retirer.retire(thread, worker)
+        self._thread_retirer.wait_all(wait_ms)
+
     @Slot()
     def on_stream_stopped(self) -> None:
         logger.info("FftTab: on_stream_stopped")
@@ -1067,7 +1102,7 @@ class FftTab(QWidget):
             return
         if not self._layout.is_valid:
             self._eig_status.setText(
-                "No sensor placement — set it in Settings → Sensor placement map.")
+                "No sensor placement: set it in Settings → Sensor placement map.")
             return
         capture_fn = getattr(self._recorder_tab, "snapshot_modal_capture", None)
         if capture_fn is None:
@@ -1167,12 +1202,9 @@ class FftTab(QWidget):
         worker = self._eig_worker
         self._eig_worker = None
         self._eig_thread = None
-        if thread is not None:
-            thread.quit()
-            thread.wait()
-            thread.deleteLater()      # don't accumulate a QThread per 10 s cycle
-        if worker is not None:
-            worker.deleteLater()
+        # Runs every ~10 s. It used to quit()+wait() here with no timeout,
+        # blocking the GUI thread until the worker thread had exited.
+        self._thread_retirer.retire(thread, worker)
 
     def _render_eigen_frequencies(self, freqs: Sequence[float],
                                   spec_f=None, spec_v=None) -> None:
@@ -1305,7 +1337,7 @@ class FftTab(QWidget):
             item.setEnabled(available)
         self.method_combo.setItemData(
             idx,
-            "Needs a sensor on floor 0 — set one in Settings → Sensor placement map."
+            "Needs a sensor on floor 0, set one in Settings → Sensor placement map."
             if not available else
             "Divides the measured base motion out of every floor and gates each "
             "peak on coherence.",
@@ -1368,7 +1400,7 @@ class FftTab(QWidget):
                           key=lambda s: (-layout.story_map[s], s)):
             combo.addItem(f"S{sid} · floor {layout.story_map[sid]}", sid)
         if combo.count() == 0:
-            combo.addItem("—", None)
+            combo.addItem(": ", None)
         idx = combo.findData(previous)
         if idx < 0:
             idx = combo.findData(slayout.default_damping_sensor(layout))
@@ -1383,18 +1415,22 @@ class FftTab(QWidget):
         if not layout.is_valid:
             label.setText(
                 "<b style='color:#ffd93d'>No sensor placement.</b> "
-                "Set it in Settings \u2192 Sensor placement map \u2014 this tab "
-                "reads it and does not define its own.")
+                "Set it in Settings \u2192 Sensor placement map. This tab reads "
+                "it and does not define its own.")
             return
         axis = self._analysis_axis()
         following = self._axis_override is None
-        bits = [f"<b>Placement (from Settings):</b> {layout.describe()}"]
-        bits.append(
+        detail = [f"<b>Placement (from Settings):</b> {layout.describe()}"]
+        detail.append(
             f"Analysing <b>{slayout.AXIS_CHANNEL.get(axis, 'ax')}</b> "
             + ("(follows the excitation axis)" if following
-               else "<span style='color:#ffd93d'>(override \u2014 differs from the "
+               else "<span style='color:#ffd93d'>(override, differs from the "
                     "excitation axis)</span>" if axis != layout.axis
                else "(override, same as the excitation axis)"))
+        detail.append(
+            "This tab reads the placement; it does not define its own. "
+            "Change it in Settings \u2192 Sensor placement map.")
+        self._placement_info.set_info_text("<br>".join(detail))
         # Warnings share ONE line: each extra line came out of the plot's height,
         # which is what made switching method resize the window.
         warnings: list = []
@@ -1409,13 +1445,13 @@ class FftTab(QWidget):
             # floor-to-floor ratio whose peaks are not the structure's modes.
             warnings.append(
                 f"base-referenced assumes S{layout.base_sensor_id} is on the "
-                f"shaker — a mis-mapped base still reads high coherence")
-        if warnings:
-            bits.append("<span style='color:#ffd93d'>"
-                        + " · ".join(warnings) + "</span>")
-        label.setText("<br>".join(bits))
-        # The reserved height can clip a long warning; the tooltip never does.
-        label.setToolTip(re.sub(r"<[^>]+>", "", "\n".join(bits)))
+                f"shaker: a mis-mapped base still reads high coherence")
+        # Only warnings are printed. The description is one click away, so a
+        # run with nothing wrong spends no plot height on explaining itself.
+        label.setText("<span style='color:#ffd93d'>" + " · ".join(warnings) + "</span>"
+                      if warnings else "")
+        # The reserved line can clip a long warning; the tooltip never does.
+        label.setToolTip(re.sub(r"<[^>]+>", "", " · ".join(warnings)))
 
     def _build_final_values_panel(self) -> QWidget:
         """Panel that freezes one 20 s modal-identification result for reporting."""
@@ -1437,7 +1473,7 @@ class FftTab(QWidget):
         self._send_final_to_model_btn.setEnabled(False)
         self._send_final_to_model_btn.clicked.connect(self._send_final_values_to_model_updating)
 
-        self._final_countdown_label = QLabel(f"Ready — {FINAL_VALUES_BATCH_S:.0f} s fixed record")
+        self._final_countdown_label = QLabel(f"Ready, {FINAL_VALUES_BATCH_S:.0f} s fixed record")
         row.addWidget(self._final_start_btn)
         row.addWidget(self._send_final_to_model_btn)
         row.addWidget(self._final_countdown_label)
@@ -1649,12 +1685,7 @@ class FftTab(QWidget):
         worker = self._final_worker
         self._final_worker = None
         self._final_thread = None
-        if thread is not None:
-            thread.quit()
-            thread.wait()
-            thread.deleteLater()
-        if worker is not None:
-            worker.deleteLater()
+        self._thread_retirer.retire(thread, worker)
         if hasattr(self, "_final_start_btn"):
             self._final_start_btn.setEnabled(True)
             self._final_start_btn.setText("Start calculating final values")
@@ -1708,7 +1739,7 @@ class FftTab(QWidget):
                     self._final_shape_plot.addItem(text)
                     self._final_shape_items.append(text)
         else:
-            msg = "No mapped mode shapes available — set the sensor→floor map before calculating final values."
+            msg = "No mapped mode shapes available, set the sensor→floor map before calculating final values."
             text = pg.TextItem(msg, color="w", anchor=(0.5, 0.5), fill=(0, 0, 0, 150))
             text.setPos(0.0, max(1.0, 0.5 * float(n_story)))
             self._final_shape_plot.addItem(text)
@@ -1750,11 +1781,11 @@ class FftTab(QWidget):
         for row in data.get("floors", []):
             if not row.get("usable"):
                 continue
-            vals = ", ".join("—" if not np.isfinite(v) else f"{v:.2f}"
+            vals = ", ".join(": " if not np.isfinite(v) else f"{v:.2f}"
                              for v in row.get("per_mode", []))
             parts.append(f"F{row['floor']} ({row['source']}): {vals}")
         if parts:
-            label.setText(f"{label.text()}  ·  torsion per mode — " + "; ".join(parts))
+            label.setText(f"{label.text()}  ·  torsion per mode, " + "; ".join(parts))
 
     def _current_right_view(self) -> str:
         text = self._right_view_combo.currentText().lower()
@@ -2128,7 +2159,7 @@ class FftTab(QWidget):
         coverage = [int(s) for s in shape_data.get("coverage_stories", [])]
         if not shapes or not coverage:
             self._eig_status.setText(
-                "Mode shapes: need mapped sensors — set the sensor→floor map.")
+                "Mode shapes: need mapped sensors, set the sensor→floor map.")
             return
 
         value_lines: list[str] = []
@@ -2163,7 +2194,7 @@ class FftTab(QWidget):
         self._shape_plot.setYRange(0, max(1, n_story), padding=0.1)
         method = str(shape_data.get("method", "fdd")).upper()
         cov = "full coverage" if full else f"partial coverage ({len(coverage)}/{n_story} floors)"
-        self._eig_status.setText(f"Live mode shapes ({method}) — {cov}")
+        self._eig_status.setText(f"Live mode shapes ({method}), {cov}")
 
     def _render_damping_ratio(self, damping: dict | None) -> None:
         """Draw damping decay from the selected sensor with legend and values."""

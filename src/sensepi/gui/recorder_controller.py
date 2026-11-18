@@ -4,6 +4,7 @@ import logging
 import math
 import queue
 import threading
+import time
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -497,6 +498,30 @@ class RecorderController(QObject):
             else:
                 thread.wait(max(0, int(wait_timeout_ms)))
 
+    def wait_for_ingest_threads(self, timeout_ms: int = 5000) -> bool:
+        """Block until every ingest thread (current or still draining) has ended.
+
+        Stop no longer blocks the GUI thread, so a thread from a previous stream
+        may still be winding down. Call this before destroying the controller
+        (app close) or starting a new stream. Returns True when all are done.
+        """
+        deadline = time.monotonic() + max(0, int(timeout_ms)) / 1000.0
+        all_done = True
+        threads = [t for t, _w in self._ingest_refs]
+        if self._ingest_thread is not None:
+            threads.append(self._ingest_thread)
+        for thread in threads:
+            try:
+                if not thread.isRunning():
+                    continue
+                remaining = int(max(0.0, deadline - time.monotonic()) * 1000)
+                if not thread.wait(remaining):
+                    all_done = False
+            except RuntimeError:  # already deleted: it finished
+                continue
+        self._release_finished_ingest()
+        return all_done
+
     def _stop_stream(self) -> None:
         self._finalize_smart_recorder()  # close any active PC recording first
         worker = self._ingest_worker
@@ -696,6 +721,11 @@ class RecorderController(QObject):
         if self._ingest_worker is not None:
             raise RuntimeError("MPU6050 streaming is already running.")
 
+        # A Stop moments ago returns immediately; let that stream's thread
+        # finish before opening a new one (usually already done).
+        if not self.wait_for_ingest_threads(3000):
+            logger.warning("Previous ingest thread still running at new stream start")
+
         self._close_active_stream()
         self._clear_sample_queue()
         # The Pi restarts t_s at 0 on every run, so samples left over from the
@@ -870,6 +900,13 @@ class RecorderController(QObject):
 
     @Slot()
     def _on_ingest_finished(self) -> None:
+        # Stop is non-blocking, so a previous stream's worker can finish after
+        # a new stream has started. Its late signal must not tear down the
+        # new stream's state.
+        sender = self.sender()
+        current = self._ingest_worker
+        if current is not None and sender is not None and sender is not current:
+            return
         if (
             not self._stop_requested
             and not self._ingest_had_error

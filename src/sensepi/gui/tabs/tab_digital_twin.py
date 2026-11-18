@@ -41,21 +41,40 @@ from PySide6.QtWidgets import (
 )
 
 from ...dataio import modal_session_loader as msl
+from .. import theme
+from ..widgets.info_button import InfoButton
 from ...analysis import sensor_layout as slayout
-from ...digital_twin import decisions as twin_decisions
-from ..widgets.decision_panel import DecisionPanel
 from ..widgets.wireframe import LiveStructureView
+from ..thread_retire import ThreadRetirer
 from ...digital_twin.comparison import compute_comparison_metrics, fft_amplitude
+
+#: Shown by the info button beside the experiment controls. The order of work is
+#: the same on every run, so it does not belong on screen permanently.
+WORKFLOW_HELP = (
+    "<b>Order of work</b><br>"
+    "1. Start the live stream in Live Signals.<br>"
+    "2. Calibrate here, or run Calibrate in Model Updating.<br>"
+    "3. Arm the numerical model.<br>"
+    "4. Press Start experiment, then start the shaker.<br><br>"
+    "<b>Starting together</b><br>"
+    "With Auto-sync on, the model waits for sustained sensor motion clearly "
+    "above the pre-start baseline, so the two clocks begin together. Keep the "
+    "structure quiet until you start the shaker.<br><br>"
+    "<b>Where the input comes from</b><br>"
+    "Model Updating, Analysis: the ground-motion file or preset, dt, factor and "
+    "damping."
+)
 
 
 class _Twin3DCanvas(FigureCanvas):
     """3D undeformed/deformed OpenSees model view."""
 
-    _STRUCTURE_BLUE = "#123B6D"
-    _REFERENCE_GREY = "#A9B4C0"
-    _BACKGROUND = "#F7F9FC"
+
 
     def __init__(self, parent: QWidget | None = None) -> None:
+        self._STRUCTURE_BLUE = theme.model_line()
+        self._REFERENCE_GREY = theme.model_reference()
+        self._BACKGROUND = theme.canvas_bg()
         self.fig = Figure(figsize=(6.0, 6.0))
         super().__init__(self.fig)
         self.setParent(parent)
@@ -74,13 +93,14 @@ class _Twin3DCanvas(FigureCanvas):
         self.ax.set_zticks([])
         self.ax.grid(False)
         self.ax.view_init(elev=25, azim=-70)
-        self.fig.tight_layout(pad=0.6)
+        theme.style_mpl_canvas(self.fig)
+        self.fig.tight_layout(pad=1.1)
         self.draw_idle()
 
     def initialize_model(self, modal_data: dict[str, Any] | None) -> None:
         self.ax.clear()
         self.ax.set_facecolor(self._BACKGROUND)
-        self.ax.set_title("Calibrated numerical model — live response", fontweight="semibold")
+        self.ax.set_title("Calibrated numerical model, live response", fontweight="semibold")
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
         self.ax.set_zlabel("Z")
@@ -89,6 +109,9 @@ class _Twin3DCanvas(FigureCanvas):
         self.ax.set_zticks([])
         self.ax.grid(False)
         self.ax.view_init(elev=25, azim=-70)
+        # Restyle: ax.clear() above dropped it, and two early returns
+        # below would skip a call placed at the end.
+        theme.style_mpl_canvas(self.fig)
         self._defo_lines = []
         if not modal_data:
             self.draw_idle()
@@ -129,7 +152,7 @@ class _Twin3DCanvas(FigureCanvas):
                 [], [], [], color=self._STRUCTURE_BLUE, linewidth=3.0, alpha=0.98,
             )
             self._defo_lines.append(line)
-        self.fig.tight_layout(pad=0.6)
+        self.fig.tight_layout(pad=1.1)
         self.draw_idle()
 
     def update_frame(self, frame: dict[str, Any]) -> None:
@@ -208,7 +231,7 @@ class _TwinPlotsCanvas(FigureCanvas):
         self._response_story = int(story)
 
         self._input_full_line, = self.ax_input.plot(
-            [], [], color="black", linestyle="--", linewidth=0.9,
+            [], [], color=theme.canvas_fg(), linestyle="--", linewidth=0.9,
             label="Base excitation", zorder=1
         )
         if self._ground_t.size:
@@ -228,7 +251,7 @@ class _TwinPlotsCanvas(FigureCanvas):
             zorder=4, animated=True
         )
         self.ax_input.set_title(
-            f"Story {story} — Base excitation and model response"
+            f"Story {story}: Base excitation and model response"
         )
         self.ax_input.set_xlabel("Time (s)")
         self.ax_input.set_ylabel("Acceleration (m/s²)")
@@ -244,7 +267,7 @@ class _TwinPlotsCanvas(FigureCanvas):
             [], [], linewidth=1.5, color="red", label="Numerical model (OpenSees)",
             animated=True
         )
-        self.ax_response.set_title(f"Story {story} — FFT comparison")
+        self.ax_response.set_title(f"Story {story}, FFT comparison")
         self.ax_response.set_xlabel("Frequency (Hz)")
         self.ax_response.set_ylabel("Amplitude (m/s²)")
         self.ax_response.set_xlim(0.0, 25.0)
@@ -252,7 +275,11 @@ class _TwinPlotsCanvas(FigureCanvas):
         self.ax_response.grid(True, alpha=0.25)
         self.ax_response.legend(loc="upper right", fontsize=9)
 
-        self.fig.tight_layout(pad=1.5)
+        # Before the blit background is recached, or the cached bitmap
+        # keeps matplotlib's white.
+        theme.style_mpl_canvas(self.fig)
+        # h_pad keeps the lower subplot's title off the upper one's x label.
+        self.fig.tight_layout(pad=1.2, h_pad=2.4)
         self._bg_stale = True
 
     def update_comparison(
@@ -524,6 +551,7 @@ class DigitalTwinExperimentTab(QWidget):
         self._setup: dict[str, Any] | None = None
         self._prepared = False
         self._running = False
+        self._stream_active = False  # True only while a live Pi stream is running
         self._sensor_t0: float | None = None
         self._sensor_start_click_t: float | None = None
         self._baseline: dict[int, float] = {}
@@ -544,20 +572,25 @@ class DigitalTwinExperimentTab(QWidget):
         self._onset_source = ""
         self._calibrated_params: dict[str, Any] | None = None
         self._calibration_source = ""
-        self._decisions = None
         self._sensor_mapping: dict | None = None
         self._calib_thread: QThread | None = None
         self._calib_worker = None
+        self._thread_retirer = ThreadRetirer(self)
         self._build_ui()
 
         # Render at a fixed GUI rate.  Worker frames are cheap to receive; if
         # several arrive while Matplotlib is busy, only the latest 3D state is
         # drawn.  Numerical integration remains independent of GUI speed.
+        # NOTE: timers are intentionally NOT started here — they are started in
+        # on_stream_started() and stopped in on_stream_stopped() so they do not
+        # waste CPU / block the GUI event loop when no stream is active.
+        # Previously they started unconditionally, causing "Python not responding"
+        # hangs after 2-3 minutes of idle (the 20 fps render + 2.5 fps wireframe
+        # combined were waking the GIL and blocking the Qt event loop).
         self._render_timer = QTimer(self)
         self._render_timer.setInterval(50)  # about 20 frames/s
         self._render_timer.timeout.connect(self._render_latest_frame)
-        self._render_timer.start()
-        self._live_view.start()
+        # _live_view and _render_timer are started by on_stream_started()
         self._update_controls()
 
     def _build_ui(self) -> None:
@@ -603,21 +636,39 @@ class DigitalTwinExperimentTab(QWidget):
         row.addWidget(QLabel("Lag:"))
         row.addWidget(self._lag_spin)
         row.addStretch(1)
-        row.addWidget(self._sonify_btn)
+        # The Sonify button is NOT placed here. It plays the model selected in
+        # the Sonification tab on live sensor data, which has nothing to do with
+        # this experiment, so Model Updating adopts it into the action row at
+        # the bottom of the tab (see host_digital_shadow).
         root.addWidget(controls)
 
-        self._setup_label = QLabel(
-            "Calibrate the model, or send the latest Continuous Update to Model, then "
-            "start the live sensor stream and Arm. Experiment input source: Model "
-            "Updating → Analysis (ground-motion file/preset, dt, factor and damping)."
-        )
+        # The workflow is the same on every run, so it sits behind the info
+        # button on the control group rather than on screen. This line carries
+        # only what changes: which input is loaded, and the caveat about it.
+        setup_row = QHBoxLayout()
+        setup_row.setContentsMargins(0, 0, 0, 0)
+        # State and setup share one line. They were two lines at opposite ends
+        # of the tab, and at rest the lower one only said "Ready.", which the
+        # upper one already implied.
+        self._status = QLabel("")
+        self._status.setWordWrap(True)
+        setup_row.addWidget(self._status)
+        self._setup_label = QLabel("Not armed. Calibrate, then arm the model.")
         self._setup_label.setWordWrap(True)
-        root.addWidget(self._setup_label)
+        setup_row.addWidget(self._setup_label, 1)
+        self._workflow_info = InfoButton(WORKFLOW_HELP, title="Digital Shadow")
+        setup_row.addWidget(self._workflow_info, 0, Qt.AlignTop)
+        root.addLayout(setup_row)
 
-        # 2x2: the two comparison plots on the left (one canvas, two subplots),
-        # the numerical model top-right, and the PHYSICAL structure bottom-right
-        # with the decision panel beside it. The two right-hand panels are the
-        # two halves of the twin — model and reality — so they sit in a column.
+        # The two comparison plots on the left (one canvas, two subplots), the
+        # numerical model top-right and the PHYSICAL structure bottom-right: the
+        # two halves of the comparison — model and reality — in a column.
+        #
+        # No decision panel here. Decisions are a Digital TWIN output: they read
+        # a calibration and say what to change about the structure. A shadow only
+        # reports where reality departs from the model, so the panel was a second
+        # rendering of what Model Updating's Digital Twin sub-tab already owns
+        # (its own DecisionPanel, fed per Continuous Update cycle).
         splitter = QSplitter(Qt.Horizontal)
         self._plots = _TwinPlotsCanvas()
         self._model_3d = _Twin3DCanvas()
@@ -626,29 +677,29 @@ class DigitalTwinExperimentTab(QWidget):
 
         right = QSplitter(Qt.Vertical)
         right.addWidget(self._model_3d)
-
-        lower = QWidget()
-        lower_row = QHBoxLayout(lower)
-        lower_row.setContentsMargins(0, 0, 0, 0)
-        lower_row.addWidget(self._live_view, stretch=3)
-        self._decision_panel = DecisionPanel(parent=self)
-        lower_row.addWidget(self._decision_panel, stretch=2)
-        right.addWidget(lower)
+        right.addWidget(self._live_view)
         right.setSizes([420, 420])
 
         splitter.addWidget(self._plots)
         splitter.addWidget(right)
-        splitter.setSizes([620, 730])
+        # The comparison plots are what this tab is for, so they get the
+        # width. The model and the live structure beside them stay legible
+        # at roughly a third.
+        splitter.setSizes([980, 520])
         root.addWidget(splitter, stretch=1)
 
-        metrics = QGroupBox("Live comparison")
+        # One plain line, no frame: six short readings do not need a titled
+        # box around them, and the frame cost a row of plot height.
+        metrics = QWidget(self)
         mrow = QHBoxLayout(metrics)
-        self._metric_rms = QLabel("RMS error: —")
-        self._metric_nrmse = QLabel("NRMSE: —")
-        self._metric_corr = QLabel("Correlation: —")
-        self._metric_peak = QLabel("Peak ratio: —")
-        self._metric_lag = QLabel("Sync lag: —")
-        self._sensor_label = QLabel("Sensor: —")
+        mrow.setContentsMargins(2, 0, 2, 0)
+        mrow.setSpacing(14)
+        self._metric_rms = QLabel("RMS error: n/a")
+        self._metric_nrmse = QLabel("NRMSE: n/a")
+        self._metric_corr = QLabel("Correlation: n/a")
+        self._metric_peak = QLabel("Peak ratio: n/a")
+        self._metric_lag = QLabel("Sync lag: n/a")
+        self._sensor_label = QLabel("Sensor: n/a")
         for widget in (
             self._metric_rms,
             self._metric_nrmse,
@@ -661,18 +712,15 @@ class DigitalTwinExperimentTab(QWidget):
         mrow.addStretch(1)
         root.addWidget(metrics)
 
-        self._status = QLabel(
-            "Ready. Recommended workflow: stream while structure is still → Arm → press Start → start the shaker. "
-            "With Auto-sync enabled, the numerical model waits for the detected shaker onset."
-        )
-        self._status.setWordWrap(True)
-        root.addWidget(self._status)
-
         self._calibrate_btn.clicked.connect(self._calibrate)
         self._arm_btn.clicked.connect(self._arm)
         self._start_btn.clicked.connect(self._start_experiment)
         self._stop_btn.clicked.connect(self._stop_experiment)
         self._sonify_btn.clicked.connect(self._toggle_sonification)
+        son_tabs = getattr(self._sonification_tab, "_tabs", None)
+        if son_tabs is not None:
+            son_tabs.currentChanged.connect(lambda _i: self.refresh_sonify_tooltip())
+        self.refresh_sonify_tooltip()
         self._story_combo.currentIndexChanged.connect(self._refresh_plot)
         self._auto_align.toggled.connect(self._on_auto_align_changed)
         self._lag_spin.valueChanged.connect(self._refresh_plot)
@@ -768,16 +816,6 @@ class DigitalTwinExperimentTab(QWidget):
             return current_widget()
         return getattr(self._sonification_tab, "chorus_tab", None)
 
-    @Slot()
-    def on_stream_started(self) -> None:
-        self._update_controls()
-
-    @Slot()
-    def on_stream_stopped(self) -> None:
-        if self._running or self._prepared:
-            self._stop_experiment()
-        self._update_controls()
-
     def _update_controls(self) -> None:
         streaming = False
         try:
@@ -811,7 +849,7 @@ class DigitalTwinExperimentTab(QWidget):
                 if first_measured is None:
                     first_measured = self._story_combo.count() - 1
             else:
-                self._story_combo.addItem(f"{story} — no sensor", story)
+                self._story_combo.addItem(f"{story}: no sensor", story)
         if current is not None and current in measured:
             idx = self._story_combo.findData(current)
             self._story_combo.setCurrentIndex(idx if idx >= 0 else 0)
@@ -889,13 +927,13 @@ class DigitalTwinExperimentTab(QWidget):
     @Slot(object)
     def _on_calibrated(self, payload) -> None:
         self._calibrated_params = payload.get("calibrated")
-        designed = payload.get("designed") or {}
-        self._decisions = twin_decisions.decide(designed, self._calibrated_params)
-        self._decision_panel.set_decisions(self._decisions, source="this calibration")
         note = "" if payload.get("success") else " (did not converge)"
+        # What this calibration IMPLIES about the structure is a Digital Twin
+        # question, and Model Updating's Digital Twin sub-tab answers it. Here the
+        # calibration matters only as the model the experiment will run.
         self._status.setText(
-            f"Calibrated{note}. {self._decisions.summary()} "
-            f"This calibration will drive the experiment — now Arm the numerical model.")
+            f"Calibrated{note}. This calibration will drive the experiment, "
+            f"now Arm the numerical model.")
         self._clear_calibration_worker()
 
     @Slot(str)
@@ -907,12 +945,8 @@ class DigitalTwinExperimentTab(QWidget):
     def _clear_calibration_worker(self) -> None:
         thread, self._calib_thread = self._calib_thread, None
         worker, self._calib_worker = self._calib_worker, None
-        if thread is not None:
-            thread.quit()
-            thread.wait()
-            thread.deleteLater()
-        if worker is not None:
-            worker.deleteLater()
+        # No blocking wait on the GUI thread (it had no timeout).
+        self._thread_retirer.retire(thread, worker)
         self._calibrate_btn.setEnabled(True)
         self._update_controls()
 
@@ -993,13 +1027,12 @@ class DigitalTwinExperimentTab(QWidget):
         self._setup_label.setText(
             f"Calibrated model ready · input: {Path(str(params.get('gmFile', ''))).name} · "
             f"dt={float(params.get('dtGM', 0.0)):.4g} s · factor={float(params.get('gmFactor', 1.0)):.4g} · "
-            f"duration≈{duration:.2f} s · source: Model Updating → Analysis. "
-            "No base sensor is used: this input is assumed to be the shaker input."
+            f"duration≈{duration:.2f} s. "
+            "The input is assumed to be what the shaker actually produced; no base "
+            "sensor is used to verify it."
         )
         self._status.setText(
-            "ARMED. Keep the structure in its normal quiet condition, then press Start experiment and start the shaker. "
-            "With Auto-sync enabled, the numerical model waits for clear sustained shaker motion before it starts."
-        )
+            "ARMED. Keep the structure quiet, then press Start experiment.")
         self._update_controls()
 
     def _capture_sensor_origin(self) -> None:
@@ -1078,7 +1111,7 @@ class DigitalTwinExperimentTab(QWidget):
                 if int(sid) in series and series[int(sid)]
             ]
             self._onset_source = (
-                f"{len(mapped)} structural sensor(s) — no base sensor is placed, "
+                f"{len(mapped)} structural sensor(s): no base sensor is placed, "
                 f"so the start is inferred from the response")
         if not mapped:
             return None
@@ -1154,10 +1187,8 @@ class DigitalTwinExperimentTab(QWidget):
         self._lag_spin.blockSignals(False)
         self._worker.request_start(realtime_offset_s=self._trigger_latency_s)
         self._status.setText(
-            f"SHAKER ONSET DETECTED — numerical model started automatically. "
-            f"Initial {self._trigger_latency_s:.3f} s detection delay is being caught up so "
-            "the physical and numerical clocks remain synchronized."
-        )
+            f"RUNNING. Onset detected; catching up {self._trigger_latency_s:.3f} s "
+            "of detection delay.")
 
     @Slot()
     def _start_experiment(self) -> None:
@@ -1177,16 +1208,12 @@ class DigitalTwinExperimentTab(QWidget):
             self._lag_spin.setValue(0.0)
             self._lag_spin.blockSignals(False)
             self._waiting_for_onset = True
-            self._status.setText(
-                "WAITING FOR SHAKER — start the shaker now. The numerical model will start "
-                "automatically only after sustained sensor motion rises clearly above the "
-                "pre-start baseline."
-            )
+            self._status.setText("WAITING FOR SHAKER. Start the shaker now.")
         else:
             self._waiting_for_onset = False
             self._worker.request_start()
             self._status.setText(
-                "RUNNING — manual synchronization mode. The numerical model started at the "
+                "RUNNING: manual synchronization mode. The numerical model started at the "
                 "button press; use Lag if a manual time shift is needed."
             )
         self._update_controls()
@@ -1269,7 +1296,41 @@ class DigitalTwinExperimentTab(QWidget):
         self._frame_dirty = True
 
     @Slot()
+    def on_stream_started(self) -> None:
+        """Called by MainWindow when the live Pi stream starts.
+
+        Activates the render timer and wireframe view so they only consume
+        CPU/GPU while there is actually data arriving.
+        """
+        self._stream_active = True
+        if not self._render_timer.isActive():
+            self._render_timer.start()
+        self._live_view.start()
+        self._update_controls()
+
+    @Slot()
+    def on_stream_stopped(self) -> None:
+        """Called by MainWindow when the live Pi stream stops.
+
+        Stops the render timer and wireframe view to prevent idle CPU usage
+        that previously caused "Python not responding" hangs after 2-3 minutes.
+        Without live sensor data there is nothing to compare against, so an
+        armed/running experiment is asked to stop; its final frame is drawn
+        once in _on_finished.
+        """
+        self._stream_active = False
+        if self._running or self._prepared:
+            self._stop_experiment()
+        self._live_view.stop()
+        if not self._running and self._render_timer.isActive():
+            self._render_timer.stop()
+        self._update_controls()
+
+    @Slot()
     def _render_latest_frame(self) -> None:
+        # Guard: do nothing when idle (stream not active and no experiment running).
+        if not self._stream_active and not self._running:
+            return
         self._poll_shaker_trigger()
         frame = self._last_frame
         if not frame or not self._frame_dirty:
@@ -1304,16 +1365,16 @@ class DigitalTwinExperimentTab(QWidget):
             self._last_analysis_refresh_wall = now
             metrics = compute_comparison_metrics(mt_aligned, my, nt, ny)
             self._metric_rms.setText(
-                f"RMS error: {metrics.rms_error:.3g} m/s²" if np.isfinite(metrics.rms_error) else "RMS error: —"
+                f"RMS error: {metrics.rms_error:.3g} m/s²" if np.isfinite(metrics.rms_error) else "RMS error: n/a"
             )
             self._metric_nrmse.setText(
-                f"NRMSE: {metrics.nrmse_percent:.1f}%" if np.isfinite(metrics.nrmse_percent) else "NRMSE: —"
+                f"NRMSE: {metrics.nrmse_percent:.1f}%" if np.isfinite(metrics.nrmse_percent) else "NRMSE: n/a"
             )
             self._metric_corr.setText(
-                f"Correlation: {metrics.correlation:.3f}" if np.isfinite(metrics.correlation) else "Correlation: —"
+                f"Correlation: {metrics.correlation:.3f}" if np.isfinite(metrics.correlation) else "Correlation: n/a"
             )
             self._metric_peak.setText(
-                f"Peak ratio P/N: {metrics.peak_ratio:.3f}" if np.isfinite(metrics.peak_ratio) else "Peak ratio P/N: —"
+                f"Peak ratio P/N: {metrics.peak_ratio:.3f}" if np.isfinite(metrics.peak_ratio) else "Peak ratio P/N: n/a"
             )
             if self._auto_align.isChecked():
                 self._metric_lag.setText(
@@ -1323,7 +1384,7 @@ class DigitalTwinExperimentTab(QWidget):
                 self._metric_lag.setText(f"Manual lag: {lag:+.3f} s")
             axis = (self._setup or {}).get("sensor_axis", "")
             self._sensor_label.setText(
-                f"Sensor: {','.join(map(str, sids)) if sids else '—'} ({axis})"
+                f"Sensor: {','.join(map(str, sids)) if sids else ', '} ({axis})"
             )
 
     @Slot(bool)
@@ -1352,6 +1413,7 @@ class DigitalTwinExperimentTab(QWidget):
                 self._status.setText(f"Experiment finished, but saving failed: {exc}")
         else:
             self._status.setText("Digital Twin experiment stopped.")
+        self._idle_render_timer_if_no_stream()
         self._update_controls()
 
     @Slot(str)
@@ -1359,9 +1421,25 @@ class DigitalTwinExperimentTab(QWidget):
         self._waiting_for_onset = False
         self._running = False
         self._prepared = False
+        self._idle_render_timer_if_no_stream()
         self._status.setText("Digital Twin experiment failed.")
         QMessageBox.critical(self, "Digital Twin experiment failed", message)
         self._update_controls()
+
+    def _idle_render_timer_if_no_stream(self) -> None:
+        # The render timer may have been kept alive past a stream stop only to
+        # finish an experiment. Draw the last pending frame once, then idle.
+        if self._stream_active:
+            return
+        if self._render_timer.isActive():
+            self._render_timer.stop()
+        if self._last_frame and self._frame_dirty:
+            self._frame_dirty = False
+            try:
+                self._model_3d.update_frame(self._last_frame)
+                self._refresh_plot()
+            except Exception:
+                pass
 
     def _clear_worker(self) -> None:
         self._thread = None
@@ -1526,6 +1604,34 @@ class DigitalTwinExperimentTab(QWidget):
                         stop()
             self._set_sonification_button(checked=False, text="▶ Sonify")
 
+    def sonify_button(self) -> QPushButton:
+        """The Sonify button, for a host that wants to place it elsewhere."""
+        return self._sonify_btn
+
+    def refresh_sonify_tooltip(self) -> None:
+        """Name the model the button will start, since it is not obvious.
+
+        Which model plays depends on the sub-tab selected over in Sonification,
+        and that is not visible from here. The button keeps its short name and
+        says the rest on hover.
+        """
+        model = self._active_sonification_model()
+        name = ""
+        tabs = getattr(self._sonification_tab, "_tabs", None)
+        if tabs is not None and model is not None:
+            idx = tabs.indexOf(model)
+            if idx >= 0:
+                name = tabs.tabText(idx)
+        if name:
+            self._sonify_btn.setToolTip(
+                f"Play \u201c{name}\u201d, the model selected in the Sonification tab, "
+                "using its own settings.\n\n"
+                "It sonifies the LIVE sensor data, not this experiment's model.")
+        else:
+            self._sonify_btn.setToolTip(
+                "Play the model selected in the Sonification tab, using its own "
+                "settings, on the live sensor data.")
+
     def shutdown(self) -> None:
         # Stop the display timers first: they poll the controller, and polling a
         # controller that is being torn down is how a clean exit turns into a
@@ -1544,3 +1650,4 @@ class DigitalTwinExperimentTab(QWidget):
         thread = self._thread
         if thread is not None and thread.isRunning():
             thread.wait(2500)
+        self._thread_retirer.wait_all(2500)

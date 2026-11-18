@@ -51,6 +51,7 @@ from ...analysis import modal as modal_id
 from ...analysis import sensor_layout as slayout
 from ...digital_twin import decisions as twin_decisions
 from ..widgets.decision_panel import DecisionPanel
+from .. import theme
 from ..widgets.wireframe import LiveStructureView
 from ...analysis import modal_tracker as modal_trk
 from ...dataio import modal_session_loader as msl
@@ -65,7 +66,7 @@ REQUIRED_MODULES = ("openseespy", "opsvis")
 # value and bias the shape. map_to_stories() ignores any sensor missing from the
 # map, so an unassigned sensor never enters the calculation.
 # Retained: the manual mode-shape table still offers "not measured" cells.
-UNASSIGNED_STORY = "—"
+UNASSIGNED_STORY = ": "
 
 # Shortest gap between two redraws of Run Analysis's live plots (see
 # ModelUpdatingTab._on_animation_frame).
@@ -119,6 +120,84 @@ class _CalibrationState:
     prior_freqs: list[float] | None = None
     prior_periods: list[float] | None = None
     prior_mode_shapes: list[list[float]] | None = None
+
+
+_CALIBRATION_STATE_FILE = "calibration_state.json"
+
+
+def _calibration_state_path() -> Path:
+    """Where the last calibration survives an app restart.
+
+    It is only ever reused when its input signature still matches the current
+    model inputs (see the worker), so restoring a stale file is harmless.
+    """
+    return _default_workspace_dir() / _CALIBRATION_STATE_FILE
+
+
+def _to_jsonable(value: Any) -> Any:
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(k): _to_jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_jsonable(v) for v in value]
+    return value
+
+
+def _save_calibration_state(state: _CalibrationState) -> None:
+    path = _calibration_state_path()
+    if not state.available:
+        with contextlib.suppress(OSError):
+            path.unlink()
+        return
+    payload = _to_jsonable({
+        "version": 1,
+        "saved_at": datetime.now().isoformat(timespec="seconds"),
+        "available": True,
+        "input_signature": state.input_signature,
+        "calibrated_params": state.calibrated_params,
+        "uncalibrated_response": state.uncalibrated_response,
+        "prior_freqs": state.prior_freqs,
+        "prior_periods": state.prior_periods,
+        "prior_mode_shapes": state.prior_mode_shapes,
+    })
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _load_calibration_state() -> _CalibrationState:
+    path = _calibration_state_path()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return _CalibrationState()
+    if not isinstance(data, dict) or not data.get("available"):
+        return _CalibrationState()
+    params = data.get("calibrated_params")
+    if not isinstance(params, dict) or not isinstance(data.get("input_signature"), str):
+        return _CalibrationState()
+    response = data.get("uncalibrated_response")
+    if isinstance(response, dict):
+        # The live response canvas expects arrays, as the worker produced them.
+        response = {
+            k: (np.asarray(v, dtype=float) if k.endswith("_hist") else v)
+            for k, v in response.items()
+        }
+    else:
+        response = None
+    return _CalibrationState(
+        available=True,
+        input_signature=data["input_signature"],
+        calibrated_params=params,
+        uncalibrated_response=response,
+        prior_freqs=data.get("prior_freqs"),
+        prior_periods=data.get("prior_periods"),
+        prior_mode_shapes=data.get("prior_mode_shapes"),
+    )
 
 
 @dataclass
@@ -358,6 +437,7 @@ class _LiveResponseCanvas(FigureCanvas):
         self.ax_acc.set_ylabel("Acceleration (m/s²)")
         self.ax_acc.grid(True, alpha=0.25)
         self.fig.tight_layout(pad=1.6)
+        theme.style_mpl_canvas(self.fig)
 
     def initialize(self, overlay_response: dict[str, Any] | None = None, tmax: float | None = None) -> None:
         self.ax_disp.clear()
@@ -429,6 +509,7 @@ class _Live3DCanvas(FigureCanvas):
         self.ax.view_init(elev=25, azim=-70)
         self.fig.tight_layout(pad=0.5)
         self.draw_idle()
+        theme.style_mpl_canvas(self.fig)
 
     def initialize_model(self, modal_data: dict[str, Any] | None, title: str = "3D Transient Response") -> None:
         self.ax.clear()
@@ -441,6 +522,7 @@ class _Live3DCanvas(FigureCanvas):
         self.ax.set_zticks([])
         self.ax.grid(False)
         self.ax.view_init(elev=25, azim=-70)
+        theme.style_mpl_canvas(self.fig)
 
         self._defo_lines = []
         if not modal_data:
@@ -806,7 +888,7 @@ class _ModelUpdatingWorker(QObject):
                 _log_model_params(final_params, upd_heights, "UPDATED MODEL (calibrated)")
             else:
                 prior_heights = final_params.get("story_heights", [])
-                _log_model_params(final_params, prior_heights, "RUN ANALYSIS — Prior model (uncalibrated)")
+                _log_model_params(final_params, prior_heights, "RUN ANALYSIS, Prior model (uncalibrated)")
 
             self.log.emit("\nExtracting modal properties...\n")
             final_modal = extract_modal_results(
@@ -1093,7 +1175,9 @@ def _fig_to_png(fig: Figure) -> bytes:
 # One fixed color per mode index, used CONSISTENTLY across every output figure
 # (spectrum peaks, identified mode shapes, parameter-history frequencies) so a
 # given mode is the same color everywhere. Indexed by 0-based mode number.
-_MODE_COLORS = ["#2563eb", "#ea580c", "#16a34a", "#9333ea", "#0891b2", "#ca8a04"]
+# These end up in the report figures, which are printed on white, so the
+# print variant. Same hue order as the on-screen palette.
+_MODE_COLORS = list(theme.MODE_COLORS_PRINT)
 
 
 def _mode_color(i: int) -> str:
@@ -1125,7 +1209,7 @@ def _render_fdd_spectrum_png(result: "modal_id.ExperimentalModalResult",
                         xytext=(2, -10), textcoords="offset points",
                         fontsize=8, color=c, rotation=90, va="top")
             handles.append(Line2D([0], [0], color=c, linestyle="--",
-                                  label=f"Mode {i + 1} — {f:.2f} Hz"))
+                                  label=f"Mode {i + 1}: {f:.2f} Hz"))
     ax.set_xlim(f_min, f_max)
     ax.set_title(title)
     ax.set_xlabel("Frequency (Hz)")
@@ -1160,7 +1244,7 @@ def _render_identified_shapes_png(story_data: "modal_id.StoryModalData",
         ax.set_xlabel("ux")
         ax.grid(True, alpha=0.3)
         handles.append(Line2D([0], [0], color=c, marker="o",
-                              label=f"Mode {m + 1} — {result.frequencies_hz[m]:.2f} Hz"))
+                              label=f"Mode {m + 1}: {result.frequencies_hz[m]:.2f} Hz"))
     fig.suptitle("Identified mode shapes (measured stories)", fontsize=10)
     fig.legend(handles=handles, loc="lower center", ncol=min(n_modes, 3),
                fontsize=8, framealpha=0.9)
@@ -1332,7 +1416,7 @@ class _IdentifyWorker(QObject):
             )
 
             # ── INPUTS ────────────────────────────────────────────────
-            self.log.emit(f"{sep}\nLOAD & IDENTIFY — sensor modal identification\n{sep}\n")
+            self.log.emit(f"{sep}\nLOAD & IDENTIFY: sensor modal identification\n{sep}\n")
             self.log.emit("INPUTS\n")
             self.log.emit(f"  Recorded session: {self._session_path}\n")
             self.log.emit(f"  Axis:             {p['sensor_axis']}\n")
@@ -1371,7 +1455,7 @@ class _IdentifyWorker(QObject):
             self.log.emit(f"  Duration:         {session.duration_s:.1f} s\n")
             self.log.emit(f"  Missing samples:  {session.nan_fraction * 100:.2f} %\n")
             if session.nan_fraction > 0.10:
-                self.log.emit("  WARNING: high fraction of missing samples — results may be unreliable.\n")
+                self.log.emit("  WARNING: high fraction of missing samples, results may be unreliable.\n")
 
             exp_dict, result, story_data = _build_sensor_exp_dict(session, p)
             if not result.success:
@@ -1428,7 +1512,7 @@ class _IdentifyWorker(QObject):
             self.log.emit(f"\n{sep}\n")
             self.log.emit(
                 "NOTE: Load & Identify does NOT run the OpenSees update. The identified\n"
-                "values are loaded into Manual input — review them, then press Calibrate,\n"
+                "values are loaded into Manual input, review them, then press Calibrate,\n"
                 "or use 'Identify & Update' to run the OpenSees calibration in one step.\n"
             )
             self.log.emit(f"{sep}\n")
@@ -1575,7 +1659,7 @@ class _ContinuousUpdateWorker(QObject):
                 have = session.duration_s if session.success else 0.0
                 self.log.emit(
                     f"  Collecting data ({have:.1f}/{duration:g} s)"
-                    f"{'' if session.success else f' — {session.message}'}; waiting…\n")
+                    f"{'' if session.success else f', {session.message}'}; waiting…\n")
                 if not self._wait_cycle(cycle_start, duration):
                     break
                 continue
@@ -1781,7 +1865,7 @@ class _ContinuousUpdateWorker(QObject):
         if pinned:
             self.log.emit(
                 "  ⚠ parameter(s) hit a bound: " + "; ".join(pinned) +
-                " — widen the bounds or move the PRIOR model closer to the rig "
+                ": widen the bounds or move the PRIOR model closer to the rig "
                 "(the filter cannot reach frequencies the model physically can't produce).\n")
 
     def _wait_cycle(self, cycle_start: float, duration: float) -> bool:
@@ -1812,7 +1896,8 @@ class ModelUpdatingTab(QWidget):
         super().__init__(parent)
         self._thread: QThread | None = None
         self._worker: _ModelUpdatingWorker | None = None
-        self._calibration_state = _CalibrationState()
+        # Restored from disk so a calibration survives closing the app.
+        self._calibration_state = _load_calibration_state()
         self._recorder_controller = None
         self._continuous_thread: QThread | None = None
         self._continuous_worker: _ContinuousUpdateWorker | None = None
@@ -1852,7 +1937,12 @@ class ModelUpdatingTab(QWidget):
         self._tabs.addTab(self._mass_tab, "Additional Mass")
         self._tabs.addTab(self._analysis_tab, "Analysis")
         self._tabs.addTab(self._calibration_tab, "Calibration")
-        self._tabs.addTab(self._output_tab, "Output")
+        # Shown as "Digital Twin": this is where the calibrated model's response
+        # is presented beside the measurement. The attribute keeps its original
+        # name because the internal "digital_twin" package and the
+        # output/digital_twin/ results folder refer to the Digital SHADOW tab,
+        # not to this one — renaming either side would cross the two over.
+        self._tabs.addTab(self._output_tab, "Digital Twin")
 
         self._build_model_tab()
         self._build_mass_tab()
@@ -1907,6 +1997,8 @@ class ModelUpdatingTab(QWidget):
         self._reset_btn = QPushButton("Reset", self)
         self._reset_btn.setToolTip("Clear results/log and return to a ready state for a new analysis.")
         actions.addWidget(self._reset_btn)
+        # host_digital_shadow() drops the Sonify button in here, after Reset.
+        self._actions_row = actions
         actions.addStretch(1)
         root.addLayout(actions)
 
@@ -2148,14 +2240,23 @@ class ModelUpdatingTab(QWidget):
         # Method selector (Q-F): Bayesian is the v26.1.1 default digital-twin engine;
         # deterministic least-squares stays selectable as the safe fallback.
         self._calibration_method = QComboBox(self)
+        # Bayesian is first, so it is already the default on open.
         self._calibration_method.addItems(["Bayesian (Gaussian)", "Least-squares (current)"])
         # Analysis scope (B4): replaces the old "use mode shapes" checkbox.
         self._analysis_scope = QComboBox(self)
         self._analysis_scope.addItems(["Frequency only", "Frequency + mode shapes"])
+        # Default to using the shapes as well: the rig gives usable shapes and
+        # calibrating on frequency alone leaves the mode order unconstrained.
+        # Loading identified data still overrides this to match what that data
+        # actually contains (see _apply_identified_to_fields).
+        self._analysis_scope.setCurrentText("Frequency + mode shapes")
         self._mass_scope = QComboBox(self)
         self._mass_scope.addItems(
             ["Self-weight mass only", "Total mass including additional masses"]
         )
+        # The camp setup always carries the added floor weights, so the total is
+        # the honest default; self-weight only is the special case.
+        self._mass_scope.setCurrentText("Total mass including additional masses")
         self._n_calib_modes = QSpinBox(self)
         self._n_calib_modes.setRange(1, 20)
         self._n_calib_modes.setValue(3)
@@ -2268,14 +2369,14 @@ class ModelUpdatingTab(QWidget):
         manual_vbox.setContentsMargins(0, 4, 0, 0)
 
         # Frequencies row (rebuilt dynamically)
-        freq_group = QGroupBox("Frequencies (Hz) — one per calibration mode", self)
+        freq_group = QGroupBox("Frequencies (Hz): one per calibration mode", self)
         self._freq_row_layout = QHBoxLayout(freq_group)
         self._exp_freq_spins: list[QDoubleSpinBox] = []
         manual_vbox.addWidget(freq_group)
 
         # Mode shapes table (rebuilt dynamically)
         shapes_group = QGroupBox(
-            "Mode Shapes UX — rows = stories, columns = modes (normalized, |max| = 1)", self
+            "Mode Shapes UX: rows = stories, columns = modes (normalized, |max| = 1)", self
         )
         shapes_vbox = QVBoxLayout(shapes_group)
         self._exp_mode_table = QTableWidget(self)
@@ -2351,8 +2452,8 @@ class ModelUpdatingTab(QWidget):
         self._sensor_method = QComboBox(self)
         self._sensor_method.addItems(["FDD", "FFT"])
         self._sensor_method.setToolTip(
-            "FDD: SVD of the cross-spectral-density matrix — signed mode shapes.\n"
-            "FFT: sensor-averaged Welch PSD peak-picking — simpler, magnitude-only shapes\n"
+            "FDD: SVD of the cross-spectral-density matrix, signed mode shapes.\n"
+            "FFT: sensor-averaged Welch PSD peak-picking, simpler, magnitude-only shapes\n"
             "(natural fit for frequency-only calibration)."
         )
         id_form.addRow("Method:", self._sensor_method)
@@ -2453,7 +2554,7 @@ class ModelUpdatingTab(QWidget):
             f"placement covers only {sorted(set(layout.story_map.values()))}. "
             f"Storey(s) {', '.join(map(str, missing))} are unmeasured; calibration "
             f"proceeds on the measured storeys only (partial coverage). Check that "
-            f"the numerical model matches the physical rig — the placement is set "
+            f"the numerical model matches the physical rig, the placement is set "
             f"in Settings, the storey count on the Model tab.\n")
 
     def _refresh_sensor_map_summary(self) -> None:
@@ -3347,6 +3448,7 @@ class ModelUpdatingTab(QWidget):
                 prior_periods=result.get("prior_periods"),
                 prior_mode_shapes=result.get("prior_mode_shapes"),
             )
+            self._persist_calibration_state()
             if result.get("report_text"):
                 self._append_log("\n\n" + result["report_text"])
             self._append_log("\n─── Calibration complete. Results shown above. ───\n")
@@ -3408,6 +3510,7 @@ class ModelUpdatingTab(QWidget):
 
         self._sensor_chain = []
         self._calibration_state = _CalibrationState()
+        self._persist_calibration_state()
         self._latest_continuous_calibration = None
         self._latest_continuous_signature = None
         self._continuous_handoff_selected = False
@@ -3455,6 +3558,35 @@ class ModelUpdatingTab(QWidget):
     def is_busy(self) -> bool:
         """True while a calibration, run or continuous update is in progress."""
         return self._thread is not None or self._continuous_thread is not None
+
+    def host_digital_shadow(self, tab: QWidget, title: str = "Digital Shadow") -> None:
+        """Adopt the Digital Shadow tab as this tab's last sub-tab.
+
+        It is added here rather than built here because it needs *this* tab as a
+        collaborator (``is_busy``, ``calibration_snapshot``,
+        ``model_definition_snapshot``). MainWindow therefore builds this tab
+        first, then the shadow, then hands the shadow over — which keeps the
+        dependency one-directional and avoids a circular construction.
+
+        Its owner stays MainWindow: the shadow is still reachable as
+        ``MainWindow.digital_twin_tab`` and is still shut down from there.
+        """
+        self._tabs.addTab(tab, title)
+        # Sonify belongs with the other tab-wide actions, not inside the
+        # experiment controls: it plays live sensor data through the
+        # Sonification tab's model and is unrelated to the experiment.
+        take_button = getattr(tab, "sonify_button", None)
+        row = getattr(self, "_actions_row", None)
+        if callable(take_button) and row is not None:
+            button = take_button()
+            if button is not None:
+                row.insertWidget(row.indexOf(self._reset_btn) + 1, button)
+
+    def _persist_calibration_state(self) -> None:
+        try:
+            _save_calibration_state(self._calibration_state)
+        except Exception as exc:  # never let persistence break the workflow
+            self._append_log(f"\n(Could not save calibration state: {exc})\n")
 
     def calibration_snapshot(self) -> dict[str, Any] | None:
         """A deep copy of the last calibrated parameters, or ``None``.
@@ -3626,7 +3758,7 @@ class ModelUpdatingTab(QWidget):
             self._status.setText("Updating model from sensor results…")
         else:
             self._append_log(
-                "\n─── Identification complete. Values loaded into Manual input — "
+                "\n─── Identification complete. Values loaded into Manual input, "
                 "review and press Calibrate. ───\n"
             )
             self._set_busy(False, "Identification complete.")
@@ -3881,6 +4013,7 @@ class ModelUpdatingTab(QWidget):
             input_signature=signature,
             calibrated_params=copy.deepcopy(params),
         )
+        self._persist_calibration_state()
         self._continuous_handoff_selected = True
         self._continuous_dt_btn.setEnabled(False)
         self._append_log(

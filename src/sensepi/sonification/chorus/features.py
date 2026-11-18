@@ -195,7 +195,12 @@ class FeatureExtractor:
             if band.sum() >= 4:
                 sb, fb = spec[band], fx[band]
                 k = int(np.argmax(sb))
-                frame.exc_freq_hz = float(fb[k])
+                # A stated drive frequency wins over the tracker. Without a base
+                # sensor the tracker reads the upper floors, which is a proxy for
+                # the input rather than the input, and on a shake table the
+                # operator knows the real number.
+                stated = float(getattr(cfg, "exc_freq_hz_override", 0.0) or 0.0)
+                frame.exc_freq_hz = stated if stated > 0.0 else float(fb[k])
                 self._exc_hist.append(frame.exc_freq_hz)
                 med = float(np.median(sb)) + 1e-12
                 frame.exc_conf = float(min(1.0, (sb[k] / med) / 20.0))
@@ -528,12 +533,24 @@ class ModalTracker:
         if shapes.ndim == 2 and shapes.shape[0] != data.shape[0]:
             shapes = shapes.T
         self._history.append((freqs, damp))
-        n = min(len(f) for f, _ in self._history)
-        fs_stack = np.vstack([f[:n] for f, _ in self._history])
-        dp_stack = np.vstack([d[:n] for _, d in self._history])
+        # Median per mode INDEX, over the history entries that actually have
+        # that index, with the latest cycle setting how many modes to report.
+        #
+        # This used to be min(len(f)) across the history, which took the
+        # FEWEST modes any recent cycle found. A single quiet cycle that
+        # resolved only mode 1 then silenced modes 2 and 3 for the next three
+        # cycles, while the Spectrum tab went on showing all three. On a rig
+        # that is shaken in bursts, that is most of the time.
+        target = int(freqs.size)
+        med_f, med_d = [], []
+        for i in range(target):
+            fv = [f[i] for f, _ in self._history if len(f) > i]
+            dv = [d[i] for _, d in self._history if len(d) > i]
+            med_f.append(float(np.median(fv)) if fv else float(freqs[i]))
+            med_d.append(float(np.median(dv)) if dv else float(damp[i]))
         self._state = ModalState(
-            frequencies_hz=np.median(fs_stack, axis=0),
-            damping=np.median(dp_stack, axis=0),
+            frequencies_hz=np.asarray(med_f, dtype=float),
+            damping=np.asarray(med_d, dtype=float),
             shapes=shapes if shapes.ndim == 2 else None,
             fs=float(fs), t_identified=float(t), ok=True,
             message=getattr(res, "message", "ok"),

@@ -30,9 +30,10 @@ from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QFrame,
                                QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QMessageBox, QPushButton, QScrollArea, QSlider,
-                               QSpinBox, QSplitter, QVBoxLayout, QWidget)
+                               QSizePolicy, QSpinBox, QSplitter, QVBoxLayout, QWidget)
 
 from ...analysis import sensor_layout as slayout
+from ..widgets.info_button import InfoButton
 from ..widgets.wireframe import LiveStructureView
 from ...sonification.chorus.types import (ROLE_COLORS, ROLE_MEANING,
                                           TYPE_ORDER, TYPES, ChorusConfig, VizFrame,
@@ -40,12 +41,15 @@ from ...sonification.chorus.types import (ROLE_COLORS, ROLE_MEANING,
 
 logger = logging.getLogger(__name__)
 
-BG = "#12151a"
-PANEL = "#1a1f27"
-FG = "#e8eaed"
-DIM = "#8b93a1"
-EDGE = "#2b3440"
-MODE_COLORS = ("#5ac8fa", "#7ee787", "#ff9f43", "#c792ea")
+# Chrome follows the operating system, like every other tab: BG is a Qt
+# palette role so the window colour is the native one, and the remaining
+# values are tuned for that native (light) chrome. The plot canvases stay
+# dark to match the Spectrum tab, so anything drawn ON a plot uses the
+# *_ON_DARK / PLOT_* values instead.
+from .. import theme
+BG = "palette(window)"
+PANEL = "palette(base)"
+FG = "palette(text)"
 
 #: Eigenfrequencies the tab works with: f1, f2, f3 (a three-storey frame).
 N_FREQS = 3
@@ -129,28 +133,59 @@ _CASE_SLOTS = (
 _KNOBS = {**_KNOBS_MAIN, **_KNOBS_ADVANCED}
 
 
+#: Width reserved for the y axis, and height for the x axis, in pixels.
+#: pyqtgraph sizes an axis to fit its current tick labels, so a log plot whose
+#: range grows from "1" to "0.0001" widens its own axis, which widens the plot,
+#: which widens the window. Reserving the room up front keeps the layout still
+#: while the data moves. Wide enough for "0.0001".
+_AXIS_W = 58
+_AXIS_H = 34
+
+
 def _style_plot(widget: pg.PlotWidget, xlabel: str = "", ylabel: str = "") -> None:
-    widget.setBackground(PANEL)
+    widget.setBackground(theme.PLOT_BG)
     for ax in ("left", "bottom"):
         a = widget.getAxis(ax)
-        a.setPen(pg.mkPen(EDGE))
-        a.setTextPen(pg.mkPen(DIM))
+        a.setPen(pg.mkPen(theme.PLOT_AXIS))
+        a.setTextPen(pg.mkPen(theme.DIM_ON_DARK))
+    widget.getAxis("left").setWidth(_AXIS_W)
+    widget.getAxis("bottom").setHeight(_AXIS_H)
+    # A plot must be able to shrink. Without this its contents set a floor that
+    # the layout has to honour, and the only way to honour it is a wider window.
+    widget.setMinimumSize(1, 1)
+    widget.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
     widget.showGrid(x=False, y=False)
     if xlabel:
-        widget.setLabel("bottom", xlabel, color=DIM, size="8pt")
+        widget.setLabel("bottom", xlabel, color=theme.DIM_ON_DARK, size="8pt")
     if ylabel:
-        widget.setLabel("left", ylabel, color=DIM, size="8pt")
+        widget.setLabel("left", ylabel, color=theme.DIM_ON_DARK, size="8pt")
 
 
-def _titled(title: str, tag: str, inner: QWidget) -> QWidget:
+def _titled(title: str, info: str, inner: QWidget) -> QWidget:
+    """One panel: its name, an info button, then the content.
+
+    The info button stands where the panel number used to. The numbers were
+    decoration, and the explanation they might have carried was being printed
+    in the title instead, which is what made the titles too long to read.
+    """
     box = QWidget()
     lay = QVBoxLayout(box)
     lay.setContentsMargins(6, 4, 6, 6)
     lay.setSpacing(4)
-    lbl = QLabel(f"{tag}  {title}")
-    lbl.setStyleSheet(f"color:{FG};font-weight:bold;font-size:11px;")
-    lay.addWidget(lbl)
+    head = QHBoxLayout()
+    head.setContentsMargins(0, 0, 0, 0)
+    head.setSpacing(5)
+    head.addWidget(InfoButton(info, title=title))
+    lbl = QLabel(title)
+    lbl.setStyleSheet(f"color:{FG};font-weight:bold;")
+    head.addWidget(lbl)
+    head.addStretch(1)
+    lay.addLayout(head)
+    # No panel may set a width floor for the window: the stage is what has to
+    # fit the window, not the other way round.
+    inner.setMinimumSize(1, 1)
     lay.addWidget(inner, 1)
+    box.setMinimumSize(1, 1)
     box.setStyleSheet(f"background:{PANEL};border-radius:4px;")
     return box
 
@@ -171,9 +206,9 @@ class _SliderRow(QWidget):
         head = QHBoxLayout()
         head.setSpacing(4)
         self._name = QLabel(label)
-        self._name.setStyleSheet(f"color:{FG};font-size:10px;")
+        self._name.setStyleSheet(f"color:{FG};")
         self._value = QLabel("")
-        self._value.setStyleSheet(f"color:{DIM};font-size:10px;")
+        self._value.setStyleSheet(f"color:{theme.dim()};")
         self._value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         head.addWidget(self._name, 1)
         head.addWidget(self._value)
@@ -223,7 +258,7 @@ class _CastPanel(QScrollArea):
         self.setStyleSheet(f"background:{PANEL};border:none;")
         self._cards: dict[int, QLabel] = {}
         self._placeholder = QLabel("waiting for the first identification…")
-        self._placeholder.setStyleSheet(f"color:{DIM};font-size:11px;padding:8px;")
+        self._placeholder.setStyleSheet(f"color:{theme.dim()};padding:8px;")
         self._lay.insertWidget(0, self._placeholder)
 
     def update_frame(self, viz: VizFrame) -> None:
@@ -235,36 +270,36 @@ class _CastPanel(QScrollArea):
         sync = viz.frame.sync
         for i, entry in enumerate(leads):
             m = entry.mode
-            colour = MODE_COLORS[m % len(MODE_COLORS)]
+            colour = theme.mode_colors()[m % len(theme.mode_colors())]
             damp = (modal.damping[m] * 100.0
                     if modal.damping is not None and m < len(modal.damping) else float("nan"))
             s = float(sync[m]) if 0 <= m < sync.size else 0.0
             n_sing = int(viz.singing.get(entry.info.species, 0))
             supporters = [c.info.species for c in viz.cast
                           if c.mode == m and c.role == "chorus"]
-            state = ("▲ RESONANCE — resonance layer active, chorus phase-locked"
+            state = ("▲ RESONANCE: resonance layer active, chorus phase-locked"
                      if s > 0.6 else "scattered chorus, individuals free-running")
-            state_col = "#ff9f43" if s > 0.6 else DIM
+            state_col = theme.mode_colors()[1] if s > 0.6 else theme.dim()
             bar = int(round(s * 22))
             html = (
-                f"<div style='color:{colour};font-weight:bold;font-size:10px'>f{m+1}"
+                f"<div style='color:{colour};font-weight:bold'>f{m+1}"
                 f" &nbsp;·&nbsp; {type_label(entry.info.type or entry.info.group).upper()}"
                 f"</div>"
-                f"<div style='color:{FG};font-size:13px;font-style:italic;"
+                f"<div style='color:{FG};font-style:italic;"
                 f"font-weight:bold'>{entry.info.species}</div>"
-                f"<div style='color:{DIM};font-size:10px'>{entry.info.common or entry.info.group}"
+                f"<div style='color:{theme.dim()}'>{entry.info.common or entry.info.group}"
                 f" · carrier {entry.info.carrier:,.0f} Hz · {entry.info.license.upper()}</div>"
-                f"<div style='color:{FG};font-size:10px'>{entry.mode_freq:.2f} Hz"
+                f"<div style='color:{FG}'>{entry.mode_freq:.2f} Hz"
                 f" &nbsp; ζ={damp:.2f}% &nbsp;→ target {entry.target_carrier:,.0f} Hz</div>"
-                f"<div style='color:#7ee787;font-size:10px'>chirps at "
+                f"<div style='color:{theme.semantic('play')}'>chirps at "
                 f"{entry.mode_freq:.2f}/s &nbsp;(1:1, no transposition)</div>"
-                f"<div style='color:{FG};font-size:10px'>singing: {n_sing} individuals"
+                f"<div style='color:{FG}'>singing: {n_sing} individuals"
                 f" &nbsp;<span style='color:{colour}'>{'█'*bar}</span>"
-                f"<span style='color:{EDGE}'>{'█'*(22-bar)}</span>"
-                f" <span style='color:{DIM}'>sync {s:.2f}</span></div>"
-                f"<div style='color:{state_col};font-size:10px'>{state}</div>"
-                f"<div style='color:{DIM};font-size:9px'>with: "
-                f"{', '.join(supporters) if supporters else '—'}</div>"
+                f"<span style='color:{theme.edge()}'>{'█'*(22-bar)}</span>"
+                f" <span style='color:{theme.dim()}'>sync {s:.2f}</span></div>"
+                f"<div style='color:{state_col}'>{state}</div>"
+                f"<div style='color:{theme.dim()}'>with: "
+                f"{', '.join(supporters) if supporters else ', '}</div>"
             )
             card = self._cards.get(m)
             if card is None:
@@ -288,9 +323,9 @@ class _RadarPanel(pg.PlotWidget):
         super().__init__()
         _style_plot(self, "structural frequency (Hz)", "PSD")
         self.setLogMode(False, True)
-        self._curve = self.plot(pen=pg.mkPen("#5ac8fa", width=2))
+        self._curve = self.plot(pen=pg.mkPen(theme.MODE_COLORS[0], width=2))
         self._mode_lines: list[pg.InfiniteLine] = []
-        self._exc = pg.InfiniteLine(angle=90, pen=pg.mkPen("#ff6b6b", width=2))
+        self._exc = pg.InfiniteLine(angle=90, pen=pg.mkPen(theme.RECORD_ON_DARK, width=2))
         self.addItem(self._exc)
         self._region = pg.LinearRegionItem(values=(0, 0), movable=False,
                                            brush=pg.mkBrush(255, 107, 107, 40))
@@ -313,8 +348,10 @@ class _RadarPanel(pg.PlotWidget):
         while len(self._mode_lines) < freqs.size:
             i = len(self._mode_lines)
             ln = pg.InfiniteLine(angle=90, pen=pg.mkPen(
-                MODE_COLORS[i % len(MODE_COLORS)], width=1, style=Qt.DashLine),
-                label=f"f{i+1}", labelOpts={"color": MODE_COLORS[i % len(MODE_COLORS)],
+                theme.MODE_COLORS[i % len(theme.MODE_COLORS)], width=1,
+                style=Qt.DashLine),
+                label=f"f{i+1}",
+                labelOpts={"color": theme.MODE_COLORS[i % len(theme.MODE_COLORS)],
                                             "position": 0.92})
             self.addItem(ln)
             self._mode_lines.append(ln)
@@ -344,7 +381,7 @@ class _WaterfallPanel(pg.PlotWidget):
         self._curves = []
         for i in range(WATERFALL_SLICES):
             frac = i / max(WATERFALL_SLICES - 1, 1)
-            col = QColor("#ff9f43")
+            col = QColor(theme.MODE_COLORS[1])
             col.setAlphaF(0.16 + 0.84 * (1.0 - frac))
             c = self.plot(pen=pg.mkPen(col, width=1.2))
             c.setZValue(-i)
@@ -378,7 +415,8 @@ class _WaterfallPanel(pg.PlotWidget):
         while len(self._mode_lines) < freqs.size:
             i = len(self._mode_lines)
             ln = pg.InfiniteLine(angle=90, pen=pg.mkPen(
-                MODE_COLORS[i % len(MODE_COLORS)], width=1, style=Qt.DotLine))
+                theme.MODE_COLORS[i % len(theme.MODE_COLORS)], width=1,
+                style=Qt.DotLine))
             self.addItem(ln)
             self._mode_lines.append(ln)
         for i, ln in enumerate(self._mode_lines):
@@ -408,7 +446,7 @@ class _ScorePanel(pg.PlotWidget):
                               fillLevel=index, brush=pg.mkBrush(fill))
             short = name if len(name) <= 22 else (
                 name.split()[0][:1] + ". " + " ".join(name.split()[1:]))
-            label = pg.TextItem(f"{short}", color=DIM, anchor=(0, 0.5))
+            label = pg.TextItem(f"{short}", color=theme.DIM_ON_DARK, anchor=(0, 0.5))
             label.setFont(QFont("", 7))
             self.addItem(label)
             lane = {"curve": curve, "label": label, "values": [], "index": index}
@@ -457,39 +495,36 @@ class _ScorePanel(pg.PlotWidget):
         self.setYRange(0, max(len(tracked), 1))
 
 
-class _LegendPanel(QLabel):
-    """⑥ What am I hearing?"""
+def legend_html() -> str:
+    """What the voices mean n/a the ⑥ panel's content, now behind an info button.
 
-    def __init__(self) -> None:
-        super().__init__()
-        self.setTextFormat(Qt.RichText)
-        self.setWordWrap(True)
-        self.setAlignment(Qt.AlignTop)
-        rows = "".join(
+    It filled a whole cell of the 2×3 stage permanently while saying the same
+    thing on every run. Freeing that cell is what lets the live wireframe span
+    both rows.
+    """
+    rows = "".join(
             f"<tr><td style='padding:2px 6px 2px 0'>"
             f"<span style='background:{ROLE_COLORS[k]};color:{ROLE_COLORS[k]}'>"
             f"&nbsp;&nbsp;&nbsp;</span></td>"
-            f"<td style='color:{FG};font-size:10px;font-weight:bold'>{k}</td></tr>"
-            f"<tr><td></td><td style='color:{DIM};font-size:9px;padding-bottom:5px'>"
+            f"<td style='color:{FG};font-weight:bold'>{k}</td></tr>"
+            f"<tr><td></td><td style='color:{theme.dim()};padding-bottom:5px'>"
             f"{ROLE_MEANING[k]}</td></tr>"
             for k in ("lead", "chorus", "resonance", "torsion", "ambient"))
-        self.setText(
-            f"<table style='border-collapse:collapse'>{rows}</table>"
-            f"<div style='color:#5ac8fa;font-size:10px;font-weight:bold;"
+    return (f"<table style='border-collapse:collapse'>{rows}</table>"
+            f"<div style='color:{theme.ACCENT};font-weight:bold;"
             f"padding-top:6px'>CHANNELS</div>"
-            f"<div style='color:{DIM};font-size:9px'>driven axis → the modes and their "
+            f"<div style='color:{theme.dim()}'>driven axis → the modes and their "
             f"leads · other axis → the supporting chorus swells and widens · az → "
             f"ambient bed density · gx/gy → a rocking floor sings the drift voice · "
             f"gz → torsion. The shaker's own sensor is the excitation reference, "
             f"never a voice.</div>"
-            f"<div style='color:#ff9f43;font-size:10px;font-weight:bold;"
+            f"<div style='color:{theme.mode_colors()[1]};font-weight:bold;"
             f"padding-top:6px'>STRUCTURAL CHANGE</div>"
-            f"<div style='color:{DIM};font-size:9px'>Each mode sings as the animal "
+            f"<div style='color:{theme.dim()}'>Each mode sings as the animal "
             f"type you chose, and inside that type the mode's frequency picks the "
             f"species. If the structure softens its frequencies drop and the lead "
             f"moves to a lower-pitched species of the same type, so the species "
             f"composition is itself a readout.</div>")
-        self.setStyleSheet(f"background:{PANEL};padding:6px;")
 
 
 class BioacousticChorusTab(QWidget):
@@ -537,16 +572,24 @@ class BioacousticChorusTab(QWidget):
         tl = QHBoxLayout(bar)
         tl.setContentsMargins(10, 6, 10, 6)
         self._btn_start = QPushButton("▶  Start")
-        self._btn_start.setStyleSheet("color:#7ee787;font-weight:bold;")
+        self._btn_start.setStyleSheet(f"color:{theme.semantic('play')};font-weight:bold;")
         self._btn_start.clicked.connect(self._on_start)
         self._btn_stop = QPushButton("■  Stop")
         self._btn_stop.clicked.connect(self._on_stop)
         self._btn_capture = QPushButton("●  Capture WAV")
         self._btn_capture.setCheckable(True)
-        self._btn_capture.setStyleSheet("color:#ff6b6b;")
+        self._btn_capture.setStyleSheet(f"color:{theme.semantic('record')};")
         self._btn_capture.toggled.connect(self._on_capture)
         self._btn_snapshot = QPushButton("Save PNG")
         self._btn_snapshot.clicked.connect(self._on_snapshot)
+        # The ⑥ "What am I hearing?" panel used to hold this permanently in a
+        # cell of the stage. Same text, one click away, and the stage keeps the
+        # cell.
+        self._btn_legend = QPushButton("What am I hearing?")
+        self._btn_legend.setToolTip("What each voice means, and which channel drives it")
+        self._legend_info = InfoButton(legend_html(), title="What am I hearing?",
+                                       max_width=460)
+        self._btn_legend.clicked.connect(self._legend_info.click)
         # SOLO: the fastest way to learn which animal belongs to which mode
         self._solo_buttons = []
         # One button per eigenfrequency.
@@ -560,14 +603,24 @@ class BioacousticChorusTab(QWidget):
         for w in (self._btn_start, self._btn_stop, self._btn_capture):
             tl.addWidget(w)
         tl.addWidget(self._btn_snapshot)
+        tl.addWidget(self._btn_legend)
+        tl.addWidget(self._legend_info)
         tl.addSpacing(12)
         tl.addWidget(QLabel("Solo:"))
         for b in self._solo_buttons:
             tl.addWidget(b)
         tl.addStretch(1)
         self._status = QLabel("idle")
-        self._status.setStyleSheet("color:#ffd93d;font-size:11px;")
-        tl.addWidget(self._status)
+        self._status.setStyleSheet(f"color:{theme.semantic('status')};")
+        # The status text changes length on every update, and a plain QLabel
+        # makes its full width a layout minimum: the transport bar's minimum
+        # went 704 -> 1240 px when the live line appeared, and the window grew
+        # to match. Ignored means it never drives the width; the text is elided
+        # to whatever room it gets and the full line stays in the tooltip.
+        self._status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self._status.setMinimumWidth(0)
+        self._status_full = "idle"
+        tl.addWidget(self._status, 1)
         root.addWidget(bar)
 
         # controls + stage
@@ -591,15 +644,8 @@ class BioacousticChorusTab(QWidget):
         lay.setSpacing(8)
 
         # Where the sensors are — read-only, like every other tab.
-        self._map_summary = QLabel("")
-        self._map_summary.setWordWrap(True)
-        self._map_summary.setStyleSheet(f"color:{DIM};font-size:10px;")
-        map_box = QGroupBox("Sensor placement (from Settings)")
-        map_box.setStyleSheet(self._group_css())
-        mbl = QVBoxLayout(map_box)
-        mbl.setContentsMargins(4, 4, 4, 4)
-        mbl.addWidget(self._map_summary)
-        lay.addWidget(map_box)
+        # No placement panel here. The map is defined in Settings and
+        # shown there; repeating it in this tab only cost space.
 
         lay.addWidget(self._build_cast_box())
 
@@ -625,8 +671,8 @@ class BioacousticChorusTab(QWidget):
         self._btn_advanced = QPushButton("▸  Advanced")
         self._btn_advanced.setCheckable(True)
         self._btn_advanced.setStyleSheet(
-            f"QPushButton{{text-align:left;color:#5ac8fa;background:{PANEL};"
-            f"border:1px solid {EDGE};border-radius:4px;padding:5px;font-size:10px}}")
+            f"QPushButton{{text-align:left;color:{theme.accent()};background:{PANEL};"
+            f"border:1px solid {theme.edge()};border-radius:4px;padding:5px}}")
         self._advanced = QWidget()
         adv = QVBoxLayout(self._advanced)
         adv.setContentsMargins(0, 0, 0, 0)
@@ -643,13 +689,12 @@ class BioacousticChorusTab(QWidget):
         adv.addWidget(ident)
         lay.addStretch(1)
         scroll.setWidget(inner)
-        self._refresh_map_summary()
         return scroll
 
     @staticmethod
     def _group_css() -> str:
-        return (f"QGroupBox{{color:#5ac8fa;font-weight:bold;font-size:10px;"
-                f"border:1px solid {EDGE};border-radius:4px;margin-top:7px;"
+        return (f"QGroupBox{{color:{theme.accent()};font-weight:bold;"
+                f"border:1px solid {theme.edge()};border-radius:4px;margin-top:7px;"
                 f"padding:6px}}"
                 f"QGroupBox::title{{subcontrol-origin:margin;left:7px}}")
 
@@ -668,7 +713,7 @@ class BioacousticChorusTab(QWidget):
             if group == "Frequency map":
                 self._chk_autofit = QCheckBox("auto-fit to this structure")
                 self._chk_autofit.setChecked(self._cfg.autofit)
-                self._chk_autofit.setStyleSheet(f"color:{FG};font-size:10px;")
+                self._chk_autofit.setStyleSheet(f"color:{FG};")
                 self._chk_autofit.setToolTip(
                     "Fit the frequency ends to the structure's own modes, so each "
                     "animal type's whole species palette is used.\n"
@@ -689,7 +734,7 @@ class BioacousticChorusTab(QWidget):
         each type the species is still chosen by the structure's frequency, so
         the damage readout survives any combination the user picks.
         """
-        box = QGroupBox("Cast — who sings what")
+        box = QGroupBox("Cast: who sings what")
         box.setStyleSheet(self._group_css())
         grid = QGridLayout(box)
         grid.setContentsMargins(4, 4, 4, 4)
@@ -709,7 +754,7 @@ class BioacousticChorusTab(QWidget):
             for k in keys:
                 c.addItem(TYPES[k][0], k)
                 c.setItemData(c.count() - 1, TYPES[k][2], Qt.ToolTipRole)
-            c.setStyleSheet(f"font-size:10px;color:{FG};")
+            c.setStyleSheet(f"color:{FG};")
             return c
 
         def select(c: QComboBox, key: str) -> None:
@@ -726,7 +771,7 @@ class BioacousticChorusTab(QWidget):
             lbl = QLabel(f"f{m + 1}")
             lbl.setToolTip(f"Eigenfrequency {m + 1}: which animal type sings it. The "
                            f"frequency itself picks the species inside the type.")
-            lbl.setStyleSheet(f"color:{MODE_COLORS[m]};font-size:10px;font-weight:bold;")
+            lbl.setStyleSheet(f"color:{theme.mode_colors()[m]};font-weight:bold;")
             c = combo()
             select(c, types[min(m, len(types) - 1)] if types else keys[0])
             c.currentIndexChanged.connect(lambda _i, k=m: self._on_mode_type(k))
@@ -737,8 +782,8 @@ class BioacousticChorusTab(QWidget):
         self._case_type_combos: dict[str, QComboBox] = {}
         for r, (attr, label, tip) in enumerate(_CASE_SLOTS, start=N_FREQS):
             lbl = QLabel(label)
-            lbl.setStyleSheet(f"color:{ROLE_COLORS.get(attr.split('_')[0], DIM)};"
-                              f"font-size:10px;")
+            lbl.setStyleSheet(f"color:{theme.role_text(ROLE_COLORS.get(attr.split('_')[0], theme.dim()))};"
+                              f"")
             lbl.setToolTip(tip)
             c = combo(extra=("auto",) if attr == "ambient_type" else ())
             c.setToolTip(tip)
@@ -780,10 +825,30 @@ class BioacousticChorusTab(QWidget):
         self._spin_reid.setValue(self._cfg.reid_interval_s)
         self._spin_reid.valueChanged.connect(
             lambda v: self._on_knob("reid_interval_s", float(v)))
+        # The drive frequency decides which mode counts as resonating, and so
+        # when the resonance voice locks on. Without a base sensor it is read
+        # from the structure's response, which is a stand-in for the input, so
+        # the operator can state the real number instead.
+        self._spin_drive = QDoubleSpinBox()
+        self._spin_drive.setRange(0.0, 200.0)
+        self._spin_drive.setDecimals(2)
+        self._spin_drive.setSingleStep(0.1)
+        self._spin_drive.setSuffix(" Hz")
+        self._spin_drive.setSpecialValueText("auto (from data)")
+        self._spin_drive.setValue(float(self._cfg.exc_freq_hz_override))
+        self._spin_drive.setToolTip(
+            "The frequency the shaker is driving at.\n\n"
+            "Leave at auto to track it from the data. With no base sensor the "
+            "tracker reads the structure's response rather than the input, so "
+            "stating the real number makes the resonance voice lock on the "
+            "mode it should.")
+        self._spin_drive.valueChanged.connect(
+            lambda v: self._on_knob("exc_freq_hz_override", float(v)))
         # The axis combo is gone: the channel follows the excitation axis in the
         # Settings map, which is the direction the rig is actually shaken in.
         # Two places to set one physical fact is how they end up disagreeing.
         for r, (lbl, w) in enumerate((("modes", self._spin_modes),
+                                      ("drive", self._spin_drive),
                                       ("re-ID (s)", self._spin_reid))):
             il.addWidget(QLabel(lbl), r, 0)
             il.addWidget(w, r, 1)
@@ -799,22 +864,51 @@ class BioacousticChorusTab(QWidget):
         # ⑤ is the same live wireframe the Digital Twin and Model Updating use:
         # per-floor pose rebuilt from ax/ay/az/gz, rendered off the GUI thread.
         # It reads the controller itself, so it needs no frames from the worker.
-        self._structure = LiveStructureView(interval_ms=250)
+        self._structure = LiveStructureView(interval_ms=250, title="")
         self._structure.set_controller(self._controller)
         self._waterfall = _WaterfallPanel()
         self._score = _ScorePanel()
-        self._legend = _LegendPanel()
-        grid.addWidget(_titled("THE CAST — which species the structure chose",
-                               "①", self._cast_panel), 0, 0)
-        grid.addWidget(_titled("RESONANCE RADAR — where the energy is",
-                               "②", self._radar), 0, 1)
-        grid.addWidget(_titled("STRUCTURE — live wireframe (ax ay az gz)", "⑤",
-                               self._structure), 0, 2)
-        grid.addWidget(_titled("FREQUENCY INTERACTION — time × frequency × energy",
-                               "③", self._waterfall), 1, 0)
-        grid.addWidget(_titled("CHORUS SCORE — who is singing, and when",
-                               "④", self._score), 1, 1)
-        grid.addWidget(_titled("WHAT AM I HEARING?", "⑥", self._legend), 1, 2)
+        grid.addWidget(_titled(
+            "The cast",
+            "Which species the structure chose, and why.<br><br>"
+            "Each eigenfrequency is cast as one species of the animal type you "
+            "picked. The frequency decides which species: a lower frequency "
+            "picks a lower-pitched animal of the same type.<br><br>"
+            "If the structure softens, its frequencies drop and the lead moves "
+            "to a lower-pitched species, so the cast list is itself a reading.",
+            self._cast_panel), 0, 0)
+        grid.addWidget(_titled(
+            "Resonance radar",
+            "Where the energy sits across frequency.<br><br>"
+            "The red line marks the structural frequency under test. A peak "
+            "that climbs and narrows around it means the structure is being "
+            "driven at resonance, which is when the resonance voice locks on.",
+            self._radar), 0, 1)
+        grid.addWidget(_titled(
+            "Live structure",
+            "The real building, drawn where its sensors actually sit: floor for "
+            "height, plan cell for position, moving with the measured signal."
+            "<br><br>"
+            "What is drawn is filtered, doubly-integrated acceleration, "
+            "<b>not</b> measured displacement. Accelerometers cannot measure "
+            "displacement, and integrating twice without bound drifts; over a "
+            "short rolling window it is stable.<br><br>"
+            "Floors with no sensor are dashed and are never interpolated.",
+            self._structure), 0, 2, 2, 1)
+        grid.addWidget(_titled(
+            "Frequency interaction",
+            "Time against frequency against energy.<br><br>"
+            "Each slice is one spectrum, with the newest at the front. Reading "
+            "down the stack shows whether a peak is holding still, drifting, or "
+            "splitting as the structure is driven.",
+            self._waterfall), 1, 0)
+        grid.addWidget(_titled(
+            "Chorus score",
+            "Who is singing, and when.<br><br>"
+            "One lane per voice, read left to right in time. It is the score "
+            "the chorus is performing, so a gap is a voice that has stopped and "
+            "a dense lane is a mode carrying most of the energy.",
+            self._score), 1, 1)
         grid.setColumnStretch(0, 3)
         grid.setColumnStretch(1, 3)
         grid.setColumnStretch(2, 2)
@@ -878,28 +972,6 @@ class BioacousticChorusTab(QWidget):
             cap = layout.max_modes(int(self._spin_modes.value()))
             if layout.is_valid and cap < int(self._spin_modes.value()):
                 self._spin_modes.setValue(cap)
-        self._refresh_map_summary()
-
-    def _refresh_map_summary(self) -> None:
-        label = getattr(self, "_map_summary", None)
-        if label is None:
-            return
-        layout = slayout.layout_from_mapping(getattr(self, "_sensor_mapping", None))
-        if not layout.is_valid:
-            label.setText(
-                "<span style='color:#ffd93d'>No placement set.</span> The chorus "
-                "still sings, but every animal sits centre and the shaker is "
-                "treated as a floor. Set it in Settings → Sensor placement map.")
-            return
-        bits = [layout.describe()]
-        if layout.has_base:
-            bits.append(f"S{layout.base_sensor_id} is the shaker — excluded from "
-                        f"identification, so it cannot be heard as a mode")
-        bits.append("plan column → stereo position · floor → distance")
-        other = "ay" if layout.channel == "ax" else "ax"
-        bits.append(f"{layout.channel} → modes · {other} → cross-axis chorus · "
-                    f"az → ambient bed · gx/gy → rocking (drift) · gz → torsion")
-        label.setText(" · ".join(bits))
 
     def _on_knob(self, attr: str, value) -> None:
         if isinstance(value, (tuple, list)):
@@ -924,7 +996,7 @@ class BioacousticChorusTab(QWidget):
         self._btn_stop.setEnabled(running)
         self._btn_capture.setEnabled(running)
         if not streaming and not running:
-            self._status.setText("start the live stream first")
+            self._set_status("start the live stream first")
 
     @Slot()
     def on_stream_started(self) -> None:
@@ -978,7 +1050,7 @@ class BioacousticChorusTab(QWidget):
         thread.started.connect(lambda: self._req_start.emit(cfg))
         thread.start()
         self._drain.start()
-        self._status.setText("starting…")
+        self._set_status("starting…")
         self._update_enabled()
 
     def _on_stop(self) -> None:
@@ -1011,7 +1083,7 @@ class BioacousticChorusTab(QWidget):
             self._btn_capture.blockSignals(True)
             self._btn_capture.setChecked(False)
             self._btn_capture.blockSignals(False)
-            self._status.setText("stopped")
+            self._set_status("stopped")
             self._stopping = False
             self._update_enabled()
 
@@ -1021,7 +1093,7 @@ class BioacousticChorusTab(QWidget):
 
     @Slot()
     def _on_worker_started(self) -> None:
-        self._status.setText("listening — identifying modes…")
+        self._set_status("listening: identifying modes…")
         self._structure.start()
         self._update_enabled()
 
@@ -1032,7 +1104,7 @@ class BioacousticChorusTab(QWidget):
     @Slot(str)
     def _on_worker_error(self, message: str) -> None:
         logger.error("chorus: %s", message)
-        self._status.setText(message)
+        self._set_status(message)
         QMessageBox.warning(self, "Sonification", message)
         self._on_stop()
 
@@ -1084,6 +1156,24 @@ class BioacousticChorusTab(QWidget):
             self._stage.grab().save(path)
 
     # ------------------------------------------------------------------ frames
+    def _set_status(self, text: str) -> None:
+        """Show ``text``, elided to the room available, full text on hover."""
+        self._status_full = str(text)
+        self._status.setToolTip(self._status_full)
+        self._elide_status()
+
+    def _elide_status(self) -> None:
+        # Writes the widget directly. Going back through _set_status here would
+        # recurse, because that is what calls this.
+        width = max(self._status.width(), 80)
+        metrics = self._status.fontMetrics()
+        self._status.setText(
+            metrics.elidedText(self._status_full, Qt.ElideRight, width))
+
+    def resizeEvent(self, event):            # noqa: N802 (Qt naming)
+        super().resizeEvent(event)
+        self._elide_status()
+
     def _drain_queue(self) -> None:
         latest: VizFrame | None = None
         while True:
@@ -1093,18 +1183,31 @@ class BioacousticChorusTab(QWidget):
                 break
         if latest is None:
             return
-        try:
-            self._cast_panel.update_frame(latest)
-            self._radar.update_frame(latest)
-            self._waterfall.update_frame(latest)
-            self._score.update_frame(latest)
-        except Exception:
-            logger.debug("chorus: panel update failed", exc_info=True)
+        # One panel per try: these shared a single block, so when the cast
+        # panel raised, the radar, the waterfall and the score were never
+        # reached and the whole stage went blank with nothing on screen to say
+        # why. Logged at warning, because debug made it invisible.
+        for name, panel in (("cast", self._cast_panel), ("radar", self._radar),
+                            ("waterfall", self._waterfall), ("score", self._score)):
+            try:
+                panel.update_frame(latest)
+            except Exception:
+                logger.warning("chorus: %s panel failed to update", name,
+                               exc_info=True)
         extra = getattr(self, "_status_extra", {})
         bits = [latest.state_text]
         if extra:
             if extra.get("silent"):
                 bits.append("SILENT (install sensepi[sonification])")
+            # Identification window, tick window and modes found. A short
+            # window here is the difference between a quiet structure and a
+            # starved snapshot, and it used to be invisible.
+            id_s = float(extra.get("id_s", 0.0) or 0.0)
+            fast_s = float(extra.get("fast_s", 0.0) or 0.0)
+            n_modes = int(extra.get("n_modes", 0) or 0)
+            if id_s or fast_s:
+                bits.append(f"win {id_s:.0f}s/{fast_s:.1f}s")
+            bits.append(f"modes {n_modes}")
             bits.append(f"buffer {extra.get('buffer_s', 0):.2f}s")
             if extra.get("rate_hz"):
                 bits.append(f"{extra['rate_hz']:.1f} Hz in")
@@ -1115,7 +1218,7 @@ class BioacousticChorusTab(QWidget):
             ch = extra.get("channels") or ()
             if ch:
                 bits.append("+" + " ".join(ch))
-        self._status.setText("  ·  ".join(bits))
+        self._set_status("  ·  ".join(bits))
 
     def closeEvent(self, event) -> None:      # noqa: N802 (Qt naming)
         self._on_stop()

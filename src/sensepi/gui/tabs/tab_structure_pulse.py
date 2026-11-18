@@ -38,14 +38,17 @@ from ...sonification.structure_pulse import (BELL_TIMBRES, SCALE_MODES,
 
 logger = logging.getLogger(__name__)
 
-BG = "#12151a"
-PANEL = "#1a1f27"
-FG = "#e8eaed"
-DIM = "#8b93a1"
-EDGE = "#2b3440"
-ACCENT = "#5ac8fa"
-MODE_COLORS = ("#5ac8fa", "#7ee787", "#ff9f43", "#c792ea")
-TRACE_COLORS = ("#5ac8fa", "#7ee787", "#ff9f43", "#c792ea", "#ffd93d", "#e05c5c")
+# Chrome follows the operating system, like every other tab: BG is a Qt
+# palette role so the window colour is the native one, and the remaining
+# values are tuned for that native (light) chrome. The plot canvases stay
+# dark to match the Spectrum tab, so anything drawn ON a plot uses the
+# *_ON_DARK / PLOT_* values instead.
+from .. import theme
+BG = "palette(window)"
+PANEL = "palette(base)"
+FG = "palette(text)"
+# Mode labels sit on chrome; the traces are drawn on the dark plot.
+TRACE_COLORS = theme.MODE_COLORS
 
 PLAYHEAD_MS = 33            # ~30 fps; the playhead only reads a cursor
 #: Ticks of a frozen cursor before we conclude the output stream has died and
@@ -142,6 +145,7 @@ class StructurePulseTab(QWidget):
         self._silent = False
         self._last_pos = -1.0
         self._stall_ticks = 0
+        self._last_wrap_pos = 0.0
         self._live_worker = None
         self._live_thread: QThread | None = None
         self._live_next = None          # the render waiting to take over
@@ -199,7 +203,7 @@ class StructurePulseTab(QWidget):
         self._spin_record.setSuffix(" s")
         row.addWidget(self._spin_record)
         self._btn_record = QPushButton("●  Start recording")
-        self._btn_record.setStyleSheet("color:#ff6b6b;font-weight:bold;")
+        self._btn_record.setStyleSheet(f"color:{theme.semantic('record')};font-weight:bold;")
         self._btn_record.clicked.connect(self._on_record)
         row.addWidget(self._btn_record)
 
@@ -231,7 +235,7 @@ class StructurePulseTab(QWidget):
         row.addSpacing(14)
         self._btn_live = QPushButton("◉  Live")
         self._btn_live.setCheckable(True)
-        self._btn_live.setStyleSheet("color:#7ee787;font-weight:bold;")
+        self._btn_live.setStyleSheet(f"color:{theme.semantic('play')};font-weight:bold;")
         self._btn_live.setToolTip(
             "Record, analyse and play continuously. Each cycle is prepared "
             "while the previous one plays, so the sound keeps running and the "
@@ -245,6 +249,22 @@ class StructurePulseTab(QWidget):
         self._spin_live.setToolTip("Length of each live cycle")
         self._spin_live.valueChanged.connect(self._on_live_window)
         row.addWidget(self._spin_live)
+        # How many times one cycle is heard before the next replaces it. The
+        # capture length is what the structure gives us; this is how fast we
+        # read it back. At 1x a 10 s window is swept once over 10 s; at 5x it
+        # is swept in 2 s and repeats five times, which turns a slow structural
+        # drift into a figure short enough to hear as a shape.
+        self._spin_replay = QSpinBox()
+        self._spin_replay.setRange(1, 20)
+        self._spin_replay.setValue(1)
+        self._spin_replay.setPrefix("\u00d7 ")
+        self._spin_replay.setToolTip(
+            "Replays per cycle.\n\n"
+            "1 sweeps the window once, taking as long as the window itself. "
+            "Higher compresses the sweep and repeats it until the next cycle "
+            "is ready, so a 10 s window at \u00d75 is swept in 2 s, five times.")
+        self._spin_replay.valueChanged.connect(self._on_replay_changed)
+        row.addWidget(self._spin_replay)
 
         self._btn_save = QPushButton("Save session")
         self._btn_save.setToolTip(
@@ -261,7 +281,7 @@ class StructurePulseTab(QWidget):
         # past the window and pushed the text off the edge. On its own line it
         # can shrink to nothing and still say everything when there is room.
         self._status = QLabel("open a recording, or record from the live stream")
-        self._status.setStyleSheet("color:#ffd93d;font-size:11px;")
+        self._status.setStyleSheet(f"color:{theme.semantic('status')};")
         self._status.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self._status.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
         self._status.setMinimumWidth(0)
@@ -270,8 +290,8 @@ class StructurePulseTab(QWidget):
 
     @staticmethod
     def _group_css() -> str:
-        return (f"QGroupBox{{color:{ACCENT};font-weight:bold;font-size:10px;"
-                f"border:1px solid {EDGE};border-radius:4px;margin-top:7px;"
+        return (f"QGroupBox{{color:{theme.accent()};font-weight:bold;"
+                f"border:1px solid {theme.edge()};border-radius:4px;margin-top:7px;"
                 f"padding:6px}}"
                 f"QGroupBox::title{{subcontrol-origin:margin;left:7px}}")
 
@@ -318,9 +338,9 @@ class StructurePulseTab(QWidget):
         self._combo_scale.addItem("Auto (contour for records)", "auto")
         for m in SCALE_MODES:
             self._combo_scale.addItem(
-                {"envelope": "Envelope — smooth contour",
-                 "magnitude": "Magnitude — ignore sign",
-                 "signed": "Signed — the value itself"}.get(m, m), m)
+                {"envelope": "Envelope: smooth contour",
+                 "magnitude": "Magnitude: ignore sign",
+                 "signed": "Signed: the value itself"}.get(m, m), m)
         self._combo_scale.setToolTip(
             "What the pitch follows. A record swings through zero, so the raw "
             "value makes the pitch wobble with the waveform; the envelope "
@@ -336,7 +356,7 @@ class StructurePulseTab(QWidget):
         self._spin_smooth.setSuffix(" %")
         self._spin_smooth.setToolTip(
             "How much of the sweep the envelope is averaged over. A record's "
-            "contour wanders — a mode shape rises once and sounds like a "
+            "contour wanders: a mode shape rises once and sounds like a "
             "gesture. More smoothing turns one into the other.")
         self._spin_smooth.valueChanged.connect(self._on_dirty)
         g.addWidget(self._spin_smooth, 4, 1)
@@ -389,7 +409,7 @@ class StructurePulseTab(QWidget):
         self._combo_timbre = []
         for i in range(3):
             lbl = QLabel(f"f{i + 1}")
-            lbl.setStyleSheet(f"color:{MODE_COLORS[i]};font-weight:bold;font-size:10px;")
+            lbl.setStyleSheet(f"color:{theme.mode_colors()[i]};font-weight:bold;")
             c = QComboBox()
             for t in BELL_TIMBRES:
                 c.addItem(t, t)
@@ -437,7 +457,7 @@ class StructurePulseTab(QWidget):
         tl = QVBoxLayout(tr)
         tl.setContentsMargins(4, 4, 4, 4)
         self._btn_play = QPushButton("▶  Play")
-        self._btn_play.setStyleSheet("color:#7ee787;font-weight:bold;")
+        self._btn_play.setStyleSheet(f"color:{theme.semantic('play')};font-weight:bold;")
         self._btn_play.clicked.connect(self._on_play)
         self._btn_stop = QPushButton("■  Stop")
         self._btn_stop.clicked.connect(self._on_stop)
@@ -450,7 +470,7 @@ class StructurePulseTab(QWidget):
 
         self._info = QLabel("")
         self._info.setWordWrap(True)
-        self._info.setStyleSheet(f"color:{DIM};font-size:10px;")
+        self._info.setStyleSheet(f"color:{theme.dim()};")
         lay.addWidget(self._info)
         lay.addStretch(1)
         scroll.setWidget(inner)
@@ -463,15 +483,15 @@ class StructurePulseTab(QWidget):
         col.setSpacing(4)
 
         self._plot = pg.PlotWidget()
-        self._plot.setBackground(PANEL)
+        self._plot.setBackground(theme.PLOT_BG)
         for ax in ("left", "bottom"):
             a = self._plot.getAxis(ax)
-            a.setPen(pg.mkPen(EDGE))
-            a.setTextPen(pg.mkPen(DIM))
+            a.setPen(pg.mkPen(theme.PLOT_AXIS))
+            a.setTextPen(pg.mkPen(theme.DIM_ON_DARK))
         self._plot.showGrid(x=True, y=True, alpha=0.15)
         self._plot.addLegend(offset=(-10, 10))
         self._playhead = pg.InfiniteLine(angle=90, movable=False,
-                                         pen=pg.mkPen("#ffd93d", width=2))
+                                         pen=pg.mkPen(theme.STATUS_ON_DARK, width=2))
         self._playhead.setVisible(False)
         self._plot.addItem(self._playhead)
         col.addWidget(self._plot, 1)
@@ -479,7 +499,7 @@ class StructurePulseTab(QWidget):
         self._caption = QLabel("The plot is the score: the playhead sweeps left "
                                "to right and the curve's height becomes sound.")
         self._caption.setWordWrap(True)
-        self._caption.setStyleSheet(f"color:{DIM};font-size:10px;padding:2px 6px;")
+        self._caption.setStyleSheet(f"color:{theme.dim()};padding:2px 6px;")
         col.addWidget(self._caption)
         return wrap
 
@@ -575,7 +595,7 @@ class StructurePulseTab(QWidget):
             logger.exception("structure pulse: save failed")
             self._set_status(f"save failed: {exc}")
             return
-        raw_note = ("with its raw data — can be re-analysed later"
+        raw_note = ("with its raw data, can be re-analysed later"
                     if self._dataset.has_raw else "results only")
         self._set_status(f"saved {folder.name} ({raw_note})")
         self._refresh_sessions()
@@ -686,6 +706,18 @@ class StructurePulseTab(QWidget):
         cfg = replace(self._cfg)
         cfg.voice = str(self._combo_voice.currentData() or "pulsar")
         cfg.duration_s = float(self._spin_dur.value())
+        # Live: fit `replay` sweeps inside one capture window, so the cycle is
+        # heard that many times before the next one is ready.
+        if self._live_worker is not None:
+            replay = max(1, int(self._spin_replay.value()))
+            if replay > 1:
+                cfg.duration_s = max(1.0, float(self._spin_live.value()) / replay)
+            # Audify is deliberately NOT retimed to the slot. Its speed is
+            # what carries the structure into hearing range: the automatic
+            # factor puts a 2 Hz mode at ~220 Hz, and forcing a pass to last
+            # window/replay instead gives roughly x8, which lands it at 16 Hz
+            # where there is nothing to hear. It keeps its own speed and simply
+            # repeats until the next cycle arrives.
         cfg.bells = bool(self._chk_bells.isChecked())
         cfg.f_lo = float(self._spin_flo.value())
         cfg.f_hi = float(self._spin_fhi.value())
@@ -809,7 +841,7 @@ class StructurePulseTab(QWidget):
         for i, c in enumerate(view.curves):
             chk = QCheckBox(c.label or f"trace {i + 1}")
             chk.setStyleSheet(
-                f"color:{TRACE_COLORS[i % len(TRACE_COLORS)]};font-size:10px;")
+                f"color:{TRACE_COLORS[i % len(TRACE_COLORS)]};")
             chk.setChecked(i == 0)
             chk.toggled.connect(self._on_traces_changed)
             self._trace_lay.addWidget(chk)
@@ -843,7 +875,7 @@ class StructurePulseTab(QWidget):
         if view is None:
             want = str(self._combo_view.currentData() or "that view")
             self._set_status(
-                f"{want} is not available in this window — "
+                f"{want} is not available in this window, "
                 f"try a longer one" if self._live_worker is not None
                 else f"{want} is not in this recording")
             self._player.clear()
@@ -942,8 +974,8 @@ class StructurePulseTab(QWidget):
                 f"current window.")
             return
         self._plot.setLogMode(x=bool(view.x_log), y=False)
-        self._plot.setLabel("bottom", view.x_label, color=DIM, size="9pt")
-        self._plot.setLabel("left", view.y_label, color=DIM, size="9pt")
+        self._plot.setLabel("bottom", view.x_label, color=theme.DIM_ON_DARK, size="9pt")
+        self._plot.setLabel("left", view.y_label, color=theme.DIM_ON_DARK, size="9pt")
         for i, c in enumerate(view.curves):
             if not c.is_usable:
                 continue
@@ -951,8 +983,8 @@ class StructurePulseTab(QWidget):
             self._plot.plot(c.x, c.y, pen=pen, name=c.label or None)
         self._apply_stable_range(view)
         for mk in view.markers:
-            colour = (MODE_COLORS[mk.mode % len(MODE_COLORS)]
-                      if mk.mode >= 0 else DIM)
+            colour = (TRACE_COLORS[mk.mode % len(TRACE_COLORS)]
+                      if mk.mode >= 0 else theme.DIM_ON_DARK)
             line = pg.InfiniteLine(pos=self._plot_x(float(mk.x)), angle=90,
                                    movable=False,
                                    pen=pg.mkPen(colour, width=1,
@@ -1006,7 +1038,7 @@ class StructurePulseTab(QWidget):
             # in a playback path blocks the thread that is supposed to be
             # animating the playhead.
             self._set_status(
-                "no audio device — playhead runs silently "
+                "no audio device: playhead runs silently "
                 "(pip install -r requirements.txt for sound)")
         self._last_pos = -1.0
         self._stall_ticks = 0
@@ -1045,17 +1077,27 @@ class StructurePulseTab(QWidget):
                 self._stall_ticks += 1
                 if self._stall_ticks == STALL_TICKS:
                     logger.warning("structure pulse: output stalled, reopening")
-                    self._set_status("audio stalled — reopening the device")
+                    self._set_status("audio stalled: reopening the device")
                     if self._ensure_audio():
                         self._player.seek_seconds(t)
                         self._player.play(restart=False,
                                           loop=bool(self._chk_loop.isChecked()))
                     else:
-                        self._set_status("audio device lost — playing silently")
+                        self._set_status("audio device lost: playing silently")
             else:
                 self._stall_ticks = 0
             self._last_pos = t
         self._playhead.setPos(self._plot_x(self._render.x_at(t)))
+        # A repeating cycle never stops on its own, so the hand-over happens
+        # when the playhead wraps. Swapping mid-sweep would cut the sound in
+        # half; at the wrap the next cycle simply starts where this one ended.
+        if (self._live_worker is not None and self._live_next is not None
+                and self._player.is_playing and t + 0.05 < self._last_wrap_pos):
+            nxt, self._live_next = self._live_next, None
+            self._last_wrap_pos = 0.0
+            self._play_render(nxt)
+            return
+        self._last_wrap_pos = t
         if not self._player.is_playing:
             if self._live_worker is not None and self._live_next is not None:
                 nxt, self._live_next = self._live_next, None
@@ -1076,6 +1118,24 @@ class StructurePulseTab(QWidget):
     def _on_live_window(self, value: int) -> None:
         if self._live_worker is not None:
             self._live_worker.configure(window_s=float(value))
+            self._push_live_config()
+
+    def _on_replay_changed(self, _value: int) -> None:
+        """Replays per cycle changed: the next cycle is rendered to match.
+
+        The one already playing is left alone. Re-rendering it underneath the
+        playhead would cut the sound for a setting whose whole point is how the
+        sound is paced.
+        """
+        if self._live_worker is not None:
+            self._push_live_config()
+
+    def _push_live_config(self) -> None:
+        """Hand the worker the render settings the next cycle should use."""
+        if self._live_worker is None:
+            return
+        self._live_worker.configure(view_name=self._combo_view.currentText(),
+                                    config=self._current_config())
 
     def _start_live(self) -> None:
         streaming = False
@@ -1111,7 +1171,7 @@ class StructurePulseTab(QWidget):
         self._live_worker, self._live_thread = worker, thread
         thread.start()
         self._btn_live.setText("■  Stop live")
-        self._set_status("live — filling the first window…")
+        self._set_status("live: filling the first window…")
         self._update_enabled()
 
     def _stop_live(self, *, wait: bool = False) -> None:
@@ -1153,7 +1213,7 @@ class StructurePulseTab(QWidget):
             self._populate_views(self._dataset.view_names())
             self._rerender()
             self._set_status(
-                f"live stopped — holding the last {self._dataset.duration_s:.0f} s window")
+                f"live stopped: holding the last {self._dataset.duration_s:.0f} s window")
         self._update_enabled()
 
     def _set_status(self, text: str) -> None:
@@ -1189,7 +1249,7 @@ class StructurePulseTab(QWidget):
             # second and would otherwise wipe out the one message explaining
             # why nothing is sounding.
             want = str(self._combo_view.currentData() or "that view")
-            bits.append(f"{want} not in this window — try a longer one")
+            bits.append(f"{want} not in this window, try a longer one")
         self._set_status(" · ".join(bits))
 
     @Slot(object, object, int)
@@ -1236,7 +1296,13 @@ class StructurePulseTab(QWidget):
         self._ensure_audio()
         self._last_pos = -1.0
         self._stall_ticks = 0
-        self._player.play(restart=True, loop=False)
+        # Live always repeats. Any render shorter than the capture cycle would
+        # otherwise finish early and leave silence until the next one was
+        # ready, which is what made audify look broken: its length comes from
+        # the data, not from the Sweep box, so one pass can be under a second.
+        live_loop = self._live_worker is not None
+        self._player.play(restart=True,
+                          loop=live_loop or bool(self._chk_loop.isChecked()))
         self._playhead.setVisible(True)
         if not self._tick.isActive():
             self._tick.start()
@@ -1293,7 +1359,7 @@ class StructurePulseTab(QWidget):
             self._worker.abort()
         if self._live_worker is not None:
             self._stop_live()
-            self._set_status("stream stopped — live mode ended")
+            self._set_status("stream stopped: live mode ended")
 
     def shutdown(self) -> None:
         """Stop audio and any worker. Called by MainWindow on close."""

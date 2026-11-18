@@ -25,11 +25,15 @@ from .tab_structure_pulse import StructurePulseTab
 
 logger = logging.getLogger(__name__)
 
-BG = "#12151a"
-PANEL = "#1a1f27"
-FG = "#e8eaed"
-DIM = "#8b93a1"
-EDGE = "#2b3440"
+# Chrome follows the operating system, like every other tab: BG is a Qt
+# palette role so the window colour is the native one, and the remaining
+# values are tuned for that native (light) chrome. The plot canvases stay
+# dark to match the Spectrum tab, so anything drawn ON a plot uses the
+# *_ON_DARK / PLOT_* values instead.
+from .. import theme
+BG = "palette(window)"
+PANEL = "palette(base)"
+FG = "palette(text)"
 
 
 class SonificationTab(QWidget):
@@ -46,6 +50,14 @@ class SonificationTab(QWidget):
         self._tabs = QTabWidget()
         self._tabs.addTab(self.chorus_tab, self.tr("Bioacoustic Chorus"))
         self._tabs.addTab(self.pulse_tab, self.tr("Structure Pulse"))
+        # Two different models of the same measurement, so say which is which
+        # before the user has to open both to find out.
+        self._tabs.setTabToolTip(0, self.tr(
+            "The structure sings as a meadow of animals. Each eigenfrequency "
+            "becomes a species, and its chirp rate is that frequency."))
+        self._tabs.setTabToolTip(1, self.tr(
+            "A plotted result becomes a score. A playhead sweeps it left to "
+            "right and the height of the curve becomes sound."))
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 4, 0, 0)

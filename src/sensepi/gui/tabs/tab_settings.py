@@ -66,6 +66,9 @@ from ...config.app_config import (
 from ...config.sampling import RECORDING_MODES, SamplingConfig
 from ...remote.pi_config_sync_worker import PiConfigSyncWorker
 from ..config.acquisition_state import SensorSelectionConfig
+from ... import APP_NAME, __version__
+from .. import theme
+from ..widgets.info_button import InfoButton
 from ..widgets.sensor_map import SensorMapWidget
 
 # Fixed device sampling rate used by recording and streaming.
@@ -287,18 +290,23 @@ class SettingsTab(QWidget):
         sensors_layout.addWidget(mpu_group)
         self.btn_sync_pi = QPushButton("Sync Pi defaults (pi_config.yaml)", sensors_group)
         self.btn_sync_pi.setToolTip("Uploads generated pi_config.yaml to the selected Pi host")
-        sync_note = QLabel(
-            "Sync writes pi_config.yaml on the selected Pi (output_dir, sampling rate, "
-            "channels, DLPF). Only needed if you run the Pi scripts manually or want Pi "
-            "defaults updated.",
-            sensors_group,
-        )
-        sync_note.setWordWrap(True)
-        sensors_layout.addWidget(sync_note)
+        # What Sync does belongs next to the button, not printed above it on
+        # every run.
+        self.sync_info = InfoButton(
+            "<b>Sync Pi defaults</b> writes pi_config.yaml on the selected Pi: "
+            "the output directory, the sampling rate, the channels and the "
+            "DLPF setting.<br><br>"
+            "You only need it if you run the Pi scripts by hand, or if you want "
+            "the Pi's own defaults brought up to date. Normal recording from "
+            "this application does not depend on it.<br><br>"
+            "<b>Save sensors.yaml</b> writes the sensor defaults on this "
+            "computer. It does not touch the Pi.",
+            title="Writing settings to the Pi", parent=sensors_group)
 
         self.btn_save_sensors = QPushButton("Save sensors.yaml", sensors_group)
         buttons_sync_row = QHBoxLayout()
         buttons_sync_row.addStretch()
+        buttons_sync_row.addWidget(self.sync_info)
         buttons_sync_row.addWidget(self.btn_sync_pi)
         buttons_sync_row.addWidget(self.btn_save_sensors)
         sensors_layout.addLayout(buttons_sync_row)
@@ -337,6 +345,24 @@ class SettingsTab(QWidget):
 
         # keep groups at their natural height; the scroll area supplies the rest
         root.addStretch(1)
+
+        # Attribution, last on the tab and in a box of its own so it sits in the
+        # same rhythm as the sections above rather than floating under them.
+        about_group = QGroupBox("About", self)
+        about_layout = QVBoxLayout(about_group)
+        footer = QLabel(
+            f"{APP_NAME} \u00b7 version {__version__}<br>"
+            "Structural monitoring and digital twin platform<br>"
+            "\u00a9 2026 Chair of Advanced Structures, "
+            "Bauhaus-Universit\u00e4t Weimar",
+            about_group)
+        footer.setTextFormat(Qt.RichText)
+        footer.setAlignment(Qt.AlignCenter)
+        footer.setStyleSheet(f"color:{theme.dim()};")
+        # Selectable, so the attribution can be copied straight into a citation.
+        footer.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        about_layout.addWidget(footer)
+        root.addWidget(about_group)
         scroll.setWidget(content)
         outer.addWidget(scroll)
 
@@ -916,7 +942,7 @@ class SettingsTab(QWidget):
         bits = []
         if needed in missing:
             bits.append(f"the map says shaking along {smap.axis.upper()} → {needed}, "
-                        f"but the channel preset does not stream {needed} — every "
+                        f"but the channel preset does not stream {needed}, every "
                         f"analysis would run on zeros")
         if "gz" in missing:
             bits.append("gz is not streamed, so no torsion reading is possible")
